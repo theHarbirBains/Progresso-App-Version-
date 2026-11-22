@@ -1,40 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, type LayoutChangeEvent, type ViewInstance } from 'react-native';
-import { Text } from '../design/Text';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
+import { SkeletonCards } from '../design/Skeleton';
+import { Text } from '../design/Text';
 import { radii } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
+import { prCheer, showPrCheer } from '../notifications/reminderScheduler';
+import { useReminders } from '../notifications/remindersContext';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { STORY_CANVAS, STORY_CAPTURE, ShareStory, type CardRect } from '../sharing/ShareCard';
+import { STORY_CANVAS, STORY_CAPTURE, ShareStory } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
-import { SkeletonCards } from '../design/Skeleton';
-import { useProfile } from '../profile/ProfileProvider';
-import { useReminders } from '../notifications/remindersContext';
-import { prCheer, showPrCheer } from '../notifications/reminderScheduler';
+import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'ShareWorkout'>;
 
-/** The story's background shown around the card in the preview, in canvas points. */
-const PREVIEW_MARGIN = 14;
-/** How far the preview may enlarge the card: past this its text would start to soften. */
-const MAX_PREVIEW_SCALE = 1.4;
+/** How far the preview may enlarge the story: past this its text would start to soften. */
+const MAX_PREVIEW_SCALE = 1.2;
 
-// A finished workout as a story image (9:16) for Instagram, TikTok and the
-// like: the screen is just the card and Share. The story on screen IS
-// the view that gets captured (via cardRef) -- it is always laid out at its
-// one story size, so the image never depends on the device -- and the
-// preview shows the card itself, close up: the story is scaled so the card
-// (with a little of the background around it) fills the room above Share,
-// the rest of the canvas out of view. The image is made on the phone and only
-// leaves through the system share sheet, where the user picks the app (and
-// can also save it) -- nothing is uploaded. Opened as the workout is finished, a new PR in it is
-// cheered with a notification ("KEEP GOING, HARBIR!"), when PR Cheers is on.
+// A finished workout as a story image (9:16) for Instagram, TikTok and the like: the screen is the
+// image and two ways out with it -- Share (the one filled button), which opens the system share
+// sheet, and Save to Photos. The story on screen IS the view that gets captured (via storyRef):
+// always laid out at its one size (360x640pt, captured at 1080x1920), so the image never depends
+// on the device -- only the preview is scaled, to fill the room above the buttons. The image is
+// made on the phone and only leaves through the share sheet or into the person's own Photos --
+// nothing is uploaded. Opened as the workout is finished, a new PR in it is cheered with a
+// notification ("KEEP GOING, HARBIR!"), when PR Cheers is on; the achievements it earned wait
+// until this page is left (AchievementUnlockHost).
 export function ShareWorkoutScreen({ route, navigation }: Props) {
   const { workoutId, justFinished = false } = route.params;
   const { profile } = useProfile();
@@ -44,18 +43,20 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
+  // Through the holidays, the image is dressed for them too: lights, a hat, pines and a deer.
+  const { decorating } = useAppTheme();
 
-  const cardRef = useRef<ViewInstance>(null);
+  const storyRef = useRef<ViewInstance>(null);
 
   const [cardData, setCardData] = useState<ShareCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // The room above the button, and where the card sits on the story: the preview fits the card.
+  // The room above the buttons: the preview fills it.
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null);
-  const [cardRect, setCardRect] = useState<CardRect | null>(null);
 
-  const [sharing, setSharing] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'share' | 'save' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId || !accessToken) return;
@@ -90,19 +91,20 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
     setStage({ width, height });
   }
 
+  /** The story as a 1080x1920 PNG on the phone. */
+  async function captureStory(): Promise<string> {
+    if (!storyRef.current) throw new Error('The card is not ready yet');
+    return captureRef(storyRef, { ...STORY_CAPTURE, format: 'png', quality: 1 });
+  }
+
   async function handleShare() {
-    setShareError(null);
-    setSharing(true);
+    setActionError(null);
+    setSaved(false);
+    setBusy('share');
     try {
-      if (!cardRef.current) throw new Error('Card is not ready yet');
-      const uri = await captureRef(cardRef, {
-        ...STORY_CAPTURE,
-        format: 'png',
-        quality: 1,
-      });
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        setShareError('Sharing is not available on this device.');
+      const uri = await captureStory();
+      if (!(await Sharing.isAvailableAsync())) {
+        setActionError('Sharing is not available on this device.');
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png' });
@@ -110,9 +112,33 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
       // Covers real capture/share failures. Neither iOS nor Android reject
       // shareAsync's promise on a plain user dismissal of the share sheet,
       // so anything that does land here is a genuine failure, not a cancel.
-      setShareError(err instanceof Error ? err.message : 'Failed to share workout');
+      setActionError(err instanceof Error ? err.message : 'Failed to share workout');
     } finally {
-      setSharing(false);
+      setBusy(null);
+    }
+  }
+
+  // Saved into the person's own Photos, asking first. Full access is asked for (not add-only):
+  // the photo-library wording every build already carries covers it, so it can never be missing.
+  async function handleSave() {
+    setActionError(null);
+    setSaved(false);
+    setBusy('save');
+    try {
+      let permission = await MediaLibrary.getPermissionsAsync(false);
+      if (!permission.granted && permission.canAskAgain) {
+        permission = await MediaLibrary.requestPermissionsAsync(false);
+      }
+      if (!permission.granted) {
+        setActionError('Allow Progresso to use Photos in iPhone Settings to save the card.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(await captureStory());
+      setSaved(true);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to save the card');
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -149,33 +175,24 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
     );
   }
 
-  // What the preview shows: the card and a margin of the story around it -- the whole story until
-  // the card has been laid out -- as large as the room allows.
-  const region = cardRect
-    ? {
-        x: Math.max(0, cardRect.x - PREVIEW_MARGIN),
-        y: Math.max(0, cardRect.y - PREVIEW_MARGIN),
-        width: Math.min(STORY_CANVAS.width, cardRect.width + 2 * PREVIEW_MARGIN),
-        height: Math.min(STORY_CANVAS.height, cardRect.height + 2 * PREVIEW_MARGIN),
-      }
-    : { x: 0, y: 0, width: STORY_CANVAS.width, height: STORY_CANVAS.height };
+  // The whole image, as large as the room above the buttons allows.
   const scale = stage
     ? Math.min(
-        cardRect ? MAX_PREVIEW_SCALE : 1,
-        stage.width / region.width,
-        stage.height / region.height,
+        MAX_PREVIEW_SCALE,
+        stage.width / STORY_CANVAS.width,
+        stage.height / STORY_CANVAS.height,
       )
     : 0;
 
   return (
     <Screen scroll={false} contentContainerStyle={styles.content} header={header}>
       <View testID="share-card-stage" style={styles.stage} onLayout={handleStageLayout}>
-        {/* Scales the preview only: the story inside keeps its own size, so the captured image is the same on every phone. Rounded, the background shown around the card. */}
+        {/* Scales the preview only: the story inside keeps its own size, so the captured image is the same on every phone. */}
         <View
           testID="share-card-preview"
           style={{
-            width: region.width * scale,
-            height: region.height * scale,
+            width: STORY_CANVAS.width * scale,
+            height: STORY_CANVAS.height * scale,
             borderRadius: radii.lg,
             overflow: 'hidden',
             opacity: stage === null ? 0 : 1,
@@ -184,17 +201,16 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
           <View
             style={{
               position: 'absolute',
-              left: (STORY_CANVAS.width * scale - STORY_CANVAS.width) / 2 - region.x * scale,
-              top: (STORY_CANVAS.height * scale - STORY_CANVAS.height) / 2 - region.y * scale,
+              left: (STORY_CANVAS.width * scale - STORY_CANVAS.width) / 2,
+              top: (STORY_CANVAS.height * scale - STORY_CANVAS.height) / 2,
               transform: [{ scale }],
             }}
           >
             <ShareStory
-              storyRef={cardRef}
+              storyRef={storyRef}
               data={cardData}
               weightUnit={weightUnit}
-              accentColor={theme.accent}
-              onCardLayout={setCardRect}
+              festive={decorating}
             />
           </View>
         </View>
@@ -204,14 +220,23 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
         <PrimaryButton
           testID="share-workout-share"
           label="Share"
-          loading={sharing}
+          loading={busy === 'share'}
+          disabled={busy !== null}
           onPress={handleShare}
           accentColor={theme.accent}
           onAccentColor={theme.onAccent}
         />
-        {shareError ? (
+        <SecondaryButton
+          testID="share-workout-save"
+          label={saved ? 'Saved to Photos' : 'Save to Photos'}
+          icon={saved ? 'check' : 'download'}
+          loading={busy === 'save'}
+          disabled={busy !== null}
+          onPress={handleSave}
+        />
+        {actionError ? (
           <Text testID="share-workout-share-error" style={styles.actionError}>
-            {shareError}
+            {actionError}
           </Text>
         ) : null}
       </View>

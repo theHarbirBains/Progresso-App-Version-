@@ -2,10 +2,8 @@ import {
   CARDIO_INFO,
   cardioDetails,
   cardioName,
-  cardioTotals,
   type CardioActivity,
 } from '../cardio/cardioActivities';
-import { workoutTimes } from '../cardio/workoutTime';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import {
@@ -15,25 +13,35 @@ import {
   fetchRepRecord,
 } from '../workouts/prQueries';
 import { bestLoggedSet, loggedSets, setValuesOf } from '../workouts/setValues';
-import { computeDurationMinutes, resolveTopSetPrLabel } from '../workouts/topSetSummary';
+import {
+  computeDurationMinutes,
+  isLiveRecord,
+  resolveTopSetPrLabel,
+  type ExerciseRecords,
+} from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
   fetchWorkoutDetail,
   type CompletedSetRecord,
 } from '../workouts/workoutQueries';
 import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
+import { shareDisplayNames, shareTitle } from './shareNames';
 
 // Pure data assembly for the workout share card. Every value here comes from
 // an existing query/definition (workoutQueries.ts, prQueries.ts,
-// muscleGroups.ts) -- the same top-set (heaviest weightKg) and PR
-// (source_set_id match) definitions already used by WorkoutDetailScreen
-// (workouts/topSetSummary.ts). No new PR logic, no estimated 1RM,
-// no invented metrics. Rendering (ShareWorkoutScreen.tsx) and native
-// capture/share are deliberately kept out of this file.
+// muscleGroups.ts) -- the same top-set (bestLoggedSet), record (isLiveRecord,
+// source_set_id match) and duration definitions WorkoutDetailScreen uses
+// (workouts/topSetSummary.ts). No new PR logic, no estimated 1RM, no invented
+// metrics. Rendering (ShareCard.tsx) and native capture/share
+// (ShareWorkoutScreen.tsx) are deliberately kept out of this file.
 
 export interface ShareTopSet {
   exerciseName: string;
-  /** The exercise's machine photo, when it has one (most don't -- the card shows its initial instead). */
+  /** The name as the card shows it (sharing/shareNames.ts): never stored, never ambiguous. */
+  displayName: string;
+  /** "Top Set" for a weighted exercise, "Best Set" for a bodyweight one, "Longest" for a timed one. */
+  label: string;
+  /** The exercise's machine photo, when it has one. */
   photoUrl: string | null;
   /** What the exercise was logged as: its best set is the heaviest, the most reps, or the longest. */
   measurementType: MeasurementType;
@@ -47,54 +55,75 @@ export interface ShareTopSet {
   prLabel: string | null;
 }
 
-/** How many of an activity's figures the card shows: its time and the one after it. */
-const SHARE_CARDIO_FIGURES = 2;
-
-/** One cardio activity as the card draws it: its glyph, its name and its figures on one line. */
+/** One cardio activity as the card draws it: its glyph, its name and its figures. */
 export interface ShareCardio {
   activity: CardioActivity;
   icon: (typeof CARDIO_INFO)[CardioActivity]['icon'];
   name: string;
-  /**
-   * Its time and the next figure saved ("30 min · 5 km", "15 min · Level 8") -- the two that
-   * matter most, so a row always fits; in km for everyone, never calories.
-   */
+  /** "15 min · 3 km · Speed 6.5 · 5% incline" -- only what was saved, km for everyone, never calories. */
   figures: string;
+  durationSeconds: number;
 }
 
 export interface ShareCardData {
+  /** The workout's own name, as stored. */
   workoutName: string;
+  /** What the card is headed with: the workout's name, or what it trained when it has none. */
+  title: string;
   performedAt: string;
   musclesTrained: string;
-  durationMinutes: number | null;
   /**
-   * With cardio, the active training in minutes -- strength and cardio, never the session's rests
-   * and breaks (cardio/workoutTime.ts), which the card shows in Duration's place; null without.
+   * The workout's whole duration in minutes -- start to finish, so the cardio done in it is in it
+   * once -- or null when none was logged.
    */
-  activeMinutes: number | null;
+  durationMinutes: number | null;
   /** Every cardio activity, in the order it was done. Empty without cardio. */
   cardio: ShareCardio[];
-  /** All the cardio's time, in seconds, and the distance of the ones with one (null with none). */
+  /** All the cardio's time, in seconds. */
   cardioSeconds: number;
-  cardioDistanceM: number | null;
   /** Exercises with at least one logged set -- never one that was only planned. */
   exerciseCount: number;
-  /** Sets actually logged (completed) -- never planned or blank ones. */
+  /** Sets actually logged (completed) -- never planned or blank ones, warm-ups or drops. */
   totalSets: number;
   /** Sum of weight x reps over the logged sets of weighted exercises, in canonical kilograms; the card converts it to the user's unit. Never estimated. */
   totalVolumeKg: number;
-  /**
-   * Every exercise's top set, in the workout's existing order -- never
-   * re-sorted by weight. All of them, not just the few the card lists, so the
-   * card's personal-record count covers the whole workout.
-   */
+  /** How many of its logged sets are CURRENTLY records -- as its own page counts them. */
+  recordCount: number;
+  /** Every exercise's top set, in the order the workout did them. */
   topSets: ShareTopSet[];
 }
+
+/** An exercise's live records: rep PRs and the 1RM for a weighted one, else its most reps or longest. */
+async function recordsFor(
+  userId: string,
+  exerciseId: string,
+  type: MeasurementType,
+): Promise<ExerciseRecords> {
+  if (type === 'weight_reps') {
+    const [repPRs, oneRepMax] = await Promise.all([
+      fetchRepPRs(userId, exerciseId),
+      fetchOneRepMax(userId, exerciseId),
+    ]);
+    return { repPRs, oneRepMax, record: null };
+  }
+  const record =
+    type === 'timed'
+      ? await fetchDurationRecord(userId, exerciseId)
+      : await fetchRepRecord(userId, exerciseId);
+  return { repPRs: [], oneRepMax: null, record };
+}
+
+const TOP_SET_LABELS: Record<MeasurementType, string> = {
+  weight_reps: 'Top Set',
+  bodyweight: 'Best Set',
+  timed: 'Longest',
+};
 
 /**
  * Assembles the share card's data. Throws if the workout is not completed --
  * sharing an in-progress workout is never allowed, so there is no
- * "incomplete workout" return shape for callers to accidentally render.
+ * "incomplete workout" return shape for callers to accidentally render. Only
+ * the workout's own exercises and sets: in a group, the person's own workout.
  */
 export async function fetchShareCardData(
   workoutId: string,
@@ -105,87 +134,72 @@ export async function fetchShareCardData(
     throw new Error('Only completed workouts can be shared');
   }
 
-  const musclesTrained = Array.from(
+  const muscles = Array.from(
     new Set(detail.exercises.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
-  ).join(', ');
+  );
 
-  const durationMinutes = computeDurationMinutes(detail.performedAt, detail.completedAt);
-
-  const topSets = (
+  const done = (
     await Promise.all(
-      detail.exercises.map(async (exercise): Promise<ShareTopSet | null> => {
+      detail.exercises.map(async (exercise) => {
         const type = measurementTypeOf(exercise);
         const topSet = bestLoggedSet(exercise.sets, type);
         if (!topSet) return null;
-
-        let prLabel: string | null;
-        if (type === 'weight_reps') {
-          const [repPRs, oneRepMax] = await Promise.all([
-            fetchRepPRs(userId, exercise.exerciseId),
-            fetchOneRepMax(userId, exercise.exerciseId),
-          ]);
-          prLabel = resolveTopSetPrLabel(topSet as CompletedSetRecord, repPRs, oneRepMax);
-        } else {
-          // A bodyweight or timed exercise's record: the most reps, the longest time.
-          const record =
-            type === 'timed'
-              ? await fetchDurationRecord(userId, exercise.exerciseId)
-              : await fetchRepRecord(userId, exercise.exerciseId);
-          prLabel = record?.sourceSetId === topSet.id ? 'PR' : null;
-        }
-
-        const { weightKg, reps, durationSeconds } = setValuesOf(topSet, type);
-        return {
-          exerciseName: exercise.exerciseName,
-          photoUrl: exercise.photoUrl ?? null,
-          measurementType: type,
-          weightKg,
-          reps,
-          durationSeconds,
-          prLabel,
-        };
+        const records = await recordsFor(userId, exercise.exerciseId, type);
+        const prLabel =
+          type === 'weight_reps'
+            ? resolveTopSetPrLabel(topSet as CompletedSetRecord, records.repPRs, records.oneRepMax)
+            : records.record?.sourceSetId === topSet.id
+              ? 'PR'
+              : null;
+        const recordSets = loggedSets(exercise.sets, type).filter((set) =>
+          isLiveRecord(set, type, records),
+        ).length;
+        return { exercise, type, topSet, prLabel, recordSets };
       }),
     )
-  ).filter((entry): entry is ShareTopSet => entry !== null);
+  ).filter((entry) => entry !== null);
+
+  const displayNames = shareDisplayNames(done.map(({ exercise }) => exercise.exerciseName));
+  const topSets: ShareTopSet[] = done.map(({ exercise, type, topSet, prLabel }, index) => {
+    const { weightKg, reps, durationSeconds } = setValuesOf(topSet, type);
+    return {
+      exerciseName: exercise.exerciseName,
+      displayName: displayNames[index],
+      label: TOP_SET_LABELS[type],
+      photoUrl: exercise.photoUrl ?? null,
+      measurementType: type,
+      weightKg,
+      reps,
+      durationSeconds,
+      prLabel,
+    };
+  });
 
   const logged = detail.exercises.map((e) => loggedSets(e.sets, measurementTypeOf(e)));
-  const exerciseCount = logged.filter((sets) => sets.length > 0).length;
-  const totalSets = logged.reduce((sum, sets) => sum + sets.length, 0);
-  // Its cardio, each activity a row of its own, and its time told apart from the session's.
   const cardioEntries = detail.cardio ?? [];
-  const times = workoutTimes({
-    performedAt: detail.performedAt,
-    completedAt: detail.completedAt,
-    strengthEndedAt: detail.strengthEndedAt,
-    hasStrength: totalSets > 0,
-    cardio: cardioEntries,
-  });
-  const totals = cardioTotals(cardioEntries);
-  // Volume is weight x reps: weighted exercises only.
+  // Volume is weight x reps: weighted exercises only, drop sets included.
   const weightedSets = detail.exercises
     .filter((e) => measurementTypeOf(e) === 'weight_reps')
     .flatMap((e) => completedSetsOnly(e.sets));
 
   return {
     workoutName: detail.name,
+    title: shareTitle(detail.name, muscles, cardioEntries.length > 0),
     performedAt: detail.performedAt,
-    musclesTrained,
-    durationMinutes,
-    activeMinutes:
-      cardioEntries.length > 0 && times.activeSeconds !== null
-        ? Math.round(times.activeSeconds / 60)
-        : null,
+    musclesTrained: muscles.join(', '),
+    durationMinutes: computeDurationMinutes(detail.performedAt, detail.completedAt),
     cardio: cardioEntries.map((entry) => ({
       activity: entry.activity,
       icon: CARDIO_INFO[entry.activity].icon,
       name: cardioName(entry),
-      figures: cardioDetails(entry).split(' · ').slice(0, SHARE_CARDIO_FIGURES).join(' · '),
+      figures: cardioDetails(entry),
+      durationSeconds: entry.durationSeconds,
     })),
-    cardioSeconds: totals.seconds,
-    cardioDistanceM: totals.distanceM,
-    exerciseCount,
-    totalSets,
+    cardioSeconds: cardioEntries.reduce((sum, entry) => sum + entry.durationSeconds, 0),
+    exerciseCount: logged.filter((sets) => sets.length > 0).length,
+    totalSets: logged.reduce((sum, sets) => sum + sets.length, 0),
     totalVolumeKg: computeLifetimeVolumeKg(weightedSets),
+    recordCount: done.reduce((sum, entry) => sum + entry.recordSets, 0),
     topSets,
   };
 }

@@ -54,7 +54,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Progresso uses your photo library to let you set a profile picture or a machine photo.",
+          "photosPermission": "Progresso uses your photo library to let you set a profile picture or a machine photo, and to save your workout cards.",
           "cameraPermission": "Progresso uses your camera to scan food barcodes and let you take a profile or machine photo."
         }
       ],

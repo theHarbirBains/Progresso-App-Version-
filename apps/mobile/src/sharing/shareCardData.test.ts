@@ -82,20 +82,94 @@ describe('fetchShareCardData', () => {
         activity: 'outdoor_run',
         icon: 'wind',
         name: 'Outdoor Running',
-        figures: '15 min · 2.5 km',
+        // Every figure it recorded, never calories.
+        figures: '15 min · 2.5 km · 6:00 /km',
+        durationSeconds: 900,
       },
     ]);
-    // 40 minutes of lifting and the 15-minute run: 55, never the hour the session took.
-    expect(result.activeMinutes).toBe(55);
     expect(result.cardioSeconds).toBe(900);
-    expect(result.cardioDistanceM).toBe(2500);
+    // The duration is the whole workout, start to finish: the run is in it once, never added on.
+    expect(result.durationMinutes).toBe(60);
+    // Cardio is never a set or volume.
+    expect(result.totalSets).toBe(1);
   });
 
-  it('has no cardio or active time for a workout without cardio', async () => {
+  it('has no cardio for a workout without cardio', async () => {
     const result = await fetchShareCardData('w1', 'user-1');
 
     expect(result.cardio).toEqual([]);
-    expect(result.activeMinutes).toBeNull();
+    expect(result.cardioSeconds).toBe(0);
+  });
+
+  it('counts every logged set that is a record now, as the workout page does', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        exercises: [
+          exercise({
+            sets: [
+              { id: 's1', setIndex: 1, weightKg: 100, reps: 8 },
+              { id: 's2', setIndex: 2, weightKg: 90, reps: 10 },
+              { id: 's3', setIndex: 3, weightKg: 110, reps: 1 },
+            ],
+          }),
+        ],
+      }),
+    );
+    mockFetchRepPRs.mockResolvedValue([
+      { reps: 8, weightKg: 100, sourceSetId: 's1' },
+      { reps: 10, weightKg: 95, sourceSetId: 'older' },
+    ]);
+    mockFetchOneRepMax.mockResolvedValue({ weightKg: 110, sourceSetId: 's3' });
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    // The 8-rep PR and the true 1RM; the 10-rep set isn't the record any more.
+    expect(result.recordCount).toBe(2);
+  });
+
+  it('names each top set as the card shows it, never ambiguously, and says what kind it is', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        exercises: [
+          exercise({
+            id: 'we1',
+            exerciseId: 'ex1',
+            exerciseName: 'Machine Shoulder Press (Double Stack)',
+          }),
+          exercise({ id: 'we2', exerciseId: 'ex2', exerciseName: 'Leg Press (Wide)' }),
+          exercise({ id: 'we3', exerciseId: 'ex3', exerciseName: 'Leg Press (Narrow)' }),
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.topSets.map((set) => set.displayName)).toEqual([
+      'Machine Shoulder Press',
+      'Leg Press (Wide)',
+      'Leg Press (Narrow)',
+    ]);
+    expect(result.topSets[0]).toMatchObject({
+      exerciseName: 'Machine Shoulder Press (Double Stack)',
+      label: 'Top Set',
+    });
+  });
+
+  it('titles a workout without a name of its own by what it trained', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        name: 'Workout',
+        exercises: [
+          exercise({ id: 'we1', exerciseId: 'ex1', muscleGroup: 'shoulders' }),
+          exercise({ id: 'we2', exerciseId: 'ex2', muscleGroup: 'biceps' }),
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.title).toBe('Shoulders & Biceps');
+    expect(result.workoutName).toBe('Workout');
   });
 
   it('returns the workout name, date, and muscles trained', async () => {
@@ -157,6 +231,8 @@ describe('fetchShareCardData', () => {
     expect(result.topSets).toEqual([
       {
         exerciseName: 'Bench Press',
+        displayName: 'Bench Press',
+        label: 'Top Set',
         photoUrl: null,
         measurementType: 'weight_reps',
         weightKg: 110,
@@ -271,6 +347,8 @@ describe('fetchShareCardData', () => {
 
     expect(result.topSets[0]).toEqual({
       exerciseName: 'Bench Press',
+      displayName: 'Bench Press',
+      label: 'Top Set',
       photoUrl: null,
       measurementType: 'weight_reps',
       weightKg: 500.5,

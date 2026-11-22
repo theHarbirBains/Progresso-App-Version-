@@ -89,6 +89,8 @@ describe('prCheer', () => {
   function topSet(overrides: Partial<ShareTopSet>): ShareTopSet {
     return {
       exerciseName: 'Lat Pulldown',
+      displayName: 'Lat Pulldown',
+      label: 'Top Set',
       photoUrl: null,
       measurementType: 'weight_reps',
       weightKg: 63.5,

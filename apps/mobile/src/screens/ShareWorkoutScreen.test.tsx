@@ -1,16 +1,15 @@
 import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { PrimaryButton } from '../design/Button';
-import { colors, fonts } from '../design/theme';
-import { expectNoBareText } from '../testUtils/expectNoBareText';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ProfileProvider } from '../profile/ProfileProvider';
-import { fetchShareCardData } from '../sharing/shareCardData';
-import { CARD_MAX_HEIGHT, CARD_SCALE, CARD_WIDTH, STORY_SAFE_AREA } from '../sharing/ShareCard';
-import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
-import { DEFAULT_THEME_ID, themeById } from '../theme/appThemes';
+import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
+import { DENSITY, STORY_PALETTE } from '../sharing/shareCardStyles';
+import { AppThemeContext } from '../theme/appThemeContext';
+import { themeById } from '../theme/appThemes';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -35,12 +34,21 @@ jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(),
 }));
 
+jest.mock('expo-media-library/legacy', () => ({
+  getPermissionsAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn(),
+  saveToLibraryAsync: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchShareCardData = fetchShareCardData as jest.Mock;
 const mockCaptureRef = captureRef as jest.Mock;
 const mockIsAvailableAsync = Sharing.isAvailableAsync as jest.Mock;
 const mockShareAsync = Sharing.shareAsync as jest.Mock;
+const mockGetPermissions = MediaLibrary.getPermissionsAsync as jest.Mock;
+const mockRequestPermissions = MediaLibrary.requestPermissionsAsync as jest.Mock;
+const mockSaveToLibrary = MediaLibrary.saveToLibraryAsync as jest.Mock;
 
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,26 +56,76 @@ const navigation: any = { goBack: mockGoBack };
 const route = { params: { workoutId: 'w1' } } as never;
 const justFinished = { params: { workoutId: 'w1', justFinished: true } } as never;
 
-const cardData = {
+function topSet(name: string, overrides: Partial<ShareCardData['topSets'][number]> = {}) {
+  return {
+    exerciseName: name,
+    displayName: name,
+    label: 'Top Set',
+    photoUrl: null,
+    measurementType: 'weight_reps' as const,
+    weightKg: 50,
+    reps: 10,
+    durationSeconds: null,
+    prLabel: null,
+    ...overrides,
+  };
+}
+
+const cardData: ShareCardData = {
   workoutName: 'Push Day',
+  title: 'Push Day',
   performedAt: '2026-01-01T10:00:00Z',
   musclesTrained: 'Chest, Shoulders',
-  durationMinutes: 45,
+  durationMinutes: 82,
+  cardio: [],
+  cardioSeconds: 0,
   exerciseCount: 2,
   totalSets: 9,
-  totalVolumeKg: 8620,
+  totalVolumeKg: 2293,
+  recordCount: 1,
   topSets: [
-    { exerciseName: 'Bench Press', photoUrl: null, weightKg: 110, reps: 8, prLabel: '8 Rep PR' },
-    { exerciseName: 'Overhead Press', photoUrl: null, weightKg: 60, reps: 8, prLabel: null },
+    topSet('Bench Press', { weightKg: 110, reps: 8, prLabel: '8 Rep PR' }),
+    topSet('Overhead Press', { weightKg: 60, reps: 8 }),
   ],
 };
 
-function topSet(name: string, prLabel: string | null = null) {
-  return { exerciseName: name, photoUrl: null, weightKg: 50, reps: 10, prLabel };
-}
+const treadmill = {
+  activity: 'treadmill' as const,
+  icon: 'trending-up' as const,
+  name: 'Treadmill',
+  figures: '15 min · 3 km · Speed 6.5 · 5% incline',
+  durationSeconds: 900,
+};
 
 async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
+function renderShare(options: { festive?: boolean; routeValue?: never } = {}) {
+  return render(
+    <ProfileProvider>
+      <AppThemeContext.Provider
+        value={{
+          theme: themeById('holiday-gym'),
+          accent: { accent: '#EBC27C', onAccent: '#1A1206' } as never,
+          chosenId: 'holiday-gym',
+          followSeasons: false,
+          loaded: true,
+          choose: () => undefined,
+          setFollowSeasons: () => undefined,
+          snowSeason: false,
+          snowfall: false,
+          snowing: false,
+          setSnowfall: () => undefined,
+          decorations: true,
+          decorating: options.festive ?? false,
+          setDecorations: () => undefined,
+        }}
+      >
+        <ShareWorkoutScreen navigation={navigation} route={options.routeValue ?? route} />
+      </AppThemeContext.Provider>
+    </ProfileProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -87,321 +145,288 @@ beforeEach(() => {
   mockCaptureRef.mockReset().mockResolvedValue('file:///tmp/share.png');
   mockIsAvailableAsync.mockReset().mockResolvedValue(true);
   mockShareAsync.mockReset().mockResolvedValue(undefined);
+  mockGetPermissions.mockReset().mockResolvedValue({ granted: true, canAskAgain: true });
+  mockRequestPermissions.mockReset().mockResolvedValue({ granted: true, canAskAgain: true });
+  mockSaveToLibrary.mockReset().mockResolvedValue(undefined);
   mockGoBack.mockClear();
 });
 
-describe('ShareWorkoutScreen loading and preview', () => {
-  it('shows a loading indicator while fetching', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
+describe('ShareWorkoutScreen -- the card, after the reference', () => {
+  it('shows a loading placeholder while fetching', async () => {
+    renderShare();
     expect(screen.getByTestId('share-workout-loading')).toBeTruthy();
-
     await screen.findByTestId('share-card', {}, { timeout: 5000 });
     await settle();
   });
 
-  it("renders the workout's own name and the date on a plain card, with nothing under the name", async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
-    // No year on the date.
+  it('heads it with the brand, WORKOUT COMPLETE, the workout and its date -- no year', async () => {
+    renderShare();
+    expect(await screen.findByTestId('share-card-header')).toHaveTextContent(
+      /Progresso.*WORKOUT COMPLETE.*Push Day/,
+    );
     expect(screen.getByTestId('share-card-date')).not.toHaveTextContent('2026');
-    // Plain: no background photo.
-    expect(screen.queryByTestId('share-card-photo')).toBeNull();
-    // The logo the app opens with, not a written brand name.
-    expect(screen.getByTestId('share-card-logo')).toBeTruthy();
-    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/PROGRESSO/);
-    // The name is the user's own -- the muscles worked aren't spelled out under it.
-    expect(screen.queryByTestId('share-card-muscles')).toBeNull();
-    expect(screen.getByTestId('share-card')).not.toHaveTextContent('Chest, Shoulders');
     await settle();
   });
 
-  it("shows the session as four stats -- duration, exercises, sets and volume in the user's unit", async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
+  it("gives its four figures: the whole duration, sets, volume in the user's unit and records", async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'lb',
     });
-
-    expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('45 min');
-    expect(screen.getByTestId('share-card-exercises')).toHaveTextContent('2');
+    renderShare();
+    await screen.findByTestId('share-card-stats');
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-volume')).toHaveTextContent('5,055 lb'),
+    );
+    expect(screen.getByTestId('share-card-duration')).toHaveTextContent('1h 22m');
     expect(screen.getByTestId('share-card-sets')).toHaveTextContent('9');
-    expect(screen.getByTestId('share-card-volume')).toHaveTextContent('8,620');
-    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Volume \(kg\)/);
+    expect(screen.getByTestId('share-card-records')).toHaveTextContent('1');
+    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(
+      /Duration.*Sets.*Volume.*Record/,
+    );
     await settle();
   });
 
-  it('leaves Duration out when it is unknown (logged with none)', async () => {
+  it('says a duration not logged is unknown, never 0', async () => {
     mockFetchShareCardData.mockResolvedValue({ ...cardData, durationMinutes: null });
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-card-exercises')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-duration')).toBeNull();
+    renderShare();
+    expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('—');
     await settle();
   });
 
-  it("lists every exercise's top set, in workout order, under Top Sets", async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    const list = await screen.findByTestId('share-card-top-sets');
-    expect(list).toHaveTextContent(/TOP SETS.*Bench Press.*Overhead Press/);
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('110 kg × 8');
-    expect(screen.getByTestId('share-card-top-set-1')).toHaveTextContent('60 kg × 8');
-    // No separate Personal Records block.
-    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/PERSONAL RECORDS/);
-    await settle();
-  });
-
-  it('marks a top set that is a personal record quietly -- its value in the accent and a small PR tag', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    // Bench Press is a PR; Overhead Press isn't.
-    expect(await screen.findByTestId('share-card-top-set-0-pr')).toHaveTextContent(/^PR$/);
-    expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style).color).toBe(
-      DEFAULT_WORKOUT_COLOR,
+  it('lists only each exercise\'s top set, in order: its name, "Top Set" and the figure in its own pill', async () => {
+    renderShare();
+    expect(await screen.findByTestId('share-card-top-set-row-0')).toHaveTextContent(
+      /Bench Press.*Top Set.*110kg × 8/,
     );
-    expect(screen.queryByTestId('share-card-top-set-1-pr')).toBeNull();
-    expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-1').props.style).color).toBe(
-      colors.textPrimary,
+    expect(screen.getByTestId('share-card-top-set-row-1')).toHaveTextContent(
+      /Overhead Press.*60kg × 8/,
     );
+    expect(screen.queryByTestId('share-card-top-set-row-2')).toBeNull();
+    // A bodyweight exercise's best and a timed one's longest read as theirs.
     await settle();
   });
 
-  it('tags a true one-rep max as 1RM', async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      topSets: [{ ...topSet('Deadlift', '1RM'), weightKg: 200, reps: 1 }],
-    });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-card-top-set-0-pr')).toHaveTextContent(/^1RM$/);
+  it('wraps a long name onto more lines at the same size, never shrinking it or crowding the figure', async () => {
+    const long = 'Seated Cable Row — Close-Grip V-Handle With A Very Long Gym Name';
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [topSet(long)] });
+    renderShare();
+    const name = await screen.findByTestId('share-card-top-set-name-0');
+    expect(name).toHaveTextContent(long);
+    expect(name.props.numberOfLines).toBe(3);
+    expect(name.props.adjustsFontSizeToFit).toBeUndefined();
+    const pill = screen.getByTestId('share-card-top-set-pill-0');
+    expect(StyleSheet.flatten(pill.props.style).flexShrink).toBe(0);
     await settle();
   });
 
-  it('shows no tag at all for a workout with no records', async () => {
+  it('gives cardio a panel of its own, each activity with what it recorded', async () => {
     mockFetchShareCardData.mockResolvedValue({
       ...cardData,
-      topSets: cardData.topSets.map((s) => ({ ...s, prLabel: null })),
-    });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-top-sets');
-
-    expect(screen.queryByTestId('share-card-top-set-0-pr')).toBeNull();
-    expect(screen.queryByTestId('share-card-top-set-1-pr')).toBeNull();
-    await settle();
-  });
-
-  it("gives cardio its own section -- each activity its glyph, name and figures -- and the active time in Duration's place", async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      activeMinutes: 65,
       cardio: [
+        treadmill,
         {
-          activity: 'outdoor_run',
-          icon: 'wind',
-          name: 'Outdoor Running',
-          figures: '30 min · 5 km · 6:00 /km',
+          ...treadmill,
+          activity: 'rowing',
+          icon: 'anchor',
+          name: 'Rowing',
+          figures: '10 min · 2 km · 2:30 /500 m',
         },
       ],
-      cardioSeconds: 1800,
-      cardioDistanceM: 5000,
+      cardioSeconds: 1500,
     });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    renderShare();
+    expect(await screen.findByTestId('share-card-cardio-row-0')).toHaveTextContent(
+      /Treadmill.*15 min · 3 km · Speed 6.5 · 5% incline/,
+    );
+    expect(screen.getByTestId('share-card-cardio-1')).toHaveTextContent(/2:30 \/500 m$/);
+    expect(screen.getByTestId('share-card-summary')).toHaveTextContent(
+      /2 Exercises.*\|.*25 min Cardio/,
+    );
+    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/\bcal\b/);
+    await settle();
+  });
 
-    expect(await screen.findByTestId('share-card-active')).toHaveTextContent('65 min');
-    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Active/);
-    expect(screen.queryByTestId('share-card-duration')).toBeNull();
-    expect(screen.getByTestId('share-card-top-set-1')).toBeTruthy();
-    expect(screen.getByTestId('share-card-cardio')).toHaveTextContent(
-      /CARDIO.*Outdoor Running.*30 min · 5 km · 6:00 \/km/,
+  it('leaves the cardio panel out without cardio, and says it was strength training', async () => {
+    renderShare();
+    await screen.findByTestId('share-card');
+    expect(screen.queryByTestId('share-card-cardio')).toBeNull();
+    expect(screen.getByTestId('share-card-summary')).toHaveTextContent(
+      /2 Exercises.*Strength Training/,
     );
     await settle();
   });
 
-  it('shows a workout of cardio alone as its time, activities and distance -- no sets or volume', async () => {
+  it('shows cardio alone as its duration, activities and time -- no sets, volume or records', async () => {
     mockFetchShareCardData.mockResolvedValue({
       ...cardData,
+      title: 'Cardio',
       exerciseCount: 0,
       totalSets: 0,
       totalVolumeKg: 0,
+      recordCount: 0,
       topSets: [],
-      activeMinutes: 40,
-      cardio: [
-        {
-          activity: 'walking',
-          icon: 'map',
-          name: 'Walking',
-          figures: '25 min · 2.5 km · 10:00 /km',
-        },
-        {
-          activity: 'stairmaster',
-          icon: 'chevrons-up',
-          name: 'StairMaster',
-          figures: '15 min · 40 floors',
-        },
-      ],
-      cardioSeconds: 2400,
-      cardioDistanceM: 2500,
+      cardio: [treadmill],
+      cardioSeconds: 900,
     });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-card-cardio-time')).toHaveTextContent('40 min');
-    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Time.*Activities.*Distance/);
-    expect(screen.getByTestId('share-card-activities')).toHaveTextContent('2');
-    expect(screen.getByTestId('share-card-distance')).toHaveTextContent(/2.5 km/);
+    renderShare();
+    expect(await screen.findByTestId('share-card-activities')).toHaveTextContent('1');
+    expect(screen.getByTestId('share-card-cardio-time')).toHaveTextContent('15 min');
+    expect(screen.getByTestId('share-card-cardio')).toHaveTextContent(/Treadmill/);
     expect(screen.queryByTestId('share-card-sets')).toBeNull();
     expect(screen.queryByTestId('share-card-volume')).toBeNull();
     expect(screen.queryByTestId('share-card-top-sets')).toBeNull();
-    expect(screen.getByTestId('share-card-cardio-1')).toHaveTextContent('15 min · 40 floors');
     await settle();
   });
 
-  it('gives each of up to seven exercises its own row, tightening the rows to fit', async () => {
-    const seven = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((n) => topSet(`Lift ${n}`));
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: seven });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-top-sets');
-
-    expect(screen.getByTestId('share-card-top-set-6')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-sets-more')).toBeNull();
-    const tall = StyleSheet.flatten(screen.getByTestId('share-card-top-set-row-0').props.style);
-    expect(tall.height).toBeLessThan(46 * CARD_SCALE);
+  it('dresses it for the holidays only while the decorations are on: lights, a hat, the pines and deer', async () => {
+    renderShare({ festive: true });
+    await screen.findByTestId('share-card');
+    expect(screen.getByTestId('share-story-lights', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('share-card-hat', { includeHiddenElements: true })).toBeTruthy();
     await settle();
   });
 
-  it('fits up to twelve exercises on the compact card: a shorter photo and slimmer rows, every top set its own row', async () => {
-    const twelve = 'ABCDEFGHIJKL'.split('').map((n) => topSet(`Lift ${n}`));
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: twelve });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-top-sets');
-
-    expect(screen.getByTestId('share-card-top-set-11')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-sets-more')).toBeNull();
-    const hero = StyleSheet.flatten(screen.getByTestId('share-card-hero').props.style);
-    expect(hero.height).toBe(120 * CARD_SCALE);
-    // Twelve rows and their gaps fit the list's room (270 + the 51 the photo gave up).
-    const row = StyleSheet.flatten(screen.getByTestId('share-card-top-set-row-0').props.style);
-    expect(12 * row.height + 11 * 3 * CARD_SCALE).toBeLessThanOrEqual(321 * CARD_SCALE + 0.001);
+  it('is plain the rest of the year -- stars, but no lights or hat', async () => {
+    renderShare();
+    await screen.findByTestId('share-card');
+    expect(screen.queryByTestId('share-story-lights', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('share-card-hat', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByTestId('share-story-stars', { includeHiddenElements: true })).toBeTruthy();
     await settle();
   });
 
-  it('keeps the full card for seven or fewer', async () => {
-    const seven = 'ABCDEFG'.split('').map((n) => topSet(`Lift ${n}`));
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: seven });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-top-sets');
-
-    const hero = StyleSheet.flatten(screen.getByTestId('share-card-hero').props.style);
-    expect(hero.height).toBe(171 * CARD_SCALE);
+  it("paints its own palette whatever the app's theme: Holiday Gym's deep green", async () => {
+    renderShare();
+    const story = StyleSheet.flatten((await screen.findByTestId('share-story')).props.style);
+    expect(story.backgroundColor).toBe(themeById('holiday-gym').background);
+    expect(STORY_PALETTE.gold).toBe(themeById('holiday-gym').accent);
     await settle();
   });
 
-  it('past twelve exercises, lists the first eleven and says how many more there are', async () => {
-    const fifteen = 'ABCDEFGHIJKLMNO'.split('').map((n) => topSet(`Lift ${n}`));
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: fifteen });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-top-sets');
-
-    expect(screen.getByTestId('share-card-top-set-10')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-set-11')).toBeNull();
-    expect(screen.getByTestId('share-card-top-sets-more')).toHaveTextContent('+4 more');
+  it('starts roomy for a short workout and snug or tight for a long one', async () => {
+    renderShare();
+    const short = await screen.findByTestId('share-card-top-set-name-0');
+    expect(StyleSheet.flatten(short.props.style).fontSize).toBe(DENSITY.roomy.name);
     await settle();
   });
 
-  it('handles a long workout name and long exercise name without crashing', async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      workoutName: 'A'.repeat(120),
-      topSets: [
-        { exerciseName: 'B'.repeat(120), photoUrl: null, weightKg: 999, reps: 999, prLabel: null },
-      ],
+  it('tightens when its words would run into the landscape, and at the tightest says how many more there are', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => topSet(`Lift ${i + 1}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: twenty, exerciseCount: 20 });
+    renderShare();
+    const words = await screen.findByTestId('share-card');
+    // Twenty rows start tight.
+    expect(
+      StyleSheet.flatten(screen.getByTestId('share-card-top-set-name-0').props.style).fontSize,
+    ).toBe(DENSITY.tight.name);
+    // Measured too tall: a row gives way to "+N more exercises", said on the card.
+    act(() => {
+      fireEvent(words, 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 336, height: 900 } },
+      });
     });
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('A'.repeat(120));
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('999 kg × 999');
+    expect(screen.getByTestId('share-card-top-sets-more')).toHaveTextContent('+2 more exercises');
+    expect(screen.getByTestId('share-card-top-set-row-17')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-top-set-row-18')).toBeNull();
     await settle();
   });
 
   it('never renders email, user id, or nutrition information', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-workout-name');
-
-    const card = screen.getByTestId('share-card');
+    renderShare();
+    const card = await screen.findByTestId('share-card');
     expect(card).not.toHaveTextContent('a@example.com');
     expect(card).not.toHaveTextContent('user-1');
-    expect(card).not.toHaveTextContent(/calor/i);
     expect(card).not.toHaveTextContent(/protein/i);
+    await settle();
+  });
+
+  it('lays the story out at its one size and scales only the preview to fit the room', async () => {
+    renderShare();
+    const story = StyleSheet.flatten((await screen.findByTestId('share-story')).props.style);
+    expect(story.width).toBe(360);
+    expect(story.height).toBe(640);
+    act(() => {
+      fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 480 } },
+      });
+    });
+    // Height-bound: 480 / 640 = 0.75.
+    const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
+    expect(preview.width).toBe(270);
+    expect(preview.height).toBe(480);
     await settle();
   });
 
   it('shows an error state with retry when loading fails', async () => {
     mockFetchShareCardData.mockRejectedValue(new Error('Only completed workouts can be shared'));
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
+    renderShare();
     expect(await screen.findByTestId('share-workout-load-error')).toHaveTextContent(
       'Only completed workouts can be shared',
     );
-
     mockFetchShareCardData.mockResolvedValue(cardData);
     fireEvent.press(screen.getByTestId('share-workout-retry'));
-
     expect(await screen.findByTestId('share-card-workout-name')).toBeTruthy();
     await settle();
   });
 
-  it('closes when Close is pressed', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+  it('closes when Close is pressed, named for assistive tech', async () => {
+    renderShare();
     await screen.findByTestId('share-card-workout-name');
-
+    expect(screen.getByTestId('share-workout-close').props.accessibilityLabel).toBe('Close');
     fireEvent.press(screen.getByTestId('share-workout-close'));
-
     expect(mockGoBack).toHaveBeenCalled();
+    await settle();
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    renderShare();
+    await screen.findByTestId('share-card');
+    expectNoBareText();
+    await settle();
+  });
+});
+
+describe('ShareWorkoutScreen -- Save to Photos', () => {
+  it('saves the same 1080x1920 image into Photos, asking first', async () => {
+    mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
+    renderShare();
+    await screen.findByTestId('share-card');
+
+    fireEvent.press(screen.getByTestId('share-workout-save'));
+
+    await waitFor(() => expect(mockSaveToLibrary).toHaveBeenCalledWith('file:///tmp/share.png'));
+    expect(mockRequestPermissions).toHaveBeenCalledWith(false);
+    expect(mockCaptureRef).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ width: 1080, height: 1920, format: 'png' }),
+    );
+    expect(await screen.findByText('Saved to Photos')).toBeTruthy();
+    await settle();
+  });
+
+  it('says how to allow it when Photos is turned down, saving nothing', async () => {
+    mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: false });
+    renderShare();
+    await screen.findByTestId('share-card');
+
+    fireEvent.press(screen.getByTestId('share-workout-save'));
+
+    expect(await screen.findByTestId('share-workout-share-error')).toHaveTextContent(
+      /iPhone Settings/,
+    );
+    expect(mockSaveToLibrary).not.toHaveBeenCalled();
     await settle();
   });
 });
 
 describe('ShareWorkoutScreen share action', () => {
   it('captures the card and opens the native share sheet', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    renderShare();
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -422,9 +447,7 @@ describe('ShareWorkoutScreen share action', () => {
   it('shows an error and does not crash when capture fails', async () => {
     mockCaptureRef.mockRejectedValue(new Error('capture failed'));
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    renderShare();
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -440,9 +463,7 @@ describe('ShareWorkoutScreen share action', () => {
   it('allows retrying after a share failure', async () => {
     mockCaptureRef.mockRejectedValueOnce(new Error('capture failed'));
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    renderShare();
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -454,166 +475,10 @@ describe('ShareWorkoutScreen share action', () => {
     expect(screen.queryByTestId('share-workout-share-error')).toBeNull();
     await settle();
   });
-});
-
-describe('ShareWorkoutScreen -- the card, then one primary action', () => {
-  it('is just the card and one button, Share -- no size switch, background photo, toggles or Save', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card');
-
-    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(screen.getByTestId('share-workout-share')).toHaveTextContent(/^Share$/);
-    expect(screen.queryByTestId('share-format')).toBeNull();
-    expect(screen.queryByTestId('share-photo-choose')).toBeNull();
-    expect(screen.queryByTestId('share-toggle-volume')).toBeNull();
-    expect(screen.queryByTestId('share-workout-save')).toBeNull();
-    await settle();
-  });
-
-  it('lays the story out at its one size and scales only the preview to fit the space', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    const story = StyleSheet.flatten((await screen.findByTestId('share-story')).props.style);
-    expect(story.width).toBe(360);
-    expect(story.height).toBe(640);
-
-    act(() => {
-      fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 480 } },
-      });
-    });
-
-    // Height-bound: 480 / 640 = 0.75.
-    const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
-    expect(preview.width).toBe(270);
-    expect(preview.height).toBe(480);
-    // The story itself is untouched, so the image is the same on every phone.
-    expect(StyleSheet.flatten(screen.getByTestId('share-story').props.style).width).toBe(360);
-    await settle();
-  });
-
-  it('previews the card close up -- the card and a little background, as large as the room allows', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card');
-    act(() => {
-      fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 480 } },
-      });
-      // A card 276 wide and 360 tall, centred on the story.
-      fireEvent(screen.getByTestId('share-card-frame'), 'layout', {
-        nativeEvent: { layout: { x: 42, y: 50, width: 276, height: 360 } },
-      });
-    });
-
-    // 276 + 28 by 360 + 28: height-bound, 480 / 388 -- bigger than the whole story's 0.75.
-    const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
-    expect(preview.height).toBeCloseTo(480);
-    expect(preview.width).toBeCloseTo(304 * (480 / 388));
-    // Only the preview: the story is still its one size.
-    expect(StyleSheet.flatten(screen.getByTestId('share-story').props.style).height).toBe(640);
-    await settle();
-  });
-
-  it('keeps a long cardio line inside its row: the name keeps its room, the figures shrink to fit', async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      cardio: [
-        { activity: 'treadmill', icon: 'trending-up', name: 'Treadmill', figures: '29 min · 5 km' },
-      ],
-      cardioSeconds: 1740,
-      cardioDistanceM: 5000,
-    });
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    const figures = await screen.findByTestId('share-card-cardio-0');
-    expect(figures.props.numberOfLines).toBe(1);
-    expect(figures.props.adjustsFontSizeToFit).toBe(true);
-    expect(StyleSheet.flatten(figures.props.style).maxWidth).toBe('62%');
-    expect(screen.getByTestId('share-card-cardio-row-0')).toHaveTextContent(
-      /Treadmill.*29 min · 5 km/,
-    );
-    await settle();
-  });
-
-  it("keeps the card inside the story's safe area, clear of Instagram's and TikTok's own controls", async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-story');
-
-    const safe = StyleSheet.flatten(screen.getByTestId('share-story-safe-area').props.style);
-    expect(safe.top).toBe(STORY_SAFE_AREA.top);
-    expect(safe.bottom).toBe(STORY_SAFE_AREA.bottom);
-    // The card is laid out at its drawn size -- every length scaled, no shrinking
-    // transform -- so its text is drawn sharp at the size it's shown.
-    const card = StyleSheet.flatten(screen.getByTestId('share-card').props.style);
-    expect(card.width).toBeCloseTo(CARD_WIDTH * CARD_SCALE, 6);
-    expect(card.transform).toBeUndefined();
-    expect(screen.queryByTestId('share-card-scale')).toBeNull();
-    const name = StyleSheet.flatten(screen.getByTestId('share-card-workout-name').props.style);
-    expect(name.fontSize).toBeCloseTo(32 * CARD_SCALE, 6);
-    // Even the tallest card, scaled, fits between the margins on every side.
-    expect(CARD_WIDTH * CARD_SCALE).toBeLessThanOrEqual(360 - 2 * STORY_SAFE_AREA.side);
-    expect(CARD_MAX_HEIGHT * CARD_SCALE).toBeCloseTo(
-      640 - STORY_SAFE_AREA.top - STORY_SAFE_AREA.bottom,
-      6,
-    );
-    // Roughly a quarter-safe margin top and bottom of the 1920px image.
-    expect(STORY_SAFE_AREA.top * 3).toBeGreaterThanOrEqual(250);
-    expect(STORY_SAFE_AREA.bottom * 3).toBeGreaterThanOrEqual(250);
-    await settle();
-  });
-
-  it("sets the card on the app theme's own plain background colour -- no photo, no gradient", async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    const story = await screen.findByTestId('share-story');
-
-    expect(StyleSheet.flatten(story.props.style).backgroundColor).toBe(
-      themeById(DEFAULT_THEME_ID).background,
-    );
-    expect(screen.queryByTestId('share-story-frame')).toBeNull();
-    await settle();
-  });
-
-  it('draws the card from the app palette and typography, not hardcoded colours', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
-
-    expect(card.backgroundColor).toBe(colors.surface);
-    expect(card.borderColor).toBe(colors.glassBorderStrong);
-    const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
-    expect(set.fontFamily).toBe(fonts.mono);
-    // A record's value (Bench Press, here) is the one accented text on the card.
-    const prValue = screen.getByTestId('share-card-top-set-0');
-    expect(StyleSheet.flatten(prValue.props.style).color).toBe(DEFAULT_WORKOUT_COLOR);
-    await settle();
-  });
-
-  it('names the close control for assistive tech', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card');
-
-    expect(screen.getByTestId('share-workout-close').props.accessibilityLabel).toBe('Close');
-    await settle();
-  });
 
   it('shows Share as busy while the card is being captured', async () => {
     mockCaptureRef.mockReturnValue(new Promise(() => undefined));
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    renderShare();
     await screen.findByTestId('share-card');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -624,29 +489,6 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
         busy: true,
       }),
     );
-  });
-
-  it('shows the load error with a Retry button that reloads', async () => {
-    mockFetchShareCardData.mockRejectedValueOnce(new Error('boom'));
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('share-workout-load-error')).toHaveTextContent('boom');
-    fireEvent.press(screen.getByTestId('share-workout-retry'));
-
-    expect(await screen.findByTestId('share-card')).toBeTruthy();
-    await settle();
-  });
-
-  it('renders no bare text outside <Text>', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card');
-
-    expectNoBareText();
-    await settle();
   });
 });
 

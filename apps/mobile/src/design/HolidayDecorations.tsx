@@ -85,13 +85,17 @@ export function HolidayLights({
   testID = 'holiday-lights',
   twinkle = false,
   style,
+  width: widthProp,
 }: {
   testID?: string;
   twinkle?: boolean;
   /** Where it hangs, over the default (the top of what it's laid over). */
   style?: StyleProp<ViewStyle>;
+  /** How wide the string is: the screen's, unless it hangs across something else (the share image). */
+  width?: number;
 }) {
-  const { width } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
+  const width = widthProp ?? screenWidth;
   const reduceMotion = useReduceMotionPreference();
   const pulse = useRef(new Animated.Value(0)).current;
   const twinkling = twinkle && !reduceMotion;

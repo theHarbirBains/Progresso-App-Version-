@@ -41,7 +41,7 @@ import {
   setValuesOf,
   shownSets,
 } from '../workouts/setValues';
-import { computeDurationMinutes } from '../workouts/topSetSummary';
+import { computeDurationMinutes, isLiveRecord } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
   deleteWorkout,
@@ -308,13 +308,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const loggedSetCount = loggedByExercise.reduce((sum, entry) => sum + entry.sets.length, 0);
   const durationMinutes = computeDurationMinutes(shown.performedAt, shown.completedAt);
   const isRecord = (exerciseId: string, type: MeasurementType, set: SetRecord) =>
-    !isOwn
-      ? false
-      : type === 'weight_reps'
-        ? Boolean(
-            repPRs[exerciseId]?.some((pr) => pr.reps === set.reps && pr.sourceSetId === set.id),
-          ) || oneRepMaxes[exerciseId]?.sourceSetId === set.id
-        : otherRecords[exerciseId]?.sourceSetId === set.id;
+    isOwn &&
+    isLiveRecord(set, type, {
+      repPRs: repPRs[exerciseId] ?? [],
+      oneRepMax: oneRepMaxes[exerciseId] ?? null,
+      record: otherRecords[exerciseId] ?? null,
+    });
   const recordCount = loggedByExercise.reduce(
     (sum, { exercise, type, sets }) =>
       sum + sets.filter((set) => isRecord(exercise.id, type, set)).length,

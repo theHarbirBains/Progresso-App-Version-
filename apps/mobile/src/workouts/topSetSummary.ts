@@ -1,4 +1,5 @@
-import type { OneRepMax, RepPR } from './prQueries';
+import type { MeasurementType } from '../exercises/movementTypes';
+import type { ExerciseRecord, OneRepMax, RepPR } from './prQueries';
 import type { CompletedSetRecord } from './workoutQueries';
 
 // The single authoritative place for two small pieces of logic shared by the
@@ -35,4 +36,32 @@ export function resolveTopSetPrLabel(
   }
   const matching = repPRs.find((pr) => pr.reps === topSet.reps);
   return matching?.sourceSetId === topSet.id ? `${topSet.reps} Rep PR` : null;
+}
+
+/** An exercise's live records, as read back for a workout (prQueries.ts). */
+export interface ExerciseRecords {
+  /** Its rep-count PRs (a weighted exercise). */
+  repPRs: RepPR[];
+  /** Its true 1RM (a weighted exercise). */
+  oneRepMax: OneRepMax | null;
+  /** Its most reps or longest time (a bodyweight or timed exercise). */
+  record: ExerciseRecord | null;
+}
+
+/**
+ * Whether a logged set is CURRENTLY one of the person's records: for a weighted exercise its rep
+ * count's PR or the true 1RM, otherwise the most reps or the longest -- the same source-set check
+ * as resolveTopSetPrLabel. Workout Detail's record tags and the share card's Records both count
+ * these.
+ */
+export function isLiveRecord(
+  set: { id: string; reps: number | null },
+  type: MeasurementType,
+  records: ExerciseRecords,
+): boolean {
+  if (type !== 'weight_reps') return records.record?.sourceSetId === set.id;
+  return (
+    records.repPRs.some((pr) => pr.reps === set.reps && pr.sourceSetId === set.id) ||
+    records.oneRepMax?.sourceSetId === set.id
+  );
 }

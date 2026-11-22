@@ -1,68 +1,47 @@
-import type { Ref } from 'react';
-import { View, type ViewInstance } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Avatar } from '../design/Avatar';
+import { useState, type ComponentProps, type Ref } from 'react';
+import { View, type LayoutChangeEvent, type ViewInstance } from 'react-native';
+import Svg, { G, Path } from 'react-native-svg';
+import { BackgroundPattern } from '../design/BackgroundPattern';
+import { HolidayLights, SantaHat } from '../design/HolidayDecorations';
 import { Text } from '../design/Text';
-import { colors } from '../design/theme';
-import { fromKg, roundWeight } from '../lib/units';
+import { formatCardioTime } from '../cardio/cardioActivities';
+import { formatWeightKg, fromKg, roundWeight } from '../lib/units';
 import { withAlpha } from '../theme/accentColor';
-import { formatCardioTime, formatKm } from '../cardio/cardioActivities';
 import { formatSetValues } from '../workouts/setValues';
-import type { ShareCardData, ShareCardio, ShareTopSet } from './shareCardData';
-import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
-import { CARD_WIDTH, STORY_CANVAS, STORY_SAFE_AREA, cardPt } from './storyLayout';
-import { useAppTheme } from '../theme/appThemeContext';
+import { formatCardDuration } from '../workouts/workoutFormat';
+import type { ShareCardData, ShareTopSet } from './shareCardData';
+import {
+  DENSITIES,
+  DENSITY,
+  STORY_PALETTE,
+  shareCardStyles,
+  storyStyles,
+  wordsBottom,
+  type StoryDensity,
+} from './shareCardStyles';
+import { STORY_CANVAS } from './storyLayout';
 
-export {
-  CARD_MAX_HEIGHT,
-  CARD_SCALE,
-  CARD_WIDTH,
-  STORY_CANVAS,
-  STORY_CAPTURE,
-  STORY_SAFE_AREA,
-} from './storyLayout';
+export { STORY_CANVAS, STORY_CAPTURE, STORY_CLEAR } from './storyLayout';
 
-// The top-sets list fills the room left under the stats (design units): rows
-// shrink a little for a longer workout, so up to MAX_ROWS exercises each get
-// their own row. A long workout (COMPACT_FROM exercises or more) gets the compact
-// card -- a shorter header and slimmer rows without pictures -- so up to
-// COMPACT_MAX_ROWS still each get their own; past that, the last row says how
-// many more there are.
-const TOP_SETS_SPACE = 270;
-const ROW_GAP = 5;
-const MAX_ROW_HEIGHT = 46;
-const MAX_ROWS = 7;
-const COMPACT_FROM = 8;
-const COMPACT_MAX_ROWS = 12;
-const HERO_HEIGHT = 171;
-const COMPACT_HERO_HEIGHT = 120;
-const COMPACT_ROW_GAP = 3;
-// With both top sets and cardio, the second section's label takes this much of the room.
-const SECOND_SECTION_SPACE = 22;
-// At most this many cardio rows (past it, the last says how many more); the top sets get the rest.
-const MAX_CARDIO_ROWS = 3;
-// A row's value never takes more than its share of the row; a long one shrinks to fit, this far.
-const VALUE_MIN_SCALE = 0.6;
+const GOLD = STORY_PALETTE.gold;
 
-const STAT_ICON_SIZE = cardPt(18);
-// The logo the app opens with (LaunchScreen's mark), cropped tight to the
-// mark, in place of a written brand name.
-const LOGO = require('../../assets/progresso-mark-share.png');
-const LOGO_ASPECT = 360 / 289;
-const LOGO_HEIGHT = cardPt(26);
-const LOGO_STYLE = { width: LOGO_HEIGHT * LOGO_ASPECT, height: LOGO_HEIGHT } as const;
+/** The card's words, at their own size whatever the phone's text size: the image never depends on the phone. */
+function CardText(props: ComponentProps<typeof Text>) {
+  return <Text allowFontScaling={false} {...props} />;
+}
 
 interface Props {
   data: ShareCardData;
   /** The user's own weight unit -- every weight on the card is shown in it. */
   weightUnit: 'kg' | 'lb';
-  /** The accent -- used only for personal records. */
-  accentColor: string;
+  /** Through the holidays (Settings > Appearance > Holiday Decorations): lights, a hat, pines and a deer. */
+  festive: boolean;
+  storyRef?: Ref<ViewInstance>;
 }
 
-// The date with no year ("Mon, Sep 20") -- specific enough to be theirs,
-// without pinning the post to an exact day of the year.
+// The date with no year ("Thu, Nov 12") -- specific enough to be theirs, without pinning the
+// post to an exact day of the year.
 function formatCardDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     weekday: 'short',
@@ -71,353 +50,361 @@ function formatCardDate(iso: string): string {
   });
 }
 
+/** "115lb × 7" -- the reference's own compact wording; "12 reps", "1:30" otherwise. */
+function topSetValue(set: ShareTopSet, unit: 'kg' | 'lb'): string {
+  if (set.measurementType === 'weight_reps') {
+    return `${formatWeightKg(set.weightKg ?? 0, unit)}${unit} × ${set.reps ?? 0}`;
+  }
+  return formatSetValues(set, unit);
+}
+
 function formatVolume(kg: number, unit: 'kg' | 'lb'): string {
-  return Math.round(roundWeight(fromKg(kg, unit))).toLocaleString();
+  return `${Math.round(roundWeight(fromKg(kg, unit))).toLocaleString()} ${unit}`;
 }
 
-function Stat({
-  icon,
-  value,
-  label,
-  first,
-  testID,
-}: {
-  icon: 'clock' | 'list' | 'layers' | 'bar-chart-2' | 'activity' | 'map-pin';
-  value: string;
-  label: string;
-  first?: boolean;
-  testID: string;
-}) {
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * How roomy a workout's card can start: by its rows, a long name counting for half another
+ * (it may wrap). The card then measures itself and tightens until it fits (ShareStory).
+ */
+export function startingDensity(data: ShareCardData): StoryDensity {
+  const longNames = data.topSets.filter((set) => set.displayName.length > 24).length;
+  const rows = data.topSets.length + data.cardio.length * 1.3 + longNames * 0.5;
+  return rows <= 6.5 ? 'roomy' : rows <= 10 ? 'snug' : 'tight';
+}
+
+/** A small dumbbell, the card's mark for a lift (Feather has none). */
+function Dumbbell({ size, color }: { size: number; color: string }) {
   return (
-    <View style={[card.stat, !first && card.statDivided]}>
-      <Feather name={icon} size={STAT_ICON_SIZE} color={colors.textSecondary} />
-      <Text testID={testID} style={card.statValue} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
-      <Text style={card.statLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <G
+        transform="rotate(-35 12 12)"
+        stroke={color}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        fill="none"
+      >
+        <Path d="M2.5 10v4M5.5 7v10M18.5 7v10M21.5 10v4M5.5 12h13" />
+      </G>
+    </Svg>
   );
 }
 
-// An exercise's machine photo, or its initial -- static, since the card is a picture.
-function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
+/** A pine, its foot at (x, foot), `h` tall: three tiers and a trunk. */
+function pine(x: number, foot: number, h: number): string {
+  const tier = (top: number, bottom: number, half: number) =>
+    `M${x} ${foot - h * top}L${x + h * half} ${foot - h * bottom}L${x - h * half} ${foot - h * bottom}Z`;
+  return [
+    tier(1, 0.6, 0.2),
+    tier(0.78, 0.32, 0.3),
+    tier(0.52, 0.08, 0.4),
+    `M${x - h * 0.05} ${foot - h * 0.1}h${h * 0.1}v${h * 0.1}h${-h * 0.1}Z`,
+  ].join('');
+}
+
+/** A deer facing left, standing on (x, foot), `s` tall. */
+function deer(x: number, foot: number, s: number) {
+  const k = s / 30;
   return (
-    <View style={[card.thumb, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Avatar
-        uri={set.photoUrl}
-        initial={set.exerciseName.trim().charAt(0).toUpperCase() || null}
-        size={size}
-        iconSize={Math.round(size * 0.5)}
-        iconColor={colors.textSecondary}
-        initialStyle={[card.thumbInitial, { fontSize: size * 0.4 }]}
+    <G transform={`translate(${x} ${foot - s}) scale(${k})`}>
+      <Path
+        d="M8 13C8 11 10 10 14 10.5C18 11 23 11 24 13.5C24.5 16 23 18 20 18.5L11 18.5C9 18.2 8 15.5 8 13Z"
+        fill={withAlpha(GOLD, 0.55)}
       />
-    </View>
+      <Path
+        d="M10 13L7 6.5M7 6.5C6 6.2 4.6 6.4 4 7.2C4.4 7.9 5.6 8 6.7 7.6M24 13.4L26 12.2M10.5 18.5L10 30M12.5 18.6L13 30M20 18.6L20 30M22.2 18L23.2 30M6.7 6.4L5.4 2M5.9 4.1L3.6 2.8M7.2 6.2L9.2 2.2M8.3 4.2L10.6 3.4"
+        stroke={withAlpha(GOLD, 0.55)}
+        strokeWidth={1.3}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </G>
   );
 }
 
-// A cardio activity's glyph in a round well of the accent -- the app's own mark for it.
-function CardioThumb({
-  entry,
-  size,
-  accentColor,
-}: {
-  entry: ShareCardio;
-  size: number;
-  accentColor: string;
-}) {
+/**
+ * The foot of the image: soft hills in the gold, darkening into the night -- and through the
+ * holidays two pines on the left, one on the right and a deer on the far hill. Drawn to its own
+ * height, so a tighter card keeps the same scene, shorter.
+ */
+function Landscape({ height: h, festive }: { height: number; festive: boolean }) {
+  const w = STORY_CANVAS.width;
   return (
-    <View
-      style={[
-        card.thumb,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: withAlpha(accentColor, 0.14),
-        },
-      ]}
-    >
-      <Feather name={entry.icon} size={Math.round(size * 0.5)} color={accentColor} />
-    </View>
+    <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <Path
+        d={`M0 ${h * 0.55}C90 ${h * 0.3} 170 ${h * 0.62} 260 ${h * 0.42}C300 ${h * 0.34} 335 ${h * 0.4} ${w} ${h * 0.36}L${w} ${h}L0 ${h}Z`}
+        fill={withAlpha(GOLD, 0.08)}
+      />
+      {festive ? (
+        <>
+          <Path d={pine(22, h * 0.86, h * 0.72)} fill={withAlpha(GOLD, 0.42)} />
+          <Path d={pine(54, h * 0.9, h * 0.5)} fill={withAlpha(GOLD, 0.32)} />
+          <Path d={pine(338, h * 0.74, h * 0.58)} fill={withAlpha(GOLD, 0.38)} />
+          {deer(282, h * 0.62, h * 0.3)}
+        </>
+      ) : null}
+      <Path
+        d={`M0 ${h * 0.8}C80 ${h * 0.6} 160 ${h * 0.86} 250 ${h * 0.7}C300 ${h * 0.62} 340 ${h * 0.7} ${w} ${h * 0.66}L${w} ${h}L0 ${h}Z`}
+        fill={withAlpha(GOLD, 0.16)}
+      />
+      <Path
+        d={`M0 ${h * 0.94}C100 ${h * 0.84} 210 ${h * 0.98} ${w} ${h * 0.86}L${w} ${h}L0 ${h}Z`}
+        fill={withAlpha(GOLD, 0.24)}
+      />
+    </Svg>
   );
 }
 
-/** Where the card sits on the story canvas, in canvas points -- for a preview that shows it close up. */
-export interface CardRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+/**
+ * The shareable workout image, after Harbir's reference: a 9:16 story (360x640pt, captured at
+ * 1080x1920) on Holiday Gym's deep green, gold sparkles across it -- and through the holidays a
+ * string of lights along the top, a Santa hat on the brand and pines and a deer on the hills at
+ * its foot. Then the brand, WORKOUT COMPLETE, the workout's name and date; its four figures
+ * (duration -- start to finish, its cardio in it once -- sets, volume in the user's unit and
+ * records held); every exercise's top set in the order done -- its name, which wraps rather than
+ * shrinking, "Top Set" under it and the figure in a gold pill in its own column; its cardio,
+ * each activity with its figures; and one line on what it was. Everything is real logged data in
+ * the user's unit; nothing is estimated, and no name, email or id is drawn.
+ *
+ * It fits any workout: it starts as roomy as the workout allows (startingDensity), measures its
+ * words and tightens -- snug, then tight -- until they sit above the landscape; and when even
+ * tight can't hold every exercise readably, the last rows give way to "+N more exercises", said
+ * on the card, never dropped silently. The whole canvas is what gets captured.
+ */
+export function ShareStory({ data, weightUnit, festive, storyRef }: Props) {
+  const [fit, setFit] = useState<{ density: StoryDensity; limit: number }>(() => ({
+    density: startingDensity(data),
+    limit: Infinity,
+  }));
+  const { density, limit } = fit;
+  const s = storyStyles[density];
+  const d = DENSITY[density];
 
-// The shareable workout image: the card on a 9:16 story canvas of the app
-// theme's own plain background colour -- no photo, no gradient -- so it looks
-// like the app it came from. This whole canvas is what gets captured; the
-// screen previews the card itself, close up (ShareWorkoutScreen).
-export function ShareStory({
-  storyRef,
-  onCardLayout,
-  ...cardProps
-}: Props & { storyRef?: Ref<ViewInstance>; onCardLayout?: (rect: CardRect) => void }) {
-  const { theme } = useAppTheme();
+  const cardioOnly = data.topSets.length === 0 && data.cardio.length > 0;
+  const overflow = data.topSets.length > limit;
+  const shown = overflow ? data.topSets.slice(0, Math.max(1, limit - 1)) : data.topSets;
+  const hidden = data.topSets.length - shown.length;
+
+  // Too tall for the image at this density: tighten, or at the tightest, give a row way.
+  function measure(event: LayoutChangeEvent) {
+    const bottom = d.top + event.nativeEvent.layout.height;
+    if (bottom <= wordsBottom(density)) return;
+    const next = DENSITIES[DENSITIES.indexOf(density) + 1];
+    // The exercise rows there are now, "+N more" included: one fewer.
+    const rows = overflow ? limit : data.topSets.length;
+    if (next) setFit({ density: next, limit });
+    else if (rows > 2) setFit({ density, limit: rows - 1 });
+  }
+
+  const duration = data.durationMinutes !== null ? formatCardDuration(data.durationMinutes) : '—';
+  const stats = cardioOnly
+    ? [
+        { key: 'duration', icon: 'clock' as const, value: duration, label: 'Duration' },
+        {
+          key: 'activities',
+          icon: 'activity' as const,
+          value: String(data.cardio.length),
+          label: data.cardio.length === 1 ? 'Activity' : 'Activities',
+        },
+        {
+          key: 'cardio-time',
+          icon: 'trending-up' as const,
+          value: formatCardioTime(data.cardioSeconds),
+          label: 'Cardio',
+        },
+      ]
+    : [
+        { key: 'duration', icon: 'clock' as const, value: duration, label: 'Duration' },
+        { key: 'sets', icon: 'layers' as const, value: String(data.totalSets), label: 'Sets' },
+        {
+          key: 'volume',
+          icon: null,
+          value: formatVolume(data.totalVolumeKg, weightUnit),
+          label: 'Volume',
+        },
+        {
+          key: 'records',
+          icon: 'award' as const,
+          value: String(data.recordCount),
+          label: data.recordCount === 1 ? 'Record' : 'Records',
+        },
+      ];
+
+  const summaryParts = [
+    data.exerciseCount > 0 ? plural(data.exerciseCount, 'Exercise', 'Exercises') : null,
+    data.cardio.length > 0
+      ? `${formatCardioTime(data.cardioSeconds)} Cardio`
+      : data.exerciseCount > 0
+        ? 'Strength Training'
+        : null,
+  ].filter((part): part is string => part !== null);
+  // A picture to VoiceOver: what's on it, in one label.
+  const accessibilityLabel = [
+    `${data.title}, ${formatCardDate(data.performedAt)}`,
+    ...stats.map((stat) => `${stat.label} ${stat.value}`),
+    ...data.topSets.map((set) => `${set.displayName}: ${topSetValue(set, weightUnit)}`),
+    ...data.cardio.map((entry) => `${entry.name}: ${entry.figures}`),
+  ].join('. ');
+
   return (
     <View
       ref={storyRef}
       collapsable={false}
       testID="share-story"
-      style={[styles.story, STORY_CANVAS, { backgroundColor: theme.background }]}
+      style={shareCardStyles.story}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
     >
-      <View testID="share-story-safe-area" style={[styles.safeArea, STORY_SAFE_AREA_STYLE]}>
-        <View
-          testID="share-card-frame"
-          onLayout={(event) => {
-            const { x, y, width, height } = event.nativeEvent.layout;
-            onCardLayout?.({ x, y: y + STORY_SAFE_AREA.top, width, height });
-          }}
-        >
-          <ShareCard {...cardProps} />
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const STORY_SAFE_AREA_STYLE = {
-  top: STORY_SAFE_AREA.top,
-  bottom: STORY_SAFE_AREA.bottom,
-} as const;
-
-// The card, plain: the brand mark, date and the workout's own name (nothing under it -- the name is the user's); then the session as
-// four stats (duration -- or, with cardio, the active training -- exercises, sets, volume; cardio
-// alone: its time, activities and distance), every exercise's top set in workout order, a personal
-// record marked quietly in the accent, and its cardio, each activity its glyph, name and figures.
-// Everything is real logged data in the user's unit (cardio in km, for everyone); nothing is
-// estimated, and no account detail (name, email, id) is ever drawn.
-// Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
-export function ShareCard({ data, weightUnit, accentColor }: Props) {
-  const cardio = data.cardio ?? [];
-  const cardioOverflow = cardio.length > MAX_CARDIO_ROWS;
-  const shownCardio = cardioOverflow ? cardio.slice(0, MAX_CARDIO_ROWS - 1) : cardio;
-  const cardioRowCount = shownCardio.length + (cardioOverflow ? 1 : 0);
-  const compact = data.topSets.length + cardioRowCount >= COMPACT_FROM;
-  const maxRows = (compact ? COMPACT_MAX_ROWS : MAX_ROWS) - cardioRowCount;
-  const overflow = data.topSets.length > maxRows;
-  const shown = overflow ? data.topSets.slice(0, maxRows - 1) : data.topSets;
-  const hiddenCount = data.topSets.length - shown.length;
-  const rowCount = shown.length + (overflow ? 1 : 0) + cardioRowCount;
-  const bothSections = shown.length > 0 && cardioRowCount > 0;
-  const cardioOnly = data.topSets.length === 0 && cardio.length > 0;
-  // The compact card's shorter header gives its room to the list; a second section's label takes some.
-  const space =
-    TOP_SETS_SPACE +
-    (compact ? HERO_HEIGHT - COMPACT_HERO_HEIGHT : 0) -
-    (bothSections ? SECOND_SECTION_SPACE : 0);
-  const gap = compact ? COMPACT_ROW_GAP : ROW_GAP;
-  const rowHeight = Math.min(
-    MAX_ROW_HEIGHT,
-    (space - (rowCount - 1) * gap) / Math.max(rowCount, 1),
-  );
-  const thumbSize = cardPt(Math.min(32, rowHeight - 14));
-
-  return (
-    <View testID="share-card" style={[card.card, { width: cardPt(CARD_WIDTH) }]}>
-      <View
-        testID="share-card-hero"
-        style={[card.hero, compact && { height: cardPt(COMPACT_HERO_HEIGHT) }]}
-      >
-        <View style={card.heroTop}>
-          <Image
-            testID="share-card-logo"
-            source={LOGO}
-            style={LOGO_STYLE}
-            contentFit="contain"
-            accessibilityLabel="Progresso"
-          />
-          <Text testID="share-card-date" style={card.date}>
-            {formatCardDate(data.performedAt)}
-          </Text>
-        </View>
-        <View>
-          <Text
-            testID="share-card-workout-name"
-            style={card.workoutName}
-            numberOfLines={compact ? 1 : 2}
-            adjustsFontSizeToFit
-            minimumFontScale={compact ? 0.6 : 0.7}
-          >
-            {data.workoutName}
-          </Text>
-        </View>
+      <BackgroundPattern
+        pattern="sparkles"
+        color={GOLD}
+        background={STORY_PALETTE.background}
+        fade={false}
+        testID="share-story-stars"
+      />
+      {festive ? (
+        <HolidayLights testID="share-story-lights" width={STORY_CANVAS.width} style={{ top: 0 }} />
+      ) : null}
+      <View testID="share-story-landscape" style={s.landscape} pointerEvents="none">
+        <Landscape height={d.landscape} festive={festive} />
       </View>
 
-      {cardioOnly ? (
-        // Cardio alone has no exercises, sets or volume: its time, activities and distance.
-        <View testID="share-card-stats" style={card.stats}>
-          <Stat
-            first
-            icon="clock"
-            value={formatCardioTime(data.cardioSeconds)}
-            label="Time"
-            testID="share-card-cardio-time"
-          />
-          <Stat
-            icon="activity"
-            value={String(cardio.length)}
-            label={cardio.length === 1 ? 'Activity' : 'Activities'}
-            testID="share-card-activities"
-          />
-          {data.cardioDistanceM !== null ? (
-            <Stat
-              icon="map-pin"
-              value={formatKm(data.cardioDistanceM)}
-              label="Distance"
-              testID="share-card-distance"
-            />
-          ) : null}
-        </View>
-      ) : (
-        <View testID="share-card-stats" style={card.stats}>
-          {/* With cardio, the active training -- strength and cardio -- never the session's rests;
-              logged with no duration (Log Past Workout's is optional), none shown. */}
-          {data.activeMinutes != null ? (
-            <Stat
-              first
-              icon="clock"
-              value={`${data.activeMinutes} min`}
-              label="Active"
-              testID="share-card-active"
-            />
-          ) : data.durationMinutes !== null ? (
-            <Stat
-              first
-              icon="clock"
-              value={`${data.durationMinutes} min`}
-              label="Duration"
-              testID="share-card-duration"
-            />
-          ) : null}
-          <Stat
-            first={data.activeMinutes == null && data.durationMinutes === null}
-            icon="list"
-            value={String(data.exerciseCount)}
-            label="Exercises"
-            testID="share-card-exercises"
-          />
-          <Stat
-            icon="layers"
-            value={String(data.totalSets)}
-            label="Sets"
-            testID="share-card-sets"
-          />
-          <Stat
-            icon="bar-chart-2"
-            value={formatVolume(data.totalVolumeKg, weightUnit)}
-            label={`Volume (${weightUnit})`}
-            testID="share-card-volume"
-          />
-        </View>
-      )}
-
-      {shown.length > 0 ? (
-        <View testID="share-card-top-sets" style={card.body}>
-          <Text style={card.sectionLabel}>TOP SETS</Text>
-          <View style={[card.rows, compact && { gap: cardPt(COMPACT_ROW_GAP) }]}>
-            {shown.map((set, index) => {
-              const isRecord = set.prLabel !== null;
-              return (
-                <View
-                  key={`${set.exerciseName}-${index}`}
-                  testID={`share-card-top-set-row-${index}`}
-                  style={[card.row, compact && card.rowCompact, { height: cardPt(rowHeight) }]}
-                >
-                  {compact ? null : <Thumb set={set} size={thumbSize} />}
-                  <Text style={[card.liftName, compact && card.liftNameCompact]} numberOfLines={1}>
-                    {set.exerciseName}
-                  </Text>
-                  {/* A personal record: the same row, its value in the accent
-                      with a small tag -- quiet, never a separate block. */}
-                  {isRecord ? (
-                    <View
-                      testID={`share-card-top-set-${index}-pr`}
-                      style={[card.prTag, { backgroundColor: withAlpha(accentColor, 0.14) }]}
-                    >
-                      <Text style={[card.prTagText, { color: accentColor }]}>
-                        {set.prLabel === '1RM' ? '1RM' : 'PR'}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Text
-                    testID={`share-card-top-set-${index}`}
-                    style={[
-                      card.liftValue,
-                      compact && card.liftValueCompact,
-                      isRecord && { color: accentColor },
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={VALUE_MIN_SCALE}
-                  >
-                    {formatSetValues(set, weightUnit)}
-                  </Text>
-                </View>
-              );
-            })}
-            {overflow ? (
-              <View style={[card.moreRow, { height: cardPt(rowHeight) }]}>
-                <Text
-                  testID="share-card-top-sets-more"
-                  style={[card.more, compact && card.liftNameCompact]}
-                >
-                  {`+${hiddenCount} more`}
-                </Text>
-              </View>
+      <View testID="share-card" style={s.words} onLayout={measure}>
+        <View testID="share-card-header" style={s.header}>
+          <View style={s.brandWrap}>
+            <CardText testID="share-card-brand" style={s.brand}>
+              Progresso
+            </CardText>
+            {festive ? (
+              <SantaHat testID="share-card-hat" size={d.brand * 0.8} style={s.hat} />
             ) : null}
           </View>
+          <View style={s.kickerRow}>
+            <View style={s.kickerRule} />
+            <CardText style={s.kicker}>WORKOUT COMPLETE</CardText>
+            <View style={s.kickerRule} />
+          </View>
+          <CardText
+            testID="share-card-workout-name"
+            style={s.title}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {data.title}
+          </CardText>
+          <CardText testID="share-card-date" style={s.date}>
+            {formatCardDate(data.performedAt)}
+          </CardText>
         </View>
-      ) : null}
 
-      {shownCardio.length > 0 ? (
-        <View testID="share-card-cardio" style={[card.body, bothSections && card.bodyFollowing]}>
-          <Text style={card.sectionLabel}>CARDIO</Text>
-          <View style={[card.rows, compact && { gap: cardPt(COMPACT_ROW_GAP) }]}>
-            {shownCardio.map((entry, index) => (
+        <View testID="share-card-stats" style={[s.panel, s.stats]}>
+          {stats.map((stat, index) => (
+            <View key={stat.key} style={[s.stat, index > 0 && s.statDivided]}>
+              {stat.icon ? (
+                <Feather name={stat.icon} size={d.statValue} color={GOLD} />
+              ) : (
+                <Dumbbell size={d.statValue + 2} color={GOLD} />
+              )}
+              <CardText
+                testID={`share-card-${stat.key}`}
+                style={s.statValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {stat.value}
+              </CardText>
+              <CardText style={s.statLabel} numberOfLines={1}>
+                {stat.label}
+              </CardText>
+            </View>
+          ))}
+        </View>
+
+        {shown.length > 0 ? (
+          <View testID="share-card-top-sets" style={[s.panel, s.rows]}>
+            {density === 'tight' ? <CardText style={s.sectionLabel}>TOP SETS</CardText> : null}
+            {shown.map((set, index) => (
+              <View
+                key={`${set.exerciseName}-${index}`}
+                testID={`share-card-top-set-row-${index}`}
+                style={[s.row, index > 0 && s.rowDivided]}
+              >
+                <View style={s.iconRound}>
+                  <Dumbbell size={d.icon * 0.55} color={GOLD} />
+                </View>
+                <View style={s.rowText}>
+                  <CardText
+                    testID={`share-card-top-set-name-${index}`}
+                    style={s.name}
+                    numberOfLines={3}
+                  >
+                    {set.displayName}
+                  </CardText>
+                  {density === 'tight' ? null : <CardText style={s.label}>{set.label}</CardText>}
+                </View>
+                <View testID={`share-card-top-set-pill-${index}`} style={s.pill}>
+                  <CardText
+                    testID={`share-card-top-set-${index}`}
+                    style={s.value}
+                    numberOfLines={1}
+                  >
+                    {topSetValue(set, weightUnit)}
+                  </CardText>
+                </View>
+              </View>
+            ))}
+            {hidden > 0 ? (
+              <CardText testID="share-card-top-sets-more" style={[s.more, s.rowDivided]}>
+                {`+${hidden} more ${hidden === 1 ? 'exercise' : 'exercises'}`}
+              </CardText>
+            ) : null}
+          </View>
+        ) : null}
+
+        {data.cardio.length > 0 ? (
+          <View testID="share-card-cardio" style={[s.panel, s.rows]}>
+            {data.cardio.map((entry, index) => (
               <View
                 key={`${entry.name}-${index}`}
                 testID={`share-card-cardio-row-${index}`}
-                style={[card.row, compact && card.rowCompact, { height: cardPt(rowHeight) }]}
+                style={[s.row, index > 0 && s.rowDivided]}
               >
-                {compact ? null : (
-                  <CardioThumb entry={entry} size={thumbSize} accentColor={accentColor} />
-                )}
-                <Text style={[card.liftName, compact && card.liftNameCompact]} numberOfLines={1}>
-                  {entry.name}
-                </Text>
-                <Text
-                  testID={`share-card-cardio-${index}`}
-                  style={[card.liftValue, compact && card.liftValueCompact]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={VALUE_MIN_SCALE}
-                >
-                  {entry.figures}
-                </Text>
+                <View style={s.iconSquare}>
+                  <Feather name={entry.icon} size={d.cardioIcon * 0.48} color={GOLD} />
+                </View>
+                <View style={s.iconDivider} />
+                <View style={s.rowText}>
+                  <CardText style={s.name} numberOfLines={2}>
+                    {entry.name}
+                  </CardText>
+                  <CardText
+                    testID={`share-card-cardio-${index}`}
+                    style={s.figures}
+                    numberOfLines={2}
+                  >
+                    {entry.figures}
+                  </CardText>
+                </View>
               </View>
             ))}
-            {cardioOverflow ? (
-              <View style={[card.moreRow, { height: cardPt(rowHeight) }]}>
-                <Text
-                  testID="share-card-cardio-more"
-                  style={[card.more, compact && card.liftNameCompact]}
-                >
-                  {`+${cardio.length - shownCardio.length} more`}
-                </Text>
-              </View>
-            ) : null}
           </View>
-        </View>
-      ) : null}
+        ) : null}
+
+        {summaryParts.length > 0 ? (
+          <CardText testID="share-card-summary" style={s.summary}>
+            {summaryParts.map((part, index) => (
+              <CardText key={part}>
+                {index > 0 ? <CardText style={s.summaryBar}>{'   |   '}</CardText> : null}
+                {part}
+              </CardText>
+            ))}
+          </CardText>
+        ) : null}
+      </View>
     </View>
   );
 }

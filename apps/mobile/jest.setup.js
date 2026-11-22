@@ -56,6 +56,13 @@ jest.mock('expo-image-picker', () => ({
 // expo-video plays a profile montage's videos. Its players and views are native: a test gets a
 // player whose methods are jest.fn()s (play, pause, release, addListener) and a plain view in
 // VideoView's place.
+// The share card's Save to Photos (ShareWorkoutScreen): the native module isn't there in Jest.
+jest.mock('expo-media-library/legacy', () => ({
+  getPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+  saveToLibraryAsync: jest.fn(async () => undefined),
+}));
+
 jest.mock('expo-video', () => {
   const { View } = require('react-native');
   return {
