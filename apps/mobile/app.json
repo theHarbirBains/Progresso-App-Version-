@@ -20,6 +20,7 @@
       }
     },
     "android": {
+      "package": "com.harbirbains.progresso",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/adaptive-icon-background.png",
@@ -78,6 +79,7 @@
         {
           "bundleIdentifier": "com.harbirbains.progresso.widgets",
           "groupIdentifier": "group.com.harbirbains.progresso",
+          "enableAndroid": false,
           "widgets": [
             {
               "name": "NutritionToday",
