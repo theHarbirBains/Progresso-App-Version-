@@ -71,6 +71,15 @@ export const WORKOUT_SPLIT_PRESETS: WorkoutSplitPreset[] = [
     ],
   },
   {
+    id: 'arnold',
+    name: 'Arnold Split',
+    days: [
+      { name: 'Chest and Back', muscleGroups: ['chest', 'back'] },
+      { name: 'Shoulders & Arms', muscleGroups: ['shoulders', 'biceps', 'triceps', 'forearms'] },
+      { name: 'Legs', muscleGroups: ['quads', 'hamstrings', 'glutes', 'calves'] },
+    ],
+  },
+  {
     id: 'ppl-upper-lower',
     name: 'Push / Pull / Legs / Upper / Lower',
     days: [

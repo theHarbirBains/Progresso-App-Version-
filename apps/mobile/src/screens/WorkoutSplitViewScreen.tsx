@@ -164,13 +164,19 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
             testID={`workout-split-view-day-${day.id}-plan`}
             style={styles.planLink}
             onPress={() =>
-              navigation.navigate('SplitDayPlan', { dayId: day.id, dayName: day.name })
+              navigation.navigate('SplitDayPlan', {
+                dayId: day.id,
+                dayName: day.name,
+                muscleGroups: day.muscleGroups,
+              })
             }
             accessibilityRole="button"
             accessibilityLabel={`Exercises for ${day.name}`}
           >
             <Text style={styles.planText}>{planSummary(plans.get(day.id) ?? [])}</Text>
-            <Text style={[styles.planAction, { color: theme.accent }]}>Plan</Text>
+            <Text style={[styles.planAction, { color: theme.accent }]}>
+              {(plans.get(day.id) ?? []).length === 0 ? 'Add Exercises' : 'Edit'}
+            </Text>
           </TouchableOpacity>
         </AppCard>
       ))}

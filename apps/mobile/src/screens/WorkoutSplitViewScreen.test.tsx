@@ -271,7 +271,11 @@ describe('WorkoutSplitViewScreen -- day plans and the next day', () => {
       /No exercises planned/,
     );
     fireEvent.press(screen.getByTestId('workout-split-view-day-day-1-plan'));
-    expect(mockNavigate).toHaveBeenCalledWith('SplitDayPlan', { dayId: 'day-1', dayName: 'Push' });
+    expect(mockNavigate).toHaveBeenCalledWith('SplitDayPlan', {
+      dayId: 'day-1',
+      dayName: 'Push',
+      muscleGroups: ['chest', 'shoulders', 'triceps'],
+    });
   });
 
   it('marks the next day on the active split: the one after the last done', async () => {

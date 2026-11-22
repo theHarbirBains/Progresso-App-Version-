@@ -1,6 +1,6 @@
 import type { Feather } from '@expo/vector-icons';
 
-// Shared presentational metadata for the 5 workout-split presets -- used by
+// Shared presentational metadata for the workout-split presets -- used by
 // both ChooseWorkoutSplitScreen (Settings/the tracking gate) and
 // WorkoutSplitPresetPicker (onboarding's split step), so the two places a
 // user can pick a preset show the exact same icon/description copy rather
@@ -12,6 +12,7 @@ export const PRESET_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   'upper-lower': 'repeat',
   'full-body': 'target',
   'bro-split': 'grid',
+  arnold: 'star',
   'ppl-upper-lower': 'layers',
 };
 
@@ -20,5 +21,6 @@ export const PRESET_DESCRIPTIONS: Record<string, string> = {
   'upper-lower': 'A simple, effective split great for strength and flexibility.',
   'full-body': 'Train everything in each session. Great for beginners or busy schedules.',
   'bro-split': 'Focus on one muscle group per day. Classic and straightforward.',
+  arnold: 'Chest with back, shoulders with arms, then legs. A classic bodybuilding split.',
   'ppl-upper-lower': 'The most complete split for maximum variety and progression.',
 };

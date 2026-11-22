@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MontageItem } from '../lib/api';
+import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 
 // The signed-in app's navigation structure. Sign-in/forgot-password/reset
 // (and now onboarding, which ends in account creation -- see
@@ -127,8 +128,12 @@ export type RootStackParamList = {
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;
   WorkoutSplitView: { splitId: string };
-  /** One split day's planned exercises. */
-  SplitDayPlan: { dayId: string; dayName: string };
+  /** One split day's planned exercises; `muscleGroups`, the day's, shown at its top. */
+  SplitDayPlan: {
+    dayId: string;
+    dayName: string;
+    muscleGroups?: SplitMuscleGroup[];
+  };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
   /** Workout Programs: ready-made splits with every workout planned (from Workout Splits). */

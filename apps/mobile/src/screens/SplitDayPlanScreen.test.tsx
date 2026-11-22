@@ -41,6 +41,12 @@ jest.mock('../workouts/ExercisePickerModal', () => {
   };
 });
 jest.mock('./ExerciseFormScreen', () => ({ ExerciseFormScreen: () => null }));
+// The picker's Last Time suggestions and the exercises' pictures read from Supabase; tested where
+// they live.
+jest.mock('../workouts/usePreviousExercises', () => ({
+  usePreviousExercises: () => ({ status: 'ready', groups: [], dayGroups: [], retry: jest.fn() }),
+}));
+jest.mock('../exercises/ExercisePhoto', () => ({ ExercisePhoto: () => null }));
 
 const navigation = { goBack: jest.fn() } as never;
 const route = { params: { dayId: 'day-1', dayName: 'Legs' } } as never;
@@ -84,6 +90,8 @@ describe('SplitDayPlanScreen', () => {
     expect(await screen.findByTestId('split-day-plan-empty')).toHaveTextContent(
       /No exercises planned/,
     );
+    // Planning a day is optional, and the page says so.
+    expect(screen.getByTestId('split-day-plan-count')).toHaveTextContent(/^Optional:/);
     fireEvent.press(screen.getByTestId('split-day-plan-add'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('picker-pick-squat'));
@@ -133,5 +141,32 @@ describe('SplitDayPlanScreen', () => {
 
     expect(setPlannedSets).not.toHaveBeenCalled();
     expect(screen.getByTestId('split-day-plan-sets-p1')).toHaveTextContent('1');
+  });
+});
+
+describe('SplitDayPlanScreen -- the day at its top, and Done', () => {
+  it("shows the day's muscle groups and how much is planned, then goes back with Done", async () => {
+    (fetchDayPlan as jest.Mock).mockResolvedValue([
+      planned({ id: 'p1', targetSets: 3 }),
+      planned({ id: 'p2', exerciseId: 'fly', exerciseName: 'Fly', targetSets: 2, position: 1 }),
+    ]);
+    render(
+      <SplitDayPlanScreen
+        navigation={navigation}
+        route={
+          {
+            params: { dayId: 'day-1', dayName: 'Push', muscleGroups: ['chest', 'triceps'] },
+          } as never
+        }
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    expect(await screen.findByTestId('split-day-plan-summary')).toHaveTextContent(
+      /Push\s*Chest · Triceps\s*2 exercises · 5 sets/,
+    );
+    fireEvent.press(screen.getByTestId('split-day-plan-done'));
+    expect((navigation as unknown as { goBack: jest.Mock }).goBack).toHaveBeenCalled();
+    expectNoBareText();
   });
 });

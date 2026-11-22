@@ -7,10 +7,6 @@ import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '..
 // shared `Screen`; a split's days and muscle groups are plain rows and text on
 // the screen, so this file only holds what those rows need.
 export const workoutSplitStyles = StyleSheet.create({
-  // Vertical rhythm between a screen's groups.
-  content: {
-    gap: spacing.xxl,
-  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
@@ -67,13 +63,6 @@ export const workoutSplitStyles = StyleSheet.create({
   },
 
   // ---- Split view (read-only) ----------------------------------------------
-  dayBlock: {
-    paddingVertical: spacing.md,
-  },
-  dayDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
   dayName: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
@@ -127,11 +116,6 @@ export const workoutSplitStyles = StyleSheet.create({
   },
 
   // ---- Split form ----------------------------------------------------------
-  formDayHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.xs,
-  },
   formDayName: {
     flex: 1,
   },

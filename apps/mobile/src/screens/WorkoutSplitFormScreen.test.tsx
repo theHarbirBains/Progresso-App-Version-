@@ -15,6 +15,7 @@ import {
   reorderWorkoutSplitDays,
   setWorkoutSplitDayMuscleGroups,
 } from '../workouts/workoutSplitQueries';
+import { fetchPlansForDays } from '../workouts/splitPlanQueries';
 import { WorkoutSplitFormScreen } from './WorkoutSplitFormScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -35,6 +36,11 @@ jest.mock('../profile/profileQueries', () => ({
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   }),
+}));
+
+// Each day's planned exercises (none unless a test says so).
+jest.mock('../workouts/splitPlanQueries', () => ({
+  fetchPlansForDays: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -61,8 +67,15 @@ const mockSetWorkoutSplitDayMuscleGroups = setWorkoutSplitDayMuscleGroups as jes
 
 const mockGoBack = jest.fn();
 const mockSetParams = jest.fn();
+const mockNavigate = jest.fn();
+const mockFetchPlansForDays = fetchPlansForDays as jest.Mock;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, setParams: mockSetParams };
+const navigation: any = {
+  goBack: mockGoBack,
+  setParams: mockSetParams,
+  navigate: mockNavigate,
+  addListener: jest.fn(() => jest.fn()),
+};
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
@@ -80,12 +93,14 @@ beforeEach(() => {
   mockUpdateMyProfile.mockReset().mockResolvedValue(undefined);
   mockGoBack.mockClear();
   mockSetParams.mockClear();
+  mockNavigate.mockClear();
+  mockFetchPlansForDays.mockReset().mockResolvedValue(new Map());
 });
 
 describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
   const route = { params: {} } as never;
 
-  it('shows only the name field and a Create button', async () => {
+  it('shows only the steps, the name field and a Create button', async () => {
     render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
@@ -93,6 +108,13 @@ describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
     expect(await screen.findByTestId('workout-split-form-name')).toBeTruthy();
     expect(screen.getByTestId('workout-split-form-create')).toBeTruthy();
     expect(screen.queryByTestId('workout-split-form-add-day')).toBeNull();
+    // Naming it first; exercises and sets are the optional last step.
+    expect(screen.getByTestId('workout-split-form-step-1').props.accessibilityLabel).toBe(
+      'Step 1, Name it: now',
+    );
+    expect(screen.getByTestId('workout-split-form-step-3').props.accessibilityLabel).toBe(
+      'Step 3, Exercises & sets, optional: next',
+    );
   });
 
   it('disables Create until a name is entered', async () => {
@@ -444,16 +466,20 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
     });
   });
 
-  it('shows days as hairline-separated blocks in no cards', async () => {
+  it('shows each day as a widget of its own, numbered', async () => {
     render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    const first = await screen.findByTestId('workout-split-day-day-push');
-    const second = screen.getByTestId('workout-split-day-day-pull');
+    await screen.findByTestId('workout-split-day-day-push');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
-    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
-    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    const dayCards = screen
+      .UNSAFE_queryAllByType(AppCard)
+      .filter((card) => /^workout-split-day-/.test(card.props.testID ?? ''));
+    expect(dayCards.map((card) => card.props.testID)).toEqual([
+      'workout-split-day-day-push',
+      'workout-split-day-day-pull',
+    ]);
+    expect(screen.getByTestId('workout-split-day-day-pull')).toHaveTextContent(/^2/);
   });
 
   it('uses labelled shared inputs for the split and each day', async () => {
@@ -545,5 +571,117 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
         busy: true,
       }),
     );
+  });
+});
+
+describe('WorkoutSplitFormScreen -- exercises & sets, and adding days', () => {
+  const route = { params: { splitId: 'split-1' } } as never;
+
+  beforeEach(() => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue({
+      id: 'split-1',
+      name: 'My Split',
+      days: [
+        { id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest', 'triceps'] },
+        { id: 'day-pull', name: 'Pull', orderIndex: 2, muscleGroups: ['back'] },
+      ],
+    });
+  });
+
+  function renderScreen() {
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+  }
+
+  it("offers each day's exercises and sets plainly, as optional, opening the day's plan", async () => {
+    renderScreen();
+    const add = await screen.findByTestId('workout-split-day-plan-day-push');
+
+    expect(screen.getByTestId('workout-split-day-day-push')).toHaveTextContent(
+      /Exercises & Sets.*Optional.*Add Exercises & Sets.*choose them as you train/,
+    );
+    fireEvent.press(add);
+    expect(mockNavigate).toHaveBeenCalledWith('SplitDayPlan', {
+      dayId: 'day-push',
+      dayName: 'Push',
+      muscleGroups: ['chest', 'triceps'],
+    });
+  });
+
+  it("lists a day's planned exercises with their sets, and reads them again on coming back", async () => {
+    const planned = (id: string, name: string, targetSets: number) => ({
+      id,
+      exerciseId: `ex-${id}`,
+      exerciseName: name,
+      muscleGroup: 'chest',
+      movementType: 'bilateral',
+      measurementType: 'weight_reps',
+      position: 0,
+      targetSets,
+    });
+    mockFetchPlansForDays.mockResolvedValue(
+      new Map([
+        ['day-push', [planned('a', 'Bench Press', 3), planned('b', 'Dips', 2)]],
+        ['day-pull', []],
+      ]),
+    );
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('workout-split-day-day-push')).toHaveTextContent(
+        /Bench Press\s*3 sets.*Dips\s*2 sets.*2 exercises · 5 sets\s*Edit/,
+      ),
+    );
+    expect(mockFetchPlansForDays).toHaveBeenCalledWith(['day-push', 'day-pull']);
+    // The third step is done once a day has exercises.
+    expect(screen.getByTestId('workout-split-form-step-3').props.accessibilityLabel).toMatch(
+      /: done$/,
+    );
+    expect(navigation.addListener).toHaveBeenCalledWith('focus', expect.any(Function));
+  });
+
+  it("adds a preset's day in one tap, with its muscle groups", async () => {
+    mockCreateWorkoutSplitDay.mockResolvedValue({
+      id: 'day-legs',
+      name: 'Legs',
+      orderIndex: 3,
+      muscleGroups: [],
+    });
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('workout-split-form-quick-Legs'));
+
+    await waitFor(() =>
+      expect(mockCreateWorkoutSplitDay).toHaveBeenCalledWith('split-1', 'Legs', 3),
+    );
+    expect(mockSetWorkoutSplitDayMuscleGroups).toHaveBeenCalledWith('day-legs', [
+      'quads',
+      'hamstrings',
+      'glutes',
+      'calves',
+    ]);
+    expect(
+      (await screen.findByTestId('workout-split-day-day-legs-muscle-glutes')).props
+        .accessibilityState.selected,
+    ).toBe(true);
+  });
+
+  it("offers every preset's days once each, the Arnold Split's among them", async () => {
+    renderScreen();
+    await screen.findByTestId('workout-split-form-quick-add');
+
+    for (const name of [
+      'Push',
+      'Pull',
+      'Legs',
+      'Upper',
+      'Lower',
+      'Full Body',
+      'Chest and Back',
+      'Shoulders & Arms',
+    ]) {
+      expect(screen.getAllByTestId(`workout-split-form-quick-${name}`)).toHaveLength(1);
+    }
   });
 });

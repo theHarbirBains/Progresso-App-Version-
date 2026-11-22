@@ -132,7 +132,14 @@ describe('ChooseWorkoutSplitScreen', () => {
     // free-form copy and may legitimately use a plain word like "strength"
     // in a sentence without that being the "PPL - Strength" style naming
     // this check actually guards against.
-    for (const id of ['ppl', 'upper-lower', 'full-body', 'bro-split', 'ppl-upper-lower']) {
+    for (const id of [
+      'ppl',
+      'upper-lower',
+      'full-body',
+      'bro-split',
+      'arnold',
+      'ppl-upper-lower',
+    ]) {
       const name = screen.getByTestId(`choose-split-preset-${id}-name`).props.children;
       expect(name).not.toMatch(/Hypertrophy/i);
       expect(name).not.toMatch(/Strength/i);
