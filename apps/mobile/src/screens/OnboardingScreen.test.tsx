@@ -403,7 +403,10 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-gender-male'));
 
     await screen.findByTestId('onboarding-step-birthday');
+    // The date and the age it makes sit together above the wheels, said once.
+    expect(screen.getByTestId('onboarding-birthday-date')).toHaveTextContent(/^January 1, \d{4}$/);
     expect(screen.getByTestId('onboarding-birthday-age')).toHaveTextContent(/\d+ years old/);
+    expect(screen.getAllByText(/^January 1, \d{4}$/)).toHaveLength(1);
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-weight');

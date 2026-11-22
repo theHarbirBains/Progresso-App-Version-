@@ -17,7 +17,12 @@ import {
   type CreateAccountFields,
   type GoogleSignUpFields,
 } from '../onboarding/CreateAccountStep';
-import { clampToLatest, latestBirthday, toDateStringUTC } from '../onboarding/dateWheelValues';
+import {
+  clampToLatest,
+  latestBirthday,
+  MONTH_NAMES,
+  toDateStringUTC,
+} from '../onboarding/dateWheelValues';
 import { DateWheelPicker } from '../onboarding/DateWheelPicker';
 import { GoalSelector } from '../onboarding/GoalSelector';
 import { HeightWheelPicker } from '../onboarding/HeightWheelPicker';
@@ -560,6 +565,25 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               <Text style={styles.stepTitle}>When&apos;s your birthday?</Text>
               <RiseIn>
                 <AppCard style={local.wheelCard}>
+                  {/* The date the wheels give, and the age it makes, above them. */}
+                  <View style={local.birthdayHead}>
+                    <View style={local.birthdayHeadText}>
+                      <Text style={local.kicker}>YOUR BIRTHDAY</Text>
+                      <Text testID="onboarding-birthday-date" style={local.birthdayDate}>
+                        {MONTH_NAMES[birthdayMonth]} {birthdayDay}, {birthdayYear}
+                      </Text>
+                    </View>
+                    {age !== null ? (
+                      <View
+                        testID="onboarding-birthday-age"
+                        style={[local.agePill, { backgroundColor: withAlpha(accent.accent, 0.14) }]}
+                      >
+                        <Text style={[local.agePillText, { color: accent.accent }]}>
+                          {age} years old
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <DateWheelPicker
                     testID="onboarding-step-birthday"
                     month={birthdayMonth}
@@ -567,6 +591,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                     year={birthdayYear}
                     // Nobody younger than 13: the wheels end on their 13th birthday's date.
                     latest={latestBirthday(MIN_SIGNUP_AGE)}
+                    showPreview={false}
                     onChange={({ month, day, year }) => {
                       setBirthdayMonth(month);
                       setBirthdayDay(day);
@@ -574,16 +599,6 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                       updateDraft({ birthday: toDateStringUTC(month, day, year) });
                     }}
                   />
-                  {age !== null ? (
-                    <View
-                      testID="onboarding-birthday-age"
-                      style={[local.agePill, { backgroundColor: withAlpha(accent.accent, 0.14) }]}
-                    >
-                      <Text style={[local.agePillText, { color: accent.accent }]}>
-                        {age} years old
-                      </Text>
-                    </View>
-                  ) : null}
                 </AppCard>
               </RiseIn>
             </>
@@ -1094,10 +1109,31 @@ const local = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The wheels take the card's whole width; each picker centres what it holds itself.
   wheelCard: {
-    alignItems: 'center',
     paddingVertical: spacing.xl,
+  },
+  birthdayHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
+    paddingBottom: spacing.lg,
+    marginBottom: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  birthdayHeadText: {
+    flex: 1,
+    gap: 2,
+  },
+  kicker: {
+    ...typeScale.caption,
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+  },
+  birthdayDate: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
   },
   agePill: {
     borderRadius: radii.pill,

@@ -11,6 +11,21 @@ describe('DateWheelPicker', () => {
     expect(screen.getByText('September 14, 2001')).toBeTruthy();
   });
 
+  it('leaves the preview out where the date is shown above it instead', () => {
+    render(
+      <DateWheelPicker
+        testID="birthday"
+        month={8}
+        day={14}
+        year={2001}
+        onChange={jest.fn()}
+        showPreview={false}
+      />,
+    );
+
+    expect(screen.queryByText('September 14, 2001')).toBeNull();
+  });
+
   it('changing the month clamps an out-of-range day', () => {
     const onChange = jest.fn();
     // January 31st -> switching to February must clamp the day to 28/29.

@@ -22,12 +22,23 @@ interface Props {
    * wheel ends at its year, and in that year the months and days end at it, so nothing later
    * can be picked. */
   latest?: WheelDate;
+  /** The "Month Day, Year" line under the wheels -- off where the date is shown above them
+   * instead (onboarding's birthday card). */
+  showPreview?: boolean;
 }
 
 const YEARS = yearRange();
 
 /** Month/Day/Year scroll wheels -- the presentation is always Month Day, Year regardless of locale (per spec), while the value stored is a plain calendar date. */
-export function DateWheelPicker({ testID, month, day, year, onChange, latest }: Props) {
+export function DateWheelPicker({
+  testID,
+  month,
+  day,
+  year,
+  onChange,
+  latest,
+  showPreview = true,
+}: Props) {
   const years = latest ? yearRange(new Date(), latest.year) : YEARS;
   const inLatestYear = latest !== undefined && year === latest.year;
   const months = inLatestYear ? MONTH_NAMES.slice(0, latest.month + 1) : MONTH_NAMES;
@@ -78,9 +89,11 @@ export function DateWheelPicker({ testID, month, day, year, onChange, latest }: 
           onChange={handleYearChange}
         />
       </View>
-      <Text style={styles.preview}>
-        {MONTH_NAMES[month]} {day}, {year}
-      </Text>
+      {showPreview ? (
+        <Text style={styles.preview}>
+          {MONTH_NAMES[month]} {day}, {year}
+        </Text>
+      ) : null}
     </View>
   );
 }
