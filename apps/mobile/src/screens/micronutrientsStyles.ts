@@ -105,6 +105,10 @@ export const micronutrientsStyles = StyleSheet.create({
   sectionGap: {
     gap: spacing.md,
   },
+  // A text's paragraphs, one under another.
+  paragraphs: {
+    gap: spacing.sm,
+  },
   // The page's one line on what the values are, under its widgets.
   footnote: {
     ...typeScale.caption,

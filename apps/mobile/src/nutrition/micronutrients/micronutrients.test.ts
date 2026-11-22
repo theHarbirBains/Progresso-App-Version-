@@ -1,7 +1,7 @@
 import { recipeMicronutrients } from '../foodGroups';
 import type { FoodRow } from '../foodQueries';
 import type { FoodLogRow } from '../foodLogQueries';
-import { dayLine, displayName, leadSentence, overUpperLimit, weekLine } from './display';
+import { dayLine, displayName, overUpperLimit, weekLine } from './display';
 import { isComplete, nutrientIntake, progressOf, weekIntake } from './intake';
 import {
   DRI_FOOTNOTES,
@@ -419,19 +419,5 @@ describe('the weekly tracker', () => {
       false,
       false,
     ]);
-  });
-});
-
-describe('leadSentence', () => {
-  it('splits off the first sentence, keeping the rest for More', () => {
-    expect(leadSentence('Helps absorb calcium. It keeps bones strong.')).toEqual({
-      lead: 'Helps absorb calcium.',
-      rest: 'It keeps bones strong.',
-    });
-    expect(leadSentence('One sentence only.')).toEqual({ lead: 'One sentence only.', rest: null });
-    // 2.4 mcg isn't the end of a sentence.
-    expect(leadSentence('Adults need 2.4 mcg a day. More in pregnancy.').lead).toBe(
-      'Adults need 2.4 mcg a day.',
-    );
   });
 });

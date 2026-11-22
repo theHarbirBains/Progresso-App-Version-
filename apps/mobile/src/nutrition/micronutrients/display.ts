@@ -43,18 +43,6 @@ function percentOf(percent: number, type: 'RDA' | 'AI' | null, week: boolean): s
   return week ? `Averaging ${percent}% of ${of}` : `${percent}% of ${of}`;
 }
 
-/**
- * A text's first sentence and the rest, for a page that shows the first and the rest a tap away.
- * A sentence ends at ".", "!" or "?" followed by a space and a capital (or a quote or bracket).
- */
-export function leadSentence(text: string): { lead: string; rest: string | null } {
-  const match = /[.!?](?=\s+[A-Z“"(])/.exec(text);
-  if (!match) return { lead: text.trim(), rest: null };
-  const end = match.index + 1;
-  const rest = text.slice(end).trim();
-  return { lead: text.slice(0, end).trim(), rest: rest || null };
-}
-
 function line(
   nutrient: NutrientDefinition,
   reference: ReferenceRow | null,

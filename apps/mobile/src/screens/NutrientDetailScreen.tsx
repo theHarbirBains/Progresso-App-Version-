@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as WebBrowser from 'expo-web-browser';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type StyleProp, type TextStyle } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AnimatedBar } from '../design/AnimatedBar';
 import { AppCard } from '../design/AppCard';
@@ -13,7 +13,6 @@ import type { RootStackParamList } from '../navigation/types';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { dayLabel, isTodayKey, shiftDay, weekOfLabel } from '../nutrition/logDay';
 import { dayLine, overUpperLimit, weekLine } from '../nutrition/micronutrients/display';
-import { MoreText } from '../nutrition/micronutrients/MoreText';
 import {
   DRI_PAGES,
   DRI_SOURCE_KEY,
@@ -72,9 +71,8 @@ const FOOD_DATA_SOURCES = [
  * value -- or the week's average -- the week day by day, and the foods it's from; then what it
  * does, what too little and too much can do, the recommendation for their life stage and the
  * upper limit apart from it, and every source, each a link. Each topic leads with its own heading
- * (TopicHeader) and says its first sentence, the rest a tap away (MoreText) -- nothing the source
- * says is cut. All of it comes from the catalogue (supabase/nutrients): a section with no source
- * that could be read says so instead of saying anything.
+ * (TopicHeader) and says it in full. All of it comes from the catalogue (supabase/nutrients): a
+ * section with no source that could be read says so instead of saying anything.
  */
 export function NutrientDetailScreen({ navigation, route }: Props) {
   const { nutrientId, day, range } = route.params;
@@ -327,11 +325,10 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
                     Today’s logged total is above this level.
                   </Text>
                 ) : null}
-                <MoreText
+                <Paragraphs
                   testID="nutrient-detail-ul-notes"
                   paragraphs={notesFor(nutrient.footnotes.ul)}
                   style={styles.quiet}
-                  label="Health Canada’s notes"
                 />
               </>
             ) : (
@@ -339,11 +336,10 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
                 <Text testID="nutrient-detail-ul" style={styles.body}>
                   Health Canada hasn’t set an upper limit.
                 </Text>
-                <MoreText
+                <Paragraphs
                   testID="nutrient-detail-ul-notes"
                   paragraphs={ulNotes}
                   style={styles.quiet}
-                  label="Health Canada’s notes"
                 />
               </>
             )}
@@ -353,11 +349,10 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
                   {formatAmount(row.cdrr)} {unit} per day
                 </Text>
                 <Text style={styles.body}>Chronic Disease Risk Reduction intake</Text>
-                <MoreText
+                <Paragraphs
                   testID="nutrient-detail-cdrr-notes"
                   paragraphs={notesFor(nutrient.footnotes.cdrr)}
                   style={styles.quiet}
-                  label="Health Canada’s notes"
                 />
               </>
             ) : null}
@@ -428,9 +423,9 @@ function Explanation({
       <View style={styles.sectionGap}>
         <TopicHeader icon={icon} title={title} accentColor={accentColor} />
         {part ? (
-          <MoreText testID={`${testID}-text`} paragraphs={[part.text]} style={styles.body} />
+          <Paragraphs testID={`${testID}-text`} paragraphs={[part.text]} style={styles.body} />
         ) : fallback && fallback.length > 0 ? (
-          <MoreText testID={`${testID}-text`} paragraphs={fallback} style={styles.body} />
+          <Paragraphs testID={`${testID}-text`} paragraphs={fallback} style={styles.body} />
         ) : (
           <Text testID={`${testID}-unavailable`} style={styles.quiet}>
             No reliable source to explain this yet, so we won’t guess.
@@ -483,13 +478,34 @@ function Recommendation({
       <Text style={styles.body}>
         {referenceTypeName(row.type)} for {lifeStageLabel(row)}
       </Text>
-      <MoreText
+      <Paragraphs
         testID="nutrient-detail-value-notes"
         paragraphs={valueNotes(nutrient, row)}
         style={styles.quiet}
-        label="Health Canada’s notes"
       />
     </>
+  );
+}
+
+/** Text in full, a paragraph each -- an explanation, or Health Canada's notes. */
+function Paragraphs({
+  paragraphs,
+  style,
+  testID,
+}: {
+  paragraphs: string[];
+  style: StyleProp<TextStyle>;
+  testID: string;
+}) {
+  if (paragraphs.length === 0) return null;
+  return (
+    <View testID={testID} style={styles.paragraphs}>
+      {paragraphs.map((paragraph, index) => (
+        <Text key={index} style={style}>
+          {paragraph}
+        </Text>
+      ))}
+    </View>
   );
 }
 

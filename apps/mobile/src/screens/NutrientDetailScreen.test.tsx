@@ -101,12 +101,10 @@ describe('NutrientDetailScreen', () => {
     expect(await screen.findByTestId('nutrient-detail-does')).toHaveTextContent(
       /What It Does.*Helps your body absorb calcium/,
     );
-    // Short: the first sentence, the rest a tap away -- nothing cut.
-    expect(screen.getByTestId('nutrient-detail-low')).not.toHaveTextContent(/rickets in children/);
-    fireEvent.press(screen.getByTestId('nutrient-detail-low-text-more'));
+    // In full, with nothing to tap to read the rest.
     expect(screen.getByTestId('nutrient-detail-low')).toHaveTextContent(/rickets in children/);
+    expect(screen.queryByTestId('nutrient-detail-low-text-more')).toBeNull();
     expect(screen.getByTestId('nutrient-detail-low')).toHaveTextContent(/isn’t a deficiency/);
-    fireEvent.press(screen.getByTestId('nutrient-detail-high-text-more'));
     expect(screen.getByTestId('nutrient-detail-high')).toHaveTextContent(
       /Kidney stones|kidney stones/,
     );
@@ -170,7 +168,6 @@ describe('NutrientDetailScreen', () => {
       'Health Canada hasn’t set an upper limit.',
     );
     // With no other source on too much B12, its note on the missing limit is what's said.
-    fireEvent.press(screen.getByTestId('nutrient-detail-high-text-more'));
     expect(screen.getByTestId('nutrient-detail-high')).toHaveTextContent(
       /ULs could not be established for vitamin B12.*does not mean that there is no potential for adverse effects/,
     );
