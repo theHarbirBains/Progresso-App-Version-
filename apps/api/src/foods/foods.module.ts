@@ -5,6 +5,7 @@ import { FoodsController } from './foods.controller';
 import { FoodsService } from './foods.service';
 import { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import { OpenFoodFactsProvider } from './providers/open-food-facts.provider';
+import { UsdaBrandedProvider } from './providers/usda-branded.provider';
 
 @Module({
   controllers: [FoodsController],
@@ -12,6 +13,7 @@ import { OpenFoodFactsProvider } from './providers/open-food-facts.provider';
     FoodsService,
     { provide: FOOD_PROVIDER, useClass: OpenFoodFactsProvider },
     AnthropicNutritionProvider,
+    UsdaBrandedProvider,
     AiUsageLimiter,
   ],
 })

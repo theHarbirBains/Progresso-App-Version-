@@ -7,6 +7,7 @@ import {
   BRANDED_SEARCH_BUDGET_MS,
   FoodsService,
 } from './foods.service';
+import type { UsdaBrandedProvider } from './providers/usda-branded.provider';
 import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import type { InterpretFoodResponse } from './interpretation';
 
@@ -756,6 +757,118 @@ describe('FoodsService.getByBarcode', () => {
 
     expect(provider.getFoodByBarcode).toHaveBeenCalled();
     expect(result).toMatchObject({ id: 'food-2', calories: 150 });
+  });
+
+  describe("USDA's Branded Foods, by barcode", () => {
+    const usdaOreo: NormalizedFood = {
+      ...normalizedOreo,
+      provider: 'usda_fdc',
+      providerFoodId: '2500691',
+      name: 'Chocolate Sandwich Cookies, Chocolate',
+      imageUrl: null,
+      calories: 160.14,
+      micronutrients: { sodium: 129.88, iron: 1.4008 },
+    };
+    const usdaBranded = (food: NormalizedFood | null, enabled = true) =>
+      ({
+        enabled,
+        getFoodByBarcode: jest.fn().mockResolvedValue(food),
+      }) as unknown as UsdaBrandedProvider;
+
+    it("uses USDA's label data before Open Food Facts', with Open Food Facts' photo, cited as USDA's", async () => {
+      const { supabaseService, instances } = mockSupabaseSequence([
+        { data: null, error: null }, // not cached
+        { data: { ...cachedExternalFoodRow, provider: 'usda_fdc' }, error: null }, // the upsert
+      ]);
+      const provider = mockProvider({
+        getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
+      });
+      const usda = usdaBranded(usdaOreo);
+      const service = new FoodsService(supabaseService, provider, mockNutritionProvider(), usda);
+
+      await service.getByBarcode('0066721016123', USER_ID);
+
+      expect(usda.getFoodByBarcode).toHaveBeenCalledWith('0066721016123');
+      const row = instances[1]!.calls.upsert?.[0]?.[0] as Record<string, unknown>;
+      expect(row).toMatchObject({
+        provider: 'usda_fdc',
+        provider_food_id: '2500691',
+        calories: 160.14,
+        micronutrients: { sodium: 129.88, iron: 1.4008 },
+        image_url: normalizedOreo.imageUrl,
+        nutrition_source_kind: 'usda_fdc',
+        nutrition_licence: 'public_domain',
+      });
+    });
+
+    it('falls back to Open Food Facts when USDA has no such barcode', async () => {
+      const { supabaseService, instances } = mockSupabaseSequence([
+        { data: null, error: null },
+        { data: cachedExternalFoodRow, error: null },
+      ]);
+      const provider = mockProvider({
+        getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
+      });
+      const service = new FoodsService(
+        supabaseService,
+        provider,
+        mockNutritionProvider(),
+        usdaBranded(null),
+      );
+
+      await service.getByBarcode('0066721016123', USER_ID);
+
+      expect(instances[1]!.calls.upsert?.[0]?.[0]).toMatchObject({ provider: 'open_food_facts' });
+    });
+
+    it("checks a product cached from Open Food Facts against USDA's once, not on every scan", async () => {
+      const { supabaseService } = mockSupabaseSequence([
+        { data: cachedExternalFoodRow, error: null },
+        { data: cachedExternalFoodRow, error: null }, // the refresh's upsert
+        { data: cachedExternalFoodRow, error: null }, // the next scan's lookup
+      ]);
+      const provider = mockProvider({
+        getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
+      });
+      const usda = usdaBranded(null);
+      const service = new FoodsService(supabaseService, provider, mockNutritionProvider(), usda);
+
+      await service.getByBarcode('0066721016123', USER_ID);
+      await service.getByBarcode('0066721016123', USER_ID);
+
+      expect(usda.getFoodByBarcode).toHaveBeenCalledTimes(1);
+    });
+
+    it("prefers USDA's cached row to Open Food Facts' for the same barcode", async () => {
+      const { supabaseService, instances } = mockSupabaseSequence([
+        { data: cachedExternalFoodRow, error: null },
+      ]);
+      const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+      await service.getByBarcode('0066721016123', USER_ID);
+
+      expect(instances[0]!.calls.order?.[1]).toEqual([
+        'provider',
+        { ascending: false, nullsFirst: false },
+      ]);
+    });
+
+    it('asks nothing of USDA without a key', async () => {
+      const { supabaseService } = mockSupabaseSequence([
+        { data: cachedExternalFoodRow, error: null },
+      ]);
+      const usda = usdaBranded(usdaOreo, false);
+      const service = new FoodsService(
+        supabaseService,
+        mockProvider(),
+        mockNutritionProvider(),
+        usda,
+      );
+
+      await service.getByBarcode('0066721016123', USER_ID);
+
+      expect(usda.getFoodByBarcode).not.toHaveBeenCalled();
+    });
   });
 
   it("never re-reads the provider for the user's own food or a seeded one, which have no provider wording", async () => {

@@ -25,7 +25,7 @@ import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodProvenance, FoodRow } from './foodQueries';
 import { FoodNutrients } from './FoodNutrients';
-import { foodSourceText } from './foodSource';
+import { foodSourceText, photoCredit } from './foodSource';
 import { wholeFigure } from './wholeFigures';
 
 export type LoggableFood = Pick<
@@ -348,6 +348,7 @@ export function LogFoodStep({
       ) : source ? (
         <Text testID="log-food-source" style={styles.attribution}>
           Source: {source}
+          {photoCredit(food.imageUrl) ? ` · ${photoCredit(food.imageUrl)}` : ''}
         </Text>
       ) : null}
 

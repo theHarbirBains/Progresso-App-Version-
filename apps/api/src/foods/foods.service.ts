@@ -19,6 +19,7 @@ import { CatalogNutritionSource } from './sources/catalog.source';
 import { OpenFoodFactsNutritionSource } from './sources/open-food-facts.source';
 import { timeLimited } from './sources/time-limited.source';
 import { USDA_CITATION, UsdaNutritionSource } from './sources/usda.source';
+import { barcodeKey, UsdaBrandedProvider } from './providers/usda-branded.provider';
 import { rankFoods, type RankableFood } from './search-ranking';
 import { correctWord, searchTermsFor, type SearchTerms } from './search-terms';
 import { SearchVocabulary } from './search-vocabulary';
@@ -262,6 +263,9 @@ export const BARCODE_REFRESH_AFTER_DAYS = 30;
 // is read again on its next scan.
 const MICRONUTRIENTS_READ_SINCE = Date.parse('2026-11-21T21:00:00Z');
 const DAY_MS = 86_400_000;
+// How many barcodes the server remembers having checked USDA's Branded Foods for, so a product
+// cached from Open Food Facts is checked there once per server run, not on every scan.
+const USDA_CHECKED_LIMIT = 5000;
 
 /** The work's result if it settles within `ms`, otherwise null; the work itself carries on. */
 async function withinBudget<T>(work: Promise<T>, ms: number): Promise<T | null> {
@@ -336,9 +340,14 @@ export class FoodsService implements OnModuleInit {
     private readonly supabaseService: SupabaseService,
     @Inject(FOOD_PROVIDER) private readonly provider: FoodProvider,
     private readonly nutritionProvider: AnthropicNutritionProvider,
+    // USDA's Branded Foods, by barcode, before the provider -- off without a key (and in tests).
+    private readonly usdaBranded?: UsdaBrandedProvider,
   ) {
     this.vocabulary = new SearchVocabulary(supabaseService);
   }
+
+  /** Barcodes checked against USDA's Branded Foods this server run (see getByBarcode). */
+  private readonly usdaChecked = new Set<string>();
 
   // The words a misspelt search is put right with are read as the server starts, so the first
   // search with a typo doesn't wait for them.
@@ -827,7 +836,13 @@ export class FoodsService implements OnModuleInit {
 
     const cached = await this.queryLocalByBarcode(trimmed, userId);
     if (!cached) return this.lookUpAndCacheBarcode(trimmed);
-    if (!cached.needsRefresh) return cached.record;
+    // A product cached from Open Food Facts is checked against USDA's Branded Foods once, so a
+    // manufacturer's own label data replaces crowd-sourced figures where USDA has it.
+    const usdaUnchecked =
+      cached.record.provider === this.provider.name &&
+      this.usdaBranded?.enabled === true &&
+      !this.usdaChecked.has(barcodeKey(trimmed));
+    if (!cached.needsRefresh && !usdaUnchecked) return cached.record;
 
     const refreshed = await withinBudget(
       this.lookUpAndCacheBarcode(trimmed),
@@ -836,19 +851,32 @@ export class FoodsService implements OnModuleInit {
     return refreshed ?? cached.record;
   }
 
-  /** The provider's product for this barcode, cached; null when it has none or the read fails. Never rejects. */
+  /**
+   * This barcode's product, cached; null when no source has it or the reads fail. Never rejects.
+   * USDA's Branded Foods (the manufacturer's label data) and the provider (Open Food Facts) are
+   * asked at once: USDA's figures where it has the product -- with the provider's photo, as USDA
+   * has none -- else the provider's.
+   */
   private async lookUpAndCacheBarcode(barcode: string): Promise<FoodRecord | null> {
-    let food: NormalizedFood | null;
-    try {
-      food = await this.provider.getFoodByBarcode(barcode);
-    } catch (err) {
-      this.logger.warn(
-        `Food provider barcode lookup failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      return null;
-    }
+    const usdaEnabled = this.usdaBranded?.enabled === true;
+    const [usda, provided] = await Promise.all([
+      usdaEnabled ? this.usdaBranded!.getFoodByBarcode(barcode) : Promise.resolve(null),
+      this.provider.getFoodByBarcode(barcode).catch((err: unknown) => {
+        this.logger.warn(
+          `Food provider barcode lookup failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return null;
+      }),
+    ]);
+    if (usdaEnabled) this.rememberUsdaChecked(barcode);
+    const food = usda ? { ...usda, imageUrl: provided?.imageUrl ?? null } : provided;
     if (!food) return null;
     return this.upsertExternalFood(food);
+  }
+
+  private rememberUsdaChecked(barcode: string) {
+    if (this.usdaChecked.size >= USDA_CHECKED_LIMIT) this.usdaChecked.clear();
+    this.usdaChecked.add(barcodeKey(barcode));
   }
 
   /**
@@ -870,8 +898,10 @@ export class FoodsService implements OnModuleInit {
       .eq('barcode', barcode)
       .eq('is_active', true)
       .or(`created_by.is.null${ownFilter}`)
-      // Own custom food first (a non-null created_by), then the shared catalog.
+      // Own custom food first (a non-null created_by), then the shared catalog -- USDA's label
+      // data ('usda_fdc') before Open Food Facts' for the same barcode.
       .order('created_by', { ascending: true, nullsFirst: false })
+      .order('provider', { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
 
@@ -928,6 +958,19 @@ export class FoodsService implements OnModuleInit {
       is_active: true,
       // Where the figures came from, as the provenance migration recorded it for products cached
       // before: so a product logged now carries it into the person's copy and their log too.
+      // A Branded food from USDA: the manufacturer's label data, public domain.
+      ...(food.provider === 'usda_fdc'
+        ? {
+            nutrition_confidence: 'verified',
+            nutrition_source_kind: 'usda_fdc',
+            nutrition_source_id: food.providerFoodId,
+            nutrition_matched_name: food.name,
+            nutrition_data_version: 'Branded Foods',
+            nutrition_retrieved_at: new Date().toISOString(),
+            nutrition_licence: 'public_domain',
+            nutrition_attribution: `${USDA_CITATION} Branded Foods. https://fdc.nal.usda.gov/`,
+          }
+        : {}),
       ...(food.provider === 'open_food_facts'
         ? {
             nutrition_confidence: 'verified',

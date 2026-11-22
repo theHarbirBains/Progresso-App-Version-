@@ -5,6 +5,7 @@ import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { FoodImage } from './FoodImage';
 import { wholeFigure } from './wholeFigures';
+import { photoCredit } from './foodSource';
 
 interface FoodFactsTestIDs {
   summary?: string;
@@ -129,6 +130,7 @@ export function FoodFacts({
       ) : sourceText ? (
         <Text testID={testIDs.source} style={styles.attribution}>
           Source: {sourceText}
+          {photoCredit(imageUrl) ? ` · ${photoCredit(imageUrl)}` : ''}
         </Text>
       ) : null}
     </View>

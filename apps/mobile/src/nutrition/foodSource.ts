@@ -8,6 +8,16 @@ export interface FoodSourceInput {
 }
 
 /**
+ * A credit for the food's photo when it's Open Food Facts' and its figures come from elsewhere --
+ * a scanned product whose figures are USDA's label data keeps Open Food Facts' photo of it.
+ */
+export function photoCredit(imageUrl: string | null | undefined): string | null {
+  return imageUrl && /(^|\.)openfoodfacts\.org\//.test(imageUrl.replace(/^https?:\/\//, ''))
+    ? 'Photo: Open Food Facts'
+    : null;
+}
+
+/**
  * Where a food's figures come from, in a few words for the food's page -- "USDA FoodData
  * Central (SR Legacy 2018-04)", "Open Food Facts", "Progresso's built-in foods" -- so a figure
  * someone doubts can be traced. Null when nothing is known. Never claims more than is recorded:

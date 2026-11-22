@@ -1,4 +1,4 @@
-import { foodSourceText, nutritionReportDraft } from './foodSource';
+import { foodSourceText, nutritionReportDraft, photoCredit } from './foodSource';
 import type { FoodProvenance } from './foodQueries';
 
 const provenance = (overrides: Partial<FoodProvenance>): FoodProvenance => ({
@@ -82,5 +82,15 @@ describe('nutritionReportDraft', () => {
       null,
     );
     expect(draft.title.length).toBe(120);
+  });
+});
+
+describe('photoCredit', () => {
+  it("credits Open Food Facts' photo of a product whose figures come from elsewhere", () => {
+    expect(photoCredit('https://images.openfoodfacts.org/images/products/004/400/front.jpg')).toBe(
+      'Photo: Open Food Facts',
+    );
+    expect(photoCredit('https://example.com/openfoodfacts.org/x.jpg')).toBeNull();
+    expect(photoCredit(null)).toBeNull();
   });
 });
