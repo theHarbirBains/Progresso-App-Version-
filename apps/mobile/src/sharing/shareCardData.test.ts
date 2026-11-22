@@ -82,7 +82,7 @@ describe('fetchShareCardData', () => {
         activity: 'outdoor_run',
         icon: 'wind',
         name: 'Outdoor Running',
-        figures: '15 min · 2.5 km · 6:00 /km',
+        figures: '15 min · 2.5 km',
       },
     ]);
     // 40 minutes of lifting and the 15-minute run: 55, never the hour the session took.

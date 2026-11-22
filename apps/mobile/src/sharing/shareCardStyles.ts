@@ -159,6 +159,7 @@ export const shareCardBodyStyles = StyleSheet.create(
       ...typeScale.callout,
       color: colors.textPrimary,
       flex: 1,
+      minWidth: 48,
     },
     // A personal record's small tag, beside its value (colour set per accent).
     prTag: {
@@ -179,10 +180,14 @@ export const shareCardBodyStyles = StyleSheet.create(
       ...typeScale.callout,
       color: colors.textSecondary,
     },
+    // A row's figure: never more than its share of the row (the name keeps the rest), shrinking
+    // to fit rather than running off the card.
     liftValue: {
       fontFamily: fonts.mono,
       fontSize: typeScale.callout.fontSize,
       color: colors.textPrimary,
+      flexShrink: 1,
+      maxWidth: '62%',
     },
     // The compact card's slimmer rows (a long workout): no picture, a size smaller.
     rowCompact: {

@@ -16,8 +16,16 @@ import { AchievementEmblem } from './AchievementEmblem';
 import { RankEmblem } from './RankEmblem';
 import { rankForPoints } from './ranks';
 
-/** While one of these is open, unlocks wait: a live workout is never interrupted. */
-const LIVE_ROUTES = new Set(['ActiveWorkout', 'GroupSession', 'TrainerLiveWorkout']);
+/**
+ * While one of these is open, unlocks wait: a live workout is never interrupted, and a workout
+ * just finished lands on its Share page -- what it earned shows once that's left (Harbir's call).
+ */
+const HELD_ROUTES = new Set([
+  'ActiveWorkout',
+  'GroupSession',
+  'TrainerLiveWorkout',
+  'ShareWorkout',
+]);
 /** More than this at once shows as a summary, not one by one. */
 const LISTED = 4;
 
@@ -51,8 +59,8 @@ function stepText(up: LevelUp): string {
 }
 
 /**
- * Shows each batch of newly awarded levels as it comes in -- never over a live workout, where it
- * waits until you've left it. A new tier comes first, on its own: the emblem rising in, "New
+ * Shows each batch of newly awarded levels as it comes in -- never over a live workout, or the
+ * Share page a finished workout lands on: it waits until you've left them. A new tier comes first, on its own: the emblem rising in, "New
  * Rank" and its name. Then the achievements: one with its emblem, name, the level it was at and
  * the one it's reached, the AP, and how far to its next level; several as a list, each with its
  * new level and AP, and the total. Under them the rank bar shows where you are now. Continue
@@ -70,8 +78,8 @@ export function AchievementUnlockHost({
   const { weightUnit } = useProgressTheme();
   const reduceMotion = useReduceMotionPreference();
   const batch = unlocks[0];
-  const live = LIVE_ROUTES.has(currentRouteName ?? '');
-  const visible = Boolean(batch) && !live && currentRouteName !== undefined;
+  const held = HELD_ROUTES.has(currentRouteName ?? '');
+  const visible = Boolean(batch) && !held && currentRouteName !== undefined;
 
   const before = batch ? rankForPoints(batch.pointsBefore) : null;
   const after = batch ? rankForPoints(batch.pointsAfter) : null;

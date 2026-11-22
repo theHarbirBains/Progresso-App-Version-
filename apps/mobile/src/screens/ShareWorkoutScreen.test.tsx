@@ -495,6 +495,52 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     await settle();
   });
 
+  it('previews the card close up -- the card and a little background, as large as the room allows', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('share-card');
+    act(() => {
+      fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 480 } },
+      });
+      // A card 276 wide and 360 tall, centred on the story.
+      fireEvent(screen.getByTestId('share-card-frame'), 'layout', {
+        nativeEvent: { layout: { x: 42, y: 50, width: 276, height: 360 } },
+      });
+    });
+
+    // 276 + 28 by 360 + 28: height-bound, 480 / 388 -- bigger than the whole story's 0.75.
+    const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
+    expect(preview.height).toBeCloseTo(480);
+    expect(preview.width).toBeCloseTo(304 * (480 / 388));
+    // Only the preview: the story is still its one size.
+    expect(StyleSheet.flatten(screen.getByTestId('share-story').props.style).height).toBe(640);
+    await settle();
+  });
+
+  it('keeps a long cardio line inside its row: the name keeps its room, the figures shrink to fit', async () => {
+    mockFetchShareCardData.mockResolvedValue({
+      ...cardData,
+      cardio: [
+        { activity: 'treadmill', icon: 'trending-up', name: 'Treadmill', figures: '29 min · 5 km' },
+      ],
+      cardioSeconds: 1740,
+      cardioDistanceM: 5000,
+    });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    const figures = await screen.findByTestId('share-card-cardio-0');
+    expect(figures.props.numberOfLines).toBe(1);
+    expect(figures.props.adjustsFontSizeToFit).toBe(true);
+    expect(StyleSheet.flatten(figures.props.style).maxWidth).toBe('62%');
+    expect(screen.getByTestId('share-card-cardio-row-0')).toHaveTextContent(
+      /Treadmill.*29 min · 5 km/,
+    );
+    await settle();
+  });
+
   it("keeps the card inside the story's safe area, clear of Instagram's and TikTok's own controls", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,

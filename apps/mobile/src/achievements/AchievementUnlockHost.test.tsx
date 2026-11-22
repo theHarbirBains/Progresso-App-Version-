@@ -127,6 +127,14 @@ describe('AchievementUnlockHost', () => {
     }
   });
 
+  it('waits for the Share page a finished workout lands on to be left', () => {
+    const view = renderHost([batch([['dedicated', 'Dedicated', 125]], 300)], 'ShareWorkout');
+    expect(screen.queryByTestId('achievement-unlock')).toBeNull();
+    view.unmount();
+    renderHost([batch([['dedicated', 'Dedicated', 125]], 300)], 'WorkoutHistory');
+    expect(screen.getByTestId('achievement-unlock')).toBeTruthy();
+  });
+
   it('shows a new rank on its own first, then the achievements', () => {
     renderHost([batch([['veteran', 'Veteran', 1000]], 1000)]);
 

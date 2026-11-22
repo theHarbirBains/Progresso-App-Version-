@@ -47,12 +47,18 @@ export interface ShareTopSet {
   prLabel: string | null;
 }
 
+/** How many of an activity's figures the card shows: its time and the one after it. */
+const SHARE_CARDIO_FIGURES = 2;
+
 /** One cardio activity as the card draws it: its glyph, its name and its figures on one line. */
 export interface ShareCardio {
   activity: CardioActivity;
   icon: (typeof CARDIO_INFO)[CardioActivity]['icon'];
   name: string;
-  /** "30 min · 5 km · 6:00 /km" -- only what was saved, in km for everyone, never calories. */
+  /**
+   * Its time and the next figure saved ("30 min · 5 km", "15 min · Level 8") -- the two that
+   * matter most, so a row always fits; in km for everyone, never calories.
+   */
   figures: string;
 }
 
@@ -173,7 +179,7 @@ export async function fetchShareCardData(
       activity: entry.activity,
       icon: CARDIO_INFO[entry.activity].icon,
       name: cardioName(entry),
-      figures: cardioDetails(entry),
+      figures: cardioDetails(entry).split(' · ').slice(0, SHARE_CARDIO_FIGURES).join(' · '),
     })),
     cardioSeconds: totals.seconds,
     cardioDistanceM: totals.distanceM,

@@ -42,6 +42,8 @@ const COMPACT_ROW_GAP = 3;
 const SECOND_SECTION_SPACE = 22;
 // At most this many cardio rows (past it, the last says how many more); the top sets get the rest.
 const MAX_CARDIO_ROWS = 3;
+// A row's value never takes more than its share of the row; a long one shrinks to fit, this far.
+const VALUE_MIN_SCALE = 0.6;
 
 const STAT_ICON_SIZE = cardPt(18);
 // The logo the app opens with (LaunchScreen's mark), cropped tight to the
@@ -71,10 +73,6 @@ function formatCardDate(iso: string): string {
 
 function formatVolume(kg: number, unit: 'kg' | 'lb'): string {
   return Math.round(roundWeight(fromKg(kg, unit))).toLocaleString();
-}
-
-function setValue(set: ShareTopSet, unit: 'kg' | 'lb'): string {
-  return formatSetValues(set, unit);
 }
 
 function Stat({
@@ -146,11 +144,23 @@ function CardioThumb({
   );
 }
 
+/** Where the card sits on the story canvas, in canvas points -- for a preview that shows it close up. */
+export interface CardRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // The shareable workout image: the card on a 9:16 story canvas of the app
 // theme's own plain background colour -- no photo, no gradient -- so it looks
-// like the app it came from. This whole canvas is what gets captured -- the
-// preview IS the image.
-export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<ViewInstance> }) {
+// like the app it came from. This whole canvas is what gets captured; the
+// screen previews the card itself, close up (ShareWorkoutScreen).
+export function ShareStory({
+  storyRef,
+  onCardLayout,
+  ...cardProps
+}: Props & { storyRef?: Ref<ViewInstance>; onCardLayout?: (rect: CardRect) => void }) {
   const { theme } = useAppTheme();
   return (
     <View
@@ -160,7 +170,15 @@ export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<
       style={[styles.story, STORY_CANVAS, { backgroundColor: theme.background }]}
     >
       <View testID="share-story-safe-area" style={[styles.safeArea, STORY_SAFE_AREA_STYLE]}>
-        <ShareCard {...cardProps} />
+        <View
+          testID="share-card-frame"
+          onLayout={(event) => {
+            const { x, y, width, height } = event.nativeEvent.layout;
+            onCardLayout?.({ x, y: y + STORY_SAFE_AREA.top, width, height });
+          }}
+        >
+          <ShareCard {...cardProps} />
+        </View>
       </View>
     </View>
   );
@@ -338,8 +356,10 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
                       isRecord && { color: accentColor },
                     ]}
                     numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={VALUE_MIN_SCALE}
                   >
-                    {setValue(set, weightUnit)}
+                    {formatSetValues(set, weightUnit)}
                   </Text>
                 </View>
               );
@@ -378,6 +398,8 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
                   testID={`share-card-cardio-${index}`}
                   style={[card.liftValue, compact && card.liftValueCompact]}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={VALUE_MIN_SCALE}
                 >
                   {entry.figures}
                 </Text>
