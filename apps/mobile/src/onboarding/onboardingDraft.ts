@@ -24,6 +24,9 @@ import { toDateStringUTC } from './dateWheelValues';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
 import { defaultRepRange } from '../workouts/progression';
+import { activateProgram } from '../programs/programActivation';
+import type { ProgramChoice } from '../programs/programHost';
+import { programById, variationById } from '../programs/programs';
 
 /**
  * Everything onboarding collects, held entirely in local/draft state --
@@ -84,6 +87,9 @@ export interface OnboardingDraft {
   /** Skipped choosing a split for now: like Create Your Own, the account starts with no split --
    * Start Workout asks for one the first time it's needed. */
   skippedSplit: boolean;
+  /** A workout program chosen in place of a preset (programs/): made the active split once the
+   * account exists, like a preset. */
+  selectedProgram: ProgramChoice | null;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
   /** Whether a trainer has been logging their workouts: true with the code the trainer gave
@@ -137,6 +143,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
   skippedSplit: false,
+  selectedProgram: null,
   emailOptIn: null,
   pushNotificationsOptIn: null,
   hasTrainerCode: null,
@@ -340,7 +347,12 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
     case 'averageWorkoutLength':
       return draft.averageWorkoutLength != null;
     case 'workoutSplit':
-      return draft.selectedSplitPresetId != null || draft.wantsCustomSplit || draft.skippedSplit;
+      return (
+        draft.selectedSplitPresetId != null ||
+        draft.selectedProgram != null ||
+        draft.wantsCustomSplit ||
+        draft.skippedSplit
+      );
     case 'emailPreference':
       return draft.emailOptIn != null;
     case 'pushNotifications':
@@ -425,7 +437,10 @@ export async function submitOnboardingDraft(
 ): Promise<ProfileResponse> {
   const input = draftToProfileInput(draft);
 
-  if (draft.selectedSplitPresetId) {
+  if (draft.selectedProgram) {
+    const split = await setUpProgram(userId, draft.selectedProgram);
+    if (split) input.activeWorkoutSplitId = split;
+  } else if (draft.selectedSplitPresetId) {
     const preset = WORKOUT_SPLIT_PRESETS.find((p) => p.id === draft.selectedSplitPresetId);
     if (preset) {
       const split = await materializeWorkoutSplitPreset(userId, preset);
@@ -463,6 +478,29 @@ async function claimTrainerCode(accessToken: string, code: string): Promise<void
       "Your trainer's code didn't work",
       `${error instanceof Error ? error.message : String(error)}\n\nYou can enter it again in Settings > Trainer Code.`,
     );
+  }
+}
+
+/**
+ * The workout program they chose, made a split of their own (its id). A program that can't be set
+ * up never fails sign-up, which goes on without it: they're told where to choose it again.
+ */
+async function setUpProgram(userId: string, choice: ProgramChoice): Promise<string | null> {
+  const program = programById(choice.programId);
+  if (!program) return null;
+  try {
+    const split = await activateProgram(
+      userId,
+      program,
+      variationById(program, choice.variationId),
+    );
+    return split.id;
+  } catch {
+    Alert.alert(
+      "Your program couldn't be set up",
+      'You can choose it again in Workout Splits > Workout Programs.',
+    );
+    return null;
   }
 }
 

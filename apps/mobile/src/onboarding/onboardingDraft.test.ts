@@ -32,6 +32,14 @@ jest.mock('../lib/pushNotifications', () => ({
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
   saveNutritionGoals: jest.fn().mockResolvedValue({}),
 }));
+// Using a workout program makes a split through Supabase (its own tests are in
+// programs/programActivation.test.ts).
+jest.mock('../programs/programActivation', () => ({ activateProgram: jest.fn() }));
+// A made-up program in place of the catalogue, which is empty until the programs are written.
+jest.mock('../programs/programCatalog', () => ({
+  WORKOUT_PROGRAMS: [jest.requireActual('../programs/__fixtures__/programs').TEST_PROGRAM],
+}));
+
 jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
 }));
@@ -419,5 +427,58 @@ describe('Find your country and Your plan is ready', () => {
     expect(computeStartStepIndex({ ...FULL_DRAFT, summarySeen: false })).toBe(
       STEP_ORDER.indexOf('summary'),
     );
+  });
+});
+
+describe('submitOnboardingDraft -- a workout program', () => {
+  it('makes the program chosen their active split, in place of a preset', async () => {
+    const { activateProgram } = jest.requireMock('../programs/programActivation') as {
+      activateProgram: jest.Mock;
+    };
+    activateProgram.mockReset().mockResolvedValue({ id: 'split-program', name: 'Test Split' });
+
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...EMPTY_DRAFT,
+      selectedProgram: { programId: 'test-split', variationId: 'six' },
+    });
+
+    expect(activateProgram).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ id: 'test-split' }),
+      expect.objectContaining({ id: 'six' }),
+    );
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ activeWorkoutSplitId: 'split-program', onboardingCompleted: true }),
+    );
+  });
+
+  it("never fails sign-up when the program can't be set up: it says where to choose it again", async () => {
+    const { activateProgram } = jest.requireMock('../programs/programActivation') as {
+      activateProgram: jest.Mock;
+    };
+    activateProgram.mockReset().mockRejectedValue(new Error('offline'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...EMPTY_DRAFT,
+      selectedProgram: { programId: 'test-split', variationId: 'three-balanced' },
+    });
+
+    expect(alert).toHaveBeenCalledWith(
+      "Your program couldn't be set up",
+      expect.stringMatching(/Workout Splits > Workout Programs/),
+    );
+    expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('activeWorkoutSplitId');
+    alert.mockRestore();
+  });
+
+  it('counts a program chosen as the split question answered', () => {
+    expect(
+      isStepAnswered('workoutSplit', {
+        ...EMPTY_DRAFT,
+        selectedProgram: { programId: 'test-split', variationId: 'six' },
+      }),
+    ).toBe(true);
   });
 });

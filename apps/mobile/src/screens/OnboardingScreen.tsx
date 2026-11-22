@@ -66,6 +66,9 @@ import { GetStartedIntro } from '../onboarding/GetStartedIntro';
 import { NutritionTargetsStep } from '../onboarding/NutritionTargetsStep';
 import { OnboardingTiles } from '../onboarding/OnboardingTiles';
 import { PlanSummary } from '../onboarding/PlanSummary';
+import { OnboardingPrograms } from '../programs/OnboardingPrograms';
+import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
+import { programById, splitNameFor, variationById } from '../programs/programs';
 import { setWelcomeStage } from '../onboarding/welcomeStage';
 import { TextInput } from '../design/TextInput';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
@@ -145,6 +148,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const [requestingNotifications, setRequestingNotifications] = useState(false);
   const [locating, setLocating] = useState(false);
   const [ranksOpen, setRanksOpen] = useState(false);
+  const [programsOpen, setProgramsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -429,6 +433,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const showContinue =
     CONTINUE_STEPS.has(step) ||
     (!OWN_FORWARD_STEPS.has(step) && arrival.current.answered && isStepAnswered(step, draft));
+
+  // The workout program chosen, by the name its split will have.
+  const chosenProgram = draft.selectedProgram ? programById(draft.selectedProgram.programId) : null;
+  const chosenProgramName =
+    chosenProgram && draft.selectedProgram
+      ? splitNameFor(chosenProgram, variationById(chosenProgram, draft.selectedProgram.variationId))
+      : null;
 
   // Shown under the birthday wheels as they turn.
   const age = draft.birthday ? ageFromBirthday(draft.birthday) : null;
@@ -801,8 +812,36 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <>
               <Text style={styles.stepTitle}>Choose your workout split</Text>
               <Text style={styles.stepExplanation}>
-                Start from a ready-made split, or build your own.
+                Start from a workout program or a ready-made split, or build your own.
               </Text>
+              {/* Workout Programs: the app's own program pages, in a sheet. */}
+              <RiseIn>
+                <View style={local.programsEntry}>
+                  <ProgramsEntryCard
+                    hero
+                    testID="onboarding-programs-open"
+                    chosen={chosenProgramName}
+                    onPress={() => setProgramsOpen(true)}
+                  />
+                </View>
+              </RiseIn>
+              <OnboardingPrograms
+                visible={programsOpen}
+                chosen={draft.selectedProgram}
+                onChoose={(selectedProgram) =>
+                  updateDraft({
+                    selectedProgram,
+                    selectedSplitPresetId: null,
+                    wantsCustomSplit: false,
+                    skippedSplit: false,
+                  })
+                }
+                onClose={() => setProgramsOpen(false)}
+                onFinish={() => {
+                  setProgramsOpen(false);
+                  advance();
+                }}
+              />
               {/* select-only: no account exists yet to own a real split
                   against, so picking a preset only records which one was
                   chosen -- see submitOnboardingDraft, which materializes it
@@ -823,6 +862,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 onPresetActivated={(presetId) => {
                   updateDraft({
                     selectedSplitPresetId: presetId,
+                    selectedProgram: null,
                     wantsCustomSplit: false,
                     skippedSplit: false,
                   });
@@ -831,6 +871,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 onCreateOwn={() => {
                   updateDraft({
                     selectedSplitPresetId: null,
+                    selectedProgram: null,
                     wantsCustomSplit: true,
                     skippedSplit: false,
                   });
@@ -846,6 +887,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   onPress={() => {
                     updateDraft({
                       selectedSplitPresetId: null,
+                      selectedProgram: null,
                       wantsCustomSplit: false,
                       skippedSplit: true,
                     });
@@ -1145,6 +1187,9 @@ const local = StyleSheet.create({
   },
   cards: {
     gap: spacing.sm,
+  },
+  programsEntry: {
+    marginBottom: spacing.lg,
   },
   cardHead: {
     flexDirection: 'row',

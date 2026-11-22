@@ -125,6 +125,23 @@ export async function reorderPlan(items: { id: string; position: number }[]): Pr
   }
 }
 
+/** Plans a whole day at once, in the order given -- a workout program's day made a split's. */
+export async function addPlannedExercises(
+  dayId: string,
+  items: { exerciseId: string; targetSets: number }[],
+): Promise<void> {
+  if (items.length === 0) return;
+  const { error } = await supabase.from('workout_split_day_exercises').insert(
+    items.map((item, position) => ({
+      workout_split_day_id: dayId,
+      exercise_id: item.exerciseId,
+      position,
+      target_sets: item.targetSets,
+    })),
+  );
+  if (error) throw new Error(error.message);
+}
+
 /** Copies one day's plan onto another -- duplicating a split. */
 export async function copyDayPlan(fromDayId: string, toDayId: string): Promise<void> {
   const plan = await fetchDayPlan(fromDayId);

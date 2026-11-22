@@ -281,12 +281,20 @@ describe('WorkoutSplitsScreen background refresh on focus', () => {
   });
 });
 
+/** The split widgets: every widget but Workout Programs'. */
+function splitCards() {
+  return screen
+    .UNSAFE_queryAllByType(AppCard)
+    .filter((card) => card.props.testID !== 'workout-splits-programs');
+}
+
 describe('WorkoutSplitsScreen -- one widget per split', () => {
   it('shows each split as its own widget: a row with its actions beneath it', async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    // One widget per split (Workout Programs' widget sits apart, under its own heading).
+    expect(splitCards()).toHaveLength(2);
     const block = within(screen.getByTestId('workout-split-split-1'));
     expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - Hypertrophy/);
     for (const action of ['edit', 'duplicate', 'delete']) {
@@ -298,8 +306,8 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    const cards = screen.UNSAFE_queryAllByType(AppCard);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false]);
+    expect(splitCards().map((c) => Boolean(c.props.hero))).toEqual([true, false]);
+    expect(screen.getByTestId('workout-splits-programs')).toBeTruthy();
   });
 
   it('bands only the active split in the Workout accent, never the others', async () => {
@@ -359,5 +367,14 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     renderScreen();
 
     expect(await screen.findByTestId('workout-splits-create')).toBeTruthy();
+  });
+});
+
+describe('WorkoutSplitsScreen -- Workout Programs', () => {
+  it('opens Workout Programs from its widget', async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('workout-splits-programs'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutPrograms');
   });
 });

@@ -48,6 +48,14 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
 }));
 jest.mock('../lib/legalLinks', () => ({ openLegalPage: jest.fn() }));
 
+// Using a workout program makes a split through Supabase (its own tests are in
+// programs/programActivation.test.ts).
+jest.mock('../programs/programActivation', () => ({ activateProgram: jest.fn() }));
+// A made-up program in place of the catalogue, which is empty until the programs are written.
+jest.mock('../programs/programCatalog', () => ({
+  WORKOUT_PROGRAMS: [jest.requireActual('../programs/__fixtures__/programs').TEST_PROGRAM],
+}));
+
 jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
 }));
@@ -1051,6 +1059,32 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     );
     renderScreen();
   }
+
+  it('chooses a workout program in a sheet of its own, made their split with the account', async () => {
+    await startAt('workoutSplit', { selectedSplitPresetId: null, skippedSplit: false });
+    expect(await screen.findByTestId('onboarding-programs-open')).toHaveTextContent(
+      /Workout Programs.*1 ready-made program/,
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-programs-open'));
+    fireEvent.press(await screen.findByTestId('workout-programs-all'));
+    fireEvent.press(await screen.findByTestId('program-card-test-split'));
+    await act(async () => {
+      fireEvent.press(await screen.findByTestId('program-detail-use'));
+    });
+    expect(await screen.findByTestId('program-added')).toHaveTextContent(/Program Chosen!/);
+    fireEvent.press(screen.getByTestId('program-added-continue'));
+
+    // On to the next question, with the program remembered in place of a preset.
+    expect(await screen.findByTestId('onboarding-step-ranks')).toBeTruthy();
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        selectedProgram: { programId: 'test-split', variationId: 'three-balanced' },
+        selectedSplitPresetId: null,
+      });
+    });
+  });
 
   it('finds the country the phone is in and lists it first, once allowed', async () => {
     jest.mocked(locationAvailable).mockReturnValue(true);

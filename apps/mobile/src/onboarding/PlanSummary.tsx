@@ -7,6 +7,7 @@ import { Text } from '../design/Text';
 import { colors, fonts, spacing, typeScale } from '../design/theme';
 import { includesNutrition, membershipOption } from '../membership/membershipTiers';
 import { useAppTheme } from '../theme/appThemeContext';
+import { programById, splitNameFor, variationById } from '../programs/programs';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
 import type { OnboardingDraft, OnboardingStep } from './onboardingDraft';
 import {
@@ -74,11 +75,19 @@ function itemsFor(draft: OnboardingDraft): Item[] {
     });
   }
   const preset = WORKOUT_SPLIT_PRESETS.find((p) => p.id === draft.selectedSplitPresetId);
+  const program = draft.selectedProgram ? programById(draft.selectedProgram.programId) : null;
   items.push({
     step: 'workoutSplit',
-    icon: 'grid',
-    label: 'Split',
-    value: preset ? preset.name : draft.wantsCustomSplit ? 'Your own' : 'Choose later',
+    icon: program ? 'award' : 'grid',
+    label: program ? 'Program' : 'Split',
+    value:
+      program && draft.selectedProgram
+        ? splitNameFor(program, variationById(program, draft.selectedProgram.variationId))
+        : preset
+          ? preset.name
+          : draft.wantsCustomSplit
+            ? 'Your own'
+            : 'Choose later',
   });
   if (draft.membershipTier) {
     items.push({

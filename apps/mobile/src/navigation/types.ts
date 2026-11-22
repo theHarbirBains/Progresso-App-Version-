@@ -131,6 +131,33 @@ export type RootStackParamList = {
   SplitDayPlan: { dayId: string; dayName: string };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
+  /** Workout Programs: ready-made splits with every workout planned (from Workout Splits). */
+  WorkoutPrograms: undefined;
+  /** The program library; `by` opens it with that filter's choices showing. */
+  ProgramLibrary: { by?: 'goal' | 'frequency' | 'focus' } | undefined;
+  /** One program, on the variation given (its default when absent) and the tab given. */
+  ProgramDetail: {
+    programId: string;
+    variationId?: string;
+    tab?: 'overview' | 'schedule' | 'workouts' | 'guidance';
+  };
+  /** One day of a program's variation: its exercises, as planned. */
+  ProgramDay: { programId: string; variationId: string; dayIndex: number };
+  /** A built-in exercise as a program shows it; with the program's place, its sets and reps,
+   * alternatives and tips too. */
+  ProgramExercise: {
+    slug: string;
+    programId?: string;
+    variationId?: string;
+    dayIndex?: number;
+    exerciseIndex?: number;
+  };
+  /** One guidance topic of a program. */
+  ProgramGuidance: { programId: string; topic: 'progression' | 'recovery' | 'exerciseSelection' };
+  /** A program's variations on one schedule, to choose between. */
+  ProgramVariations: { programId: string; variationId: string };
+  /** A program used: the split made of it (null in onboarding, where it's made later). */
+  ProgramAdded: { programId: string; variationId: string; splitId: string | null };
   Profile: undefined;
   /** Opens on Friends, or on the tab given (a profile's "2 requests" opens Requests). */
   FindPeople: { tab?: 'requests' } | undefined;

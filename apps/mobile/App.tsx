@@ -135,6 +135,7 @@ import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
 import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
 import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
+import { PROGRAM_SCREENS } from './src/programs/programScreens';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
 import { SplitDayPlanScreen } from './src/screens/SplitDayPlanScreen';
 import { WidgetSync } from './src/widgets/WidgetSync';
@@ -510,6 +511,14 @@ function Root() {
                     component={ProgressExerciseDetailScreen}
                   />
                   <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
+                  {/* Workout Programs (programs/programScreens.ts) -- onboarding's sheet has them too. */}
+                  {PROGRAM_SCREENS.map((screen) => (
+                    <Stack.Screen
+                      key={screen.name}
+                      name={screen.name}
+                      component={screen.component}
+                    />
+                  ))}
                   <Stack.Screen name="WorkoutSplitView" component={WorkoutSplitViewScreen} />
                   <Stack.Screen name="SplitDayPlan" component={SplitDayPlanScreen} />
                   <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />

@@ -18,6 +18,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
+import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
 import {
   deleteWorkoutSplit,
   duplicateWorkoutSplit,
@@ -267,6 +268,14 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('WorkoutSplitForm', {})}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+      />
+
+      <View style={styles.presetsSectionWrap}>
+        <SectionHeader label="Workout Programs" />
+      </View>
+      <ProgramsEntryCard
+        testID="workout-splits-programs"
+        onPress={() => navigation.navigate('WorkoutPrograms')}
       />
 
       <View style={styles.presetsSectionWrap}>
