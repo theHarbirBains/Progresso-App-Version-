@@ -217,7 +217,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         testID="training-comfort-sheet"
       >
         <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
-          How comfortable are you with planning and progressing your workouts?
+          How confident are you in planning and progressing your workouts?
         </Text>
         <View style={localStyles.comfortOptions}>
           <TrainingComfortSelector

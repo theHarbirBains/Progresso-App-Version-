@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { TurboModuleRegistry } from 'react-native';
 
 // jest.setup.js stands this module in as "a real build"; here is the real one.
-const { hasHealthKitNative, hasWidgetsNative } =
+const { hasHealthKitNative, hasLocationNative, hasWidgetsNative } =
   jest.requireActual<typeof import('./nativeModules')>('./nativeModules');
 
 jest.mock('expo', () => ({ requireOptionalNativeModule: jest.fn() }));
@@ -51,5 +51,17 @@ describe('hasHealthKitNative', () => {
   it('is false in Expo Go, which has no Nitro modules', () => {
     jest.spyOn(TurboModuleRegistry, 'get').mockReturnValue(null);
     expect(hasHealthKitNative()).toBe(false);
+  });
+});
+
+describe('hasLocationNative', () => {
+  it('is true in a build with expo-location', () => {
+    optionalModule.mockImplementation((name: string) => (name === 'ExpoLocation' ? {} : null));
+    expect(hasLocationNative()).toBe(true);
+  });
+
+  it('is false without it', () => {
+    optionalModule.mockReturnValue(null);
+    expect(hasLocationNative()).toBe(false);
   });
 });

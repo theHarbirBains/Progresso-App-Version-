@@ -62,6 +62,7 @@ const FULL_DRAFT: OnboardingDraft = {
   activityLevel: 'moderately_active',
   nutritionTargets: { calories: 2400, proteinG: 141, carbsG: 290, fatG: 52 },
   ranksSeen: true,
+  summarySeen: true,
   trainingComfort: 'knows_basics',
   workoutFrequencyDays: 4,
   averageWorkoutLength: '45_60',
@@ -118,13 +119,15 @@ describe('isStepAnswered / computeStartStepIndex', () => {
   });
 
   it('asks for daily targets only with Nutrition in the membership, and about Apple Health only where it is', () => {
-    const none = { healthAvailable: false };
+    const none = { healthAvailable: false, locationAvailable: false };
     expect(stepApplies('activityLevel', { ...FULL_DRAFT, membershipTier: 'workouts' }, none)).toBe(
       false,
     );
     expect(stepApplies('nutritionTargets', FULL_DRAFT, none)).toBe(true);
     expect(stepApplies('appleHealth', FULL_DRAFT, none)).toBe(false);
-    expect(stepApplies('appleHealth', FULL_DRAFT, { healthAvailable: true })).toBe(true);
+    expect(
+      stepApplies('appleHealth', FULL_DRAFT, { healthAvailable: true, locationAvailable: false }),
+    ).toBe(true);
     // From membership with Workouts alone: past both Nutrition steps, to the split.
     expect(
       nextStepIndex(
@@ -354,7 +357,7 @@ describe('onboarding in named parts', () => {
   it('says where a step sits among the steps asked, by part', () => {
     const asked = stepsAsked(
       { ...EMPTY_DRAFT, membershipTier: 'workouts' },
-      { healthAvailable: false },
+      { healthAvailable: false, locationAvailable: false },
     );
     // Without Nutrition, Your Plan is the membership, the split and ranks.
     expect(stepPlace('workoutSplit', asked)).toEqual({
@@ -366,7 +369,8 @@ describe('onboarding in named parts', () => {
         { steps: 4, done: 4 },
         { steps: 3, done: 2 },
         { steps: 2, done: 0 },
-        { steps: 2, done: 0 },
+        // The trainer's code, Your plan is ready, and Create your account.
+        { steps: 3, done: 0 },
       ],
     });
     expect(stepPlace('referralSource', asked)).toMatchObject({
@@ -391,5 +395,29 @@ describe('submitOnboardingDraft -- Build My Own Split', () => {
 
     await submitOnboardingDraft('token-123', 'user-1', { ...EMPTY_DRAFT, skippedSplit: true });
     expect(takeCustomSplitBuilder()).toBe(false);
+  });
+});
+
+describe('Find your country and Your plan is ready', () => {
+  it('asks where the phone is only where it can, before the country list', () => {
+    const can = { healthAvailable: false, locationAvailable: true };
+    const cannot = { healthAvailable: false, locationAvailable: false };
+    expect(stepApplies('location', EMPTY_DRAFT, can)).toBe(true);
+    expect(stepApplies('location', EMPTY_DRAFT, cannot)).toBe(false);
+    expect(STEP_ORDER.indexOf('location')).toBe(STEP_ORDER.indexOf('country') - 1);
+    expect(isStepAnswered('location', EMPTY_DRAFT)).toBe(false);
+    expect(isStepAnswered('location', { ...EMPTY_DRAFT, locationAsked: false })).toBe(true);
+  });
+
+  it('asks the sex again when a draft from before saved another answer', () => {
+    expect(isStepAnswered('gender', { ...EMPTY_DRAFT, gender: 'female' })).toBe(true);
+    expect(isStepAnswered('gender', { ...EMPTY_DRAFT, gender: 'other' })).toBe(false);
+  });
+
+  it('shows the plan once, just before the account is made', () => {
+    expect(STEP_ORDER.indexOf('summary')).toBe(STEP_ORDER.indexOf('createAccount') - 1);
+    expect(computeStartStepIndex({ ...FULL_DRAFT, summarySeen: false })).toBe(
+      STEP_ORDER.indexOf('summary'),
+    );
   });
 });

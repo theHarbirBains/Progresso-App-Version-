@@ -1,15 +1,23 @@
 import { Feather } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
+import { AppCard } from '../design/AppCard';
 import { PrimaryButton, TextButton } from '../design/Button';
+import { GlyphWell } from '../design/GlyphWell';
+import { RiseIn } from '../design/RiseIn';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
+import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
+
+type Glyph = keyof typeof Feather.glyphMap;
 
 interface Props {
   testID: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: Glyph;
   title: string;
   description: string;
+  /** What allowing it gives, a line each with its glyph. */
+  points?: { icon: Glyph; text: string }[];
   connectLabel: string;
   skipLabel: string;
   onConnect: () => void;
@@ -18,12 +26,17 @@ interface Props {
   connectBusy?: boolean;
 }
 
-/** Generic "ask for a permission or connection, or skip" onboarding step; the caller decides what Connect does. */
+/**
+ * Generic "ask for a permission or connection, or skip" onboarding step, as one widget: its glyph
+ * in a ringed accent well, the title and a line, and what allowing it gives -- then Allow and Not
+ * Now beneath. The caller decides what Connect does.
+ */
 export function PermissionStep({
   testID,
   icon,
   title,
   description,
+  points = [],
   connectLabel,
   skipLabel,
   onConnect,
@@ -33,48 +46,75 @@ export function PermissionStep({
   const accent = useAppTheme().accent.accent;
   return (
     <View testID={testID} style={styles.container}>
-      <View style={styles.iconCircle}>
-        <Feather name={icon} size={32} color={accent} />
-      </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <RiseIn>
+        <AppCard hero style={styles.card}>
+          <View style={[styles.halo, { borderColor: withAlpha(accent, 0.22) }]}>
+            <View style={[styles.iconCircle, { backgroundColor: withAlpha(accent, 0.16) }]}>
+              <Feather name={icon} size={30} color={accent} />
+            </View>
+          </View>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.description}>{description}</Text>
+          {points.length > 0 ? (
+            <View style={styles.points}>
+              {points.map((point) => (
+                <View key={point.text} style={styles.point}>
+                  <GlyphWell icon={point.icon} accentColor={accent} size={32} />
+                  <Text style={styles.pointText}>{point.text}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </AppCard>
+      </RiseIn>
 
-      <View style={styles.actions}>
-        <PrimaryButton
-          testID={`${testID}-connect`}
-          label={connectLabel}
-          onPress={onConnect}
-          loading={connectBusy}
-        />
-        <TextButton
-          testID={`${testID}-skip`}
-          label={skipLabel}
-          onPress={onSkip}
-          disabled={connectBusy}
-        />
-      </View>
+      <RiseIn>
+        <View style={styles.actions}>
+          <PrimaryButton
+            testID={`${testID}-connect`}
+            label={connectLabel}
+            onPress={onConnect}
+            loading={connectBusy}
+          />
+          <TextButton
+            testID={`${testID}-skip`}
+            label={skipLabel}
+            onPress={onSkip}
+            disabled={connectBusy}
+          />
+        </View>
+      </RiseIn>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    paddingTop: spacing.lg,
+    gap: spacing.xl,
+  },
+  card: {
     alignItems: 'center',
-    paddingTop: spacing.xxl,
+    paddingVertical: spacing.xxl,
+  },
+  halo: {
+    width: 92,
+    height: 92,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
   },
   iconCircle: {
     width: 72,
     height: 72,
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
   },
   title: {
-    ...typeScale.cardTitle,
+    ...typeScale.screenTitle,
     color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: spacing.sm,
@@ -83,11 +123,27 @@ const styles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.xxl,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.sm,
+  },
+  points: {
+    alignSelf: 'stretch',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  point: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  pointText: {
+    ...typeScale.callout,
+    color: colors.textSecondaryBright,
+    flex: 1,
   },
   actions: {
-    alignSelf: 'stretch',
     gap: spacing.sm,
   },
 });

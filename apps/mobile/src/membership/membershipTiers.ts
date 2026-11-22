@@ -14,6 +14,8 @@ export interface MembershipOption {
   icon: keyof typeof Feather.glyphMap;
   /** The parts of the app it includes, each with its every feature (MEMBERSHIP_AREAS). */
   areas: MembershipArea[];
+  /** What it is in three short lines, each with its glyph -- onboarding's membership choice. */
+  highlights: { icon: keyof typeof Feather.glyphMap; text: string }[];
 }
 
 /** A part of the app a membership includes. */
@@ -88,6 +90,11 @@ export const MEMBERSHIP_OPTIONS: MembershipOption[] = [
     summary: 'Track your training and watch your strength grow.',
     icon: 'activity',
     areas: ['workouts'],
+    highlights: [
+      { icon: 'calendar', text: 'Workout plans and live tracking' },
+      { icon: 'award', text: 'Records, progress and ranks' },
+      { icon: 'users', text: 'Friends and group workouts' },
+    ],
   },
   {
     tier: 'workouts_nutrition',
@@ -95,6 +102,11 @@ export const MEMBERSHIP_OPTIONS: MembershipOption[] = [
     summary: 'Your training and what you eat, side by side.',
     icon: 'pie-chart',
     areas: ['workouts', 'nutrition'],
+    highlights: [
+      { icon: 'check', text: 'Everything in Workouts' },
+      { icon: 'search', text: 'Food logging and barcode scans' },
+      { icon: 'target', text: 'Calorie and macro targets' },
+    ],
   },
   {
     tier: 'everything',
@@ -102,6 +114,11 @@ export const MEMBERSHIP_OPTIONS: MembershipOption[] = [
     summary: 'For coaches: train your clients in Progresso too.',
     icon: 'star',
     areas: ['workouts', 'nutrition', 'trainer'],
+    highlights: [
+      { icon: 'check', text: 'Everything in Workouts + Nutrition' },
+      { icon: 'briefcase', text: 'A workspace for your clients' },
+      { icon: 'edit-3', text: 'Log and coach their workouts' },
+    ],
   },
 ];
 

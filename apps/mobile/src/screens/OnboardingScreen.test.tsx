@@ -15,6 +15,7 @@ import {
   type OnboardingStep,
 } from '../onboarding/onboardingDraft';
 import { getWelcomeStage, setWelcomeStage } from '../onboarding/welcomeStage';
+import { countryFromLocation, locationAvailable } from '../onboarding/countryFromLocation';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -51,6 +52,29 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
 }));
 
+// "Let's get you started!" opens straight onto the first question here (its own tests are in
+// onboarding/GetStartedIntro.test.tsx).
+jest.mock('../onboarding/GetStartedIntro', () => {
+  const { useEffect } = jest.requireActual('react');
+  return {
+    GetStartedIntro: ({ onReveal, onFinish }: { onReveal: () => void; onFinish: () => void }) => {
+      useEffect(() => {
+        onReveal();
+        onFinish();
+        // Once, as it opens -- like the real one.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    },
+  };
+});
+
+// Location isn't here unless a test says so (Find your country's own tests, below).
+jest.mock('../onboarding/countryFromLocation', () => ({
+  locationAvailable: jest.fn(() => false),
+  countryFromLocation: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockSignUpWithPassword = jest.fn();
 const mockSignInWithProvider = jest.fn();
@@ -77,6 +101,8 @@ beforeEach(async () => {
   mockRequestNotificationPermission.mockReset().mockResolvedValue(true);
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
   jest.mocked(stepsAccess).mockReset().mockResolvedValue('unavailable');
+  jest.mocked(locationAvailable).mockReset().mockReturnValue(false);
+  jest.mocked(countryFromLocation).mockReset();
   jest.mocked(askForSteps).mockReset().mockResolvedValue(undefined);
   jest.mocked(saveNutritionGoals).mockReset().mockResolvedValue({
     calories: 2000,
@@ -257,13 +283,15 @@ describe('OnboardingScreen', () => {
     renderScreen();
     await screen.findByTestId('onboarding-step-membership');
 
-    // One large card each, to swipe through, each saying only what it adds.
-    expect(screen.getByTestId('onboarding-step-membership-pager').props.horizontal).toBe(true);
+    // All three at once, each in a few short lines.
     expect(screen.getByTestId('onboarding-step-membership-card-workouts')).toHaveTextContent(
-      /Live workout tracking.*Swipe for Workouts \+ Nutrition/,
+      /Workouts.*Free.*Workout plans and live tracking/,
     );
+    expect(
+      screen.getByTestId('onboarding-step-membership-card-workouts_nutrition'),
+    ).toHaveTextContent(/Everything in Workouts.*Food logging and barcode scans/);
     expect(screen.getByTestId('onboarding-step-membership-card-everything')).toHaveTextContent(
-      /Everything in Workouts \+ Nutrition, plus:.*Trainer Workspace/,
+      /Everything in Workouts \+ Nutrition.*A workspace for your clients/,
     );
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts'));
 
@@ -289,6 +317,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           trainingComfort: 'knows_basics',
@@ -311,7 +340,8 @@ describe('OnboardingScreen', () => {
     expect(continueButton().props.accessibilityState).toMatchObject({ disabled: false });
 
     fireEvent.press(continueButton());
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    // Then everything chosen, at a glance, before the account is made.
+    expect(await screen.findByTestId('onboarding-step-summary')).toBeTruthy();
   });
 
   it('lets the workout split be skipped for now, setting up no split', async () => {
@@ -327,6 +357,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           hasTrainerCode: false,
@@ -364,9 +395,15 @@ describe('OnboardingScreen', () => {
     fireEvent.press(await screen.findByTestId('onboarding-step-country-option-CA'));
 
     await screen.findByTestId('onboarding-step-gender');
+    // Two answers, for the calorie estimate's formula.
+    expect(screen.getByText('What is your sex?')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-gender-male')).toHaveTextContent(/Man/);
+    expect(screen.getByTestId('onboarding-gender-female')).toHaveTextContent(/Woman/);
+    expect(screen.queryByTestId('onboarding-gender-other')).toBeNull();
     fireEvent.press(screen.getByTestId('onboarding-gender-male'));
 
     await screen.findByTestId('onboarding-step-birthday');
+    expect(screen.getByTestId('onboarding-birthday-age')).toHaveTextContent(/\d+ years old/);
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-weight');
@@ -384,8 +421,9 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-training-comfort');
     expect(
-      screen.getByText('How comfortable are you with planning and progressing your workouts?'),
+      screen.getByText('How confident are you in planning and progressing your workouts?'),
     ).toBeTruthy();
+    expect(screen.getByText('Choose the option that best describes your experience.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('onboarding-step-training-comfort-knows_basics'));
 
     await screen.findByTestId('onboarding-step-workout-frequency');
@@ -399,6 +437,10 @@ describe('OnboardingScreen', () => {
 
     // With Nutrition: how active, then the daily targets worked out from it.
     await screen.findByTestId('onboarding-step-activity-level');
+    // Each level with about how many steps a day, and what a day like it looks like.
+    expect(screen.getByTestId('onboarding-activity-moderately_active')).toHaveTextContent(
+      /7,500-10,000 steps a day.*working out 3-5 days a week/,
+    );
     fireEvent.press(screen.getByTestId('onboarding-activity-moderately_active'));
     await screen.findByTestId('onboarding-step-nutrition-targets');
     // 176 lb: 140 g protein, 52 g fat.
@@ -424,6 +466,15 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-trainer-code');
     fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
+
+    // Everything chosen, at a glance.
+    const summary = await screen.findByTestId('onboarding-step-summary');
+    expect(summary).toHaveTextContent(/Build Muscle, Get Stronger/);
+    expect(summary).toHaveTextContent(/4 days a week/);
+    expect(summary).toHaveTextContent(/Push \/ Pull \/ Legs/);
+    expect(summary).toHaveTextContent(/Workouts \+ Nutrition/);
+    expect(summary).toHaveTextContent(/140 g protein/);
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-create-account');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
@@ -507,6 +558,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           hasTrainerCode: false,
@@ -594,6 +646,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           hasTrainerCode: false,
@@ -662,6 +715,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           hasTrainerCode: false,
@@ -692,6 +746,9 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-trainer-code');
     fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
+
+    await screen.findByTestId('onboarding-step-summary');
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-create-account');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
@@ -744,6 +801,7 @@ describe('OnboardingScreen', () => {
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
           ranksSeen: true,
+          summarySeen: true,
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           hasTrainerCode: false,
@@ -798,6 +856,7 @@ describe('OnboardingScreen', () => {
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
     ranksSeen: true,
+    summarySeen: true,
     activityLevel: 'moderately_active',
     skippedNutritionTargets: true,
     hasTrainerCode: false,
@@ -872,6 +931,7 @@ describe('OnboardingScreen -- notifications step', () => {
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
     ranksSeen: true,
+    summarySeen: true,
     activityLevel: 'moderately_active',
     skippedNutritionTargets: true,
     hasTrainerCode: false,
@@ -975,6 +1035,7 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     skippedNutritionTargets: true,
     selectedSplitPresetId: 'ppl',
     ranksSeen: true,
+    summarySeen: true,
     emailOptIn: true,
     pushNotificationsOptIn: false,
     hasTrainerCode: false,
@@ -987,6 +1048,63 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     );
     renderScreen();
   }
+
+  it('finds the country the phone is in and lists it first, once allowed', async () => {
+    jest.mocked(locationAvailable).mockReturnValue(true);
+    jest.mocked(countryFromLocation).mockResolvedValue({ status: 'found', country: 'CA' });
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('onboarding-referral-source-tiktok'));
+
+    const step = await screen.findByTestId('onboarding-step-location');
+    expect(step).toHaveTextContent(/Find your country.*Never sent to Progresso or kept/);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-step-location-connect'));
+    });
+
+    await screen.findByTestId('onboarding-step-country');
+    expect(screen.getByTestId('onboarding-step-country-located')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-step-country-option-CA')).toHaveTextContent(
+      /Canada.*Your location/,
+    );
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        locationAsked: true,
+        locatedCountry: 'CA',
+        country: null,
+      });
+    });
+  });
+
+  it('goes on to the plain list without asking when Not Now is tapped', async () => {
+    jest.mocked(locationAvailable).mockReturnValue(true);
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('onboarding-referral-source-tiktok'));
+
+    fireEvent.press(await screen.findByTestId('onboarding-step-location-skip'));
+
+    await screen.findByTestId('onboarding-step-country');
+    expect(countryFromLocation).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('onboarding-step-country-located')).toBeNull();
+  });
+
+  it('changes an answer from Your plan is ready, coming straight back to it', async () => {
+    await startAt('summary', { summarySeen: false });
+    const summary = await screen.findByTestId('onboarding-step-summary');
+    expect(summary).toHaveTextContent(/Lose Fat/);
+    expect(screen.getByTestId('onboarding-continue')).toHaveTextContent('Looks Good');
+
+    fireEvent.press(screen.getByTestId('onboarding-step-summary-fitnessGoal'));
+    await screen.findByTestId('onboarding-step-fitness-goal');
+    fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-get_stronger'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    expect(await screen.findByTestId('onboarding-step-summary')).toHaveTextContent(
+      /Lose Fat, Get Stronger/,
+    );
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+  });
 
   it('lets no one pick a birthday under 13: the year wheel ends 13 years ago', async () => {
     const now = new Date();
@@ -1111,7 +1229,7 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     );
     fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-summary')).toBeTruthy();
   });
 
   it('says what creating an account agrees to, each page a tap away', async () => {

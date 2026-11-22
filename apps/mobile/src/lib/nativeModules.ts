@@ -26,6 +26,11 @@ export function hasWidgetsNative(): boolean {
   );
 }
 
+/** Location's native side (expo-location), which onboarding's Find your country uses. */
+export function hasLocationNative(): boolean {
+  return requireOptionalNativeModule('ExpoLocation') != null;
+}
+
 /** Apple Health's native side: the library is built on Nitro modules. */
 export function hasHealthKitNative(): boolean {
   return TurboModuleRegistry.get('NitroModules') != null;

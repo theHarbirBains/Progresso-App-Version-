@@ -116,7 +116,7 @@ describe('SettingsWorkoutPreferencesScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('open-training-comfort')).toHaveTextContent(
-      /I know the basics, but need guidance/,
+      /I understand the basics/,
     );
     expect(screen.getByTestId('open-rep-range')).toHaveTextContent(/8–12/);
     expect(screen.getByTestId('progression-tips-toggle').props.value).toBe(true);
@@ -138,7 +138,7 @@ describe('SettingsWorkoutPreferencesScreen', () => {
       trainingComfort: 'follows_method',
     });
     expect(await screen.findByTestId('open-training-comfort')).toHaveTextContent(
-      /I follow a specific training method/,
+      /I follow structured programming/,
     );
   });
 

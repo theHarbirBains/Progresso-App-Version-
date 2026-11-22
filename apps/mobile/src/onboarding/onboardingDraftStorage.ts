@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FitnessGoal } from '../lib/api';
 import { EMPTY_DRAFT, type OnboardingDraft } from './onboardingDraft';
+import { isOfferedGoal } from './onboardingOptions';
 
 const STORAGE_KEY = '@progresso/onboardingDraft';
 
@@ -40,6 +41,8 @@ export async function loadOnboardingDraft(): Promise<StoredDraft | null> {
     // A draft from before several goals could be picked kept its one goal on its own.
     if (stored.fitnessGoal && !stored.fitnessGoals) draft.fitnessGoals = [stored.fitnessGoal];
     delete (draft as { fitnessGoal?: unknown }).fitnessGoal;
+    // Goals onboarding no longer offers (General Health, Other) can't be unticked, so they go.
+    draft.fitnessGoals = draft.fitnessGoals.filter(isOfferedGoal);
     return { draft, stepIndex: parsed.stepIndex };
   } catch {
     return null;

@@ -1,7 +1,6 @@
-import { View } from 'react-native';
 import type { FitnessGoal } from '../lib/api';
 import { FITNESS_GOAL_OPTIONS } from './onboardingOptions';
-import { OnboardingOptionCard } from './OnboardingOptionCard';
+import { OnboardingTiles } from './OnboardingTiles';
 
 interface Props {
   testID: string;
@@ -11,28 +10,22 @@ interface Props {
   max: number;
 }
 
-/** Pick-several fitness goals, up to `max`, kept in the order picked. Tapping a picked one drops it. */
+/**
+ * Pick-several fitness goals, up to `max`, kept in the order picked, as a grid of widget tiles.
+ * Tapping a picked one drops it.
+ */
 export function GoalSelector({ testID, value, onChange, max }: Props) {
   const full = value.length >= max;
   return (
-    <View testID={testID}>
-      {FITNESS_GOAL_OPTIONS.map((option) => {
-        const selected = value.includes(option.value);
-        return (
-          <OnboardingOptionCard
-            key={option.value}
-            testID={`${testID}-${option.value}`}
-            label={option.label}
-            selected={selected}
-            disabled={full && !selected}
-            onPress={() =>
-              onChange(
-                selected ? value.filter((goal) => goal !== option.value) : [...value, option.value],
-              )
-            }
-          />
-        );
-      })}
-    </View>
+    <OnboardingTiles
+      testID={testID}
+      tilePrefix={testID}
+      options={FITNESS_GOAL_OPTIONS}
+      isSelected={(goal) => value.includes(goal)}
+      isDisabled={(goal) => full && !value.includes(goal)}
+      onPress={(goal) =>
+        onChange(value.includes(goal) ? value.filter((g) => g !== goal) : [...value, goal])
+      }
+    />
   );
 }

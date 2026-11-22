@@ -35,6 +35,11 @@ import { defaultRepRange } from '../workouts/progression';
  */
 export interface OnboardingDraft {
   referralSource: ReferralSource | null;
+  /** Answered Find your country: true if they allowed their location, false for Not Now. */
+  locationAsked: boolean | null;
+  /** The country their phone was in, when they allowed it -- shown first in the country list,
+   * never saved to the account (only the country they pick is). */
+  locatedCountry: string | null;
   /** ISO 3166-1 alpha-2. */
   country: string | null;
   gender: Gender | null;
@@ -55,6 +60,8 @@ export interface OnboardingDraft {
   skippedNutritionTargets: boolean;
   /** Went past How ranks work. */
   ranksSeen: boolean;
+  /** Went past Your plan is ready. */
+  summarySeen: boolean;
   /** Answered the Apple Health question: true if they asked to connect, false for Not Now. Kept
    * only here -- Apple Health itself remembers what they allowed. */
   appleHealthAsked: boolean | null;
@@ -107,6 +114,8 @@ const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 
 export const EMPTY_DRAFT: OnboardingDraft = {
   referralSource: null,
+  locationAsked: null,
+  locatedCountry: null,
   country: null,
   gender: null,
   birthday: toDateStringUTC(0, 1, DEFAULT_BIRTH_YEAR),
@@ -120,6 +129,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   nutritionTargets: null,
   skippedNutritionTargets: false,
   ranksSeen: false,
+  summarySeen: false,
   appleHealthAsked: null,
   trainingComfort: null,
   workoutFrequencyDays: null,
@@ -145,6 +155,8 @@ export const EMPTY_DRAFT: OnboardingDraft = {
 // step there is.
 export const STEP_ORDER = [
   'referralSource',
+  // Where location is there to ask: the country they're in goes first in the list.
+  'location',
   'country',
   'gender',
   'birthday',
@@ -165,6 +177,8 @@ export const STEP_ORDER = [
   // Where Apple Health is there to ask.
   'appleHealth',
   'trainerCode',
+  // Everything chosen, at a glance, before the account is made.
+  'summary',
   'createAccount',
 ] as const;
 
@@ -176,7 +190,7 @@ export const STEP_ORDER = [
 export const STEP_SECTIONS: readonly { title: string; steps: readonly OnboardingStep[] }[] = [
   {
     title: 'About You',
-    steps: ['referralSource', 'country', 'gender', 'birthday', 'weight', 'height'],
+    steps: ['referralSource', 'location', 'country', 'gender', 'birthday', 'weight', 'height'],
   },
   {
     title: 'Your Training',
@@ -187,7 +201,7 @@ export const STEP_SECTIONS: readonly { title: string; steps: readonly Onboarding
     steps: ['membership', 'activityLevel', 'nutritionTargets', 'workoutSplit', 'ranks'],
   },
   { title: 'Staying in Touch', steps: ['emailPreference', 'pushNotifications', 'appleHealth'] },
-  { title: 'Your Account', steps: ['trainerCode', 'createAccount'] },
+  { title: 'Your Account', steps: ['trainerCode', 'summary', 'createAccount'] },
 ];
 
 /** Where a step sits: its part, its place in that part, and how far through each part it is. */
@@ -235,10 +249,12 @@ export function isOldEnough(birthday: string | null, now: Date = new Date()): bo
 export interface StepContext {
   /** Apple Health is on this phone, in this copy of the app. */
   healthAvailable: boolean;
+  /** This copy of the app can ask where the phone is. */
+  locationAvailable: boolean;
 }
 
 /** Whether a step is asked at all: Nutrition's only with it in the membership, Apple Health's
- * only where it's there to ask. */
+ * and location's only where they're there to ask. */
 export function stepApplies(
   step: OnboardingStep,
   draft: OnboardingDraft,
@@ -250,6 +266,8 @@ export function stepApplies(
       return draft.membershipTier !== null && includesNutrition(draft.membershipTier);
     case 'appleHealth':
       return context.healthAvailable;
+    case 'location':
+      return context.locationAvailable;
     default:
       return true;
   }
@@ -288,10 +306,13 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
   switch (step) {
     case 'referralSource':
       return draft.referralSource != null;
+    case 'location':
+      return draft.locationAsked != null;
     case 'country':
       return draft.country != null;
     case 'gender':
-      return draft.gender != null;
+      // What is your sex? has two answers; one saved before from the old list is asked again.
+      return draft.gender === 'male' || draft.gender === 'female';
     case 'birthday':
       return isOldEnough(draft.birthday);
     case 'weight':
@@ -308,6 +329,8 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.nutritionTargets != null || draft.skippedNutritionTargets;
     case 'ranks':
       return draft.ranksSeen;
+    case 'summary':
+      return draft.summarySeen;
     case 'appleHealth':
       return draft.appleHealthAsked != null;
     case 'trainingComfort':
@@ -337,7 +360,7 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
  * action, not a stored field). */
 export function computeStartStepIndex(
   draft: OnboardingDraft,
-  context: StepContext = { healthAvailable: false },
+  context: StepContext = { healthAvailable: false, locationAvailable: false },
 ): number {
   const index = STEP_ORDER.findIndex(
     (step) => stepApplies(step, draft, context) && !isStepAnswered(step, draft),

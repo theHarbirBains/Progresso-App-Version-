@@ -21,6 +21,22 @@ interface MockAuthHandles {
 // setUser/clearUser calls are asserted directly instead of going through
 // the real @sentry/react-native module.
 // Google and Apple are off for now (auth/socialSignIn.ts); the OAuth tests here turn them on.
+// "Let's get you started!" opens straight onto onboarding's first question here.
+jest.mock('./src/onboarding/GetStartedIntro', () => {
+  const { useEffect } = jest.requireActual('react');
+  return {
+    GetStartedIntro: ({ onReveal, onFinish }: { onReveal: () => void; onFinish: () => void }) => {
+      useEffect(() => {
+        onReveal();
+        onFinish();
+        // Once, as it opens -- like the real one.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    },
+  };
+});
+
 jest.mock('./src/auth/socialSignIn', () => ({ socialSignInEnabled: () => true }));
 
 jest.mock('./src/lib/sentry', () => ({
@@ -385,6 +401,7 @@ describe('Authentication flow', () => {
           activityLevel: 'moderately_active',
           skippedNutritionTargets: true,
           ranksSeen: true,
+          summarySeen: true,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',

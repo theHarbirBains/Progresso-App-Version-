@@ -117,7 +117,21 @@
           "background": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Progresso uses your location once, while you sign up, to put the country you're in at the top of the list. It's never sent to Progresso or kept.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false,
+          "locationFullAccuracyPermission": false,
+          "isIosReducedAccuracyByDefault": true,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ]
   }
 }

@@ -11,6 +11,8 @@ interface Props {
   onPress: () => void;
   /** Whether it's the chosen one of a set. Leave it out for a tile that opens something instead. */
   selected?: boolean;
+  /** Can't be picked right now (a pick-several set already has its most): dimmed. */
+  disabled?: boolean;
   accentColor?: string;
   onAccentColor?: string;
   accessibilityLabel: string;
@@ -36,6 +38,7 @@ export function ChoiceTile({
   children,
   onPress,
   selected,
+  disabled = false,
   accentColor: accentColorProp,
   onAccentColor: onAccentColorProp,
   accessibilityLabel,
@@ -82,12 +85,18 @@ export function ChoiceTile({
       onPress={onPress}
       onPressIn={() => pressTo(PRESS_SCALE)}
       onPressOut={() => pressTo(1)}
+      // Only passed when it is: Pressable adds its own state for any value given.
+      disabled={disabled || undefined}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={selected === undefined ? undefined : { selected }}
+      accessibilityState={
+        selected === undefined && !disabled
+          ? undefined
+          : { ...(selected === undefined ? {} : { selected }), ...(disabled ? { disabled } : {}) }
+      }
       style={style}
     >
-      <Animated.View style={[styles.tile, { transform: [{ scale }] }]}>
+      <Animated.View style={[styles.tile, disabled && styles.disabled, { transform: [{ scale }] }]}>
         {selected !== undefined ? (
           <Animated.View
             pointerEvents="none"
@@ -131,6 +140,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: colors.surfaceLift,
     padding: spacing.md,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   // The chosen look, faded in over the tile's own edge and fill.
   chosen: {

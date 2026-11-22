@@ -284,11 +284,13 @@ jest.mock('expo-file-system', () => ({
 }));
 jest.mock('expo-asset', () => ({ Asset: { fromModule: jest.fn() } }));
 
-// Tests stand for a real build, which has the widgets' and Apple Health's native sides (Expo Go
-// has neither); lib/nativeModules.test.ts and the tests that cover going without them say so.
+// Tests stand for a real build, which has the widgets', Apple Health's and location's native
+// sides (Expo Go has neither of the first two); lib/nativeModules.test.ts and the tests that cover
+// going without them say so.
 jest.mock('./src/lib/nativeModules', () => ({
   hasWidgetsNative: jest.fn(() => true),
   hasHealthKitNative: jest.fn(() => true),
+  hasLocationNative: jest.fn(() => true),
 }));
 
 // The SwiftUI views and modifiers the widget layouts are written with only exist inside the
@@ -331,3 +333,13 @@ jest.mock('expo-contacts', () => {
     presentAccessPickerAsync: removed('presentAccessPickerAsync'),
   };
 });
+
+// expo-location (onboarding's Find your country): no native module in Jest. Permission defaults to
+// not granted, so nothing reads a position unless a test says so.
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ granted: false }),
+  getLastKnownPositionAsync: jest.fn().mockResolvedValue(null),
+  getCurrentPositionAsync: jest.fn().mockResolvedValue(null),
+  reverseGeocodeAsync: jest.fn().mockResolvedValue([]),
+  Accuracy: { Lowest: 1 },
+}));

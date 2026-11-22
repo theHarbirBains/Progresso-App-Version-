@@ -13,8 +13,12 @@ describe('TrainingComfortSelector', () => {
     ]) {
       expect(screen.getByTestId(`comfort-${value}`)).toBeTruthy();
     }
-    expect(screen.getByText(/not sure how to track progress/i)).toBeTruthy();
-    expect(screen.getByText(/programming from a coach/i)).toBeTruthy();
+    expect(screen.getByText("I'm a beginner")).toBeTruthy();
+    expect(screen.getByText(/learning how to choose exercises, structure workouts/)).toBeTruthy();
+    expect(screen.getByText('I understand the basics')).toBeTruthy();
+    expect(screen.getByText("I'm confident with my training")).toBeTruthy();
+    expect(screen.getByText('I follow structured programming')).toBeTruthy();
+    expect(screen.getByText(/periodization or a coach-designed program/)).toBeTruthy();
   });
 
   it('reports the answer pressed', () => {

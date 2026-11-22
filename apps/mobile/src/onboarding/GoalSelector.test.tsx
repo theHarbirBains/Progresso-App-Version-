@@ -2,11 +2,21 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GoalSelector } from './GoalSelector';
 
 describe('GoalSelector', () => {
-  it('renders every fitness goal option', () => {
+  it('offers the six goals, and nothing else', () => {
     render(<GoalSelector testID="goal" value={[]} onChange={jest.fn()} max={3} />);
 
-    expect(screen.getByTestId('goal-build_muscle')).toBeTruthy();
-    expect(screen.getByTestId('goal-other')).toBeTruthy();
+    for (const [value, label] of [
+      ['build_muscle', 'Build Muscle'],
+      ['get_stronger', 'Get Stronger'],
+      ['lose_fat', 'Lose Fat'],
+      ['improve_athletic_performance', 'Improve Athletic Performance'],
+      ['improve_fitness', 'Improve Overall Fitness'],
+      ['maintain_fitness', 'Maintain Fitness'],
+    ]) {
+      expect(screen.getByTestId(`goal-${value}`)).toHaveTextContent(new RegExp(label!));
+    }
+    expect(screen.queryByTestId('goal-general_health')).toBeNull();
+    expect(screen.queryByTestId('goal-other')).toBeNull();
   });
 
   it('marks every picked goal', () => {
@@ -40,7 +50,7 @@ describe('GoalSelector', () => {
     render(
       <GoalSelector
         testID="goal"
-        value={['lose_fat', 'get_stronger', 'other']}
+        value={['lose_fat', 'get_stronger', 'maintain_fitness']}
         onChange={onChange}
         max={3}
       />,
@@ -50,6 +60,8 @@ describe('GoalSelector', () => {
     fireEvent.press(screen.getByTestId('goal-build_muscle'));
     expect(onChange).not.toHaveBeenCalled();
 
-    expect(screen.getByTestId('goal-other').props.accessibilityState.disabled).toBe(false);
+    expect(
+      screen.getByTestId('goal-maintain_fitness').props.accessibilityState.disabled,
+    ).toBeFalsy();
   });
 });
