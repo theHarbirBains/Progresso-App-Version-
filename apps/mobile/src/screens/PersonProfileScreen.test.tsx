@@ -597,7 +597,10 @@ describe('PersonProfileScreen', () => {
       profile({
         followStatus: 'none',
         followsYou: false,
+        isPublic: false,
         canSeeActivity: false,
+        bio: null,
+        rank: null,
         stats: null,
         exercises: null,
         achievements: null,
@@ -609,14 +612,15 @@ describe('PersonProfileScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-private')).toHaveTextContent(
-      /Follow Sam to see their training/,
+      "Sam's profile is private",
     );
+    // Said under their name too.
+    expect(screen.getByTestId('person-profile-private-badge')).toHaveTextContent(/Private Profile/);
     expect(screen.queryByTestId('person-profile-error')).toBeNull();
     expect(screen.queryByTestId('person-profile-tiles')).toBeNull();
     expect(screen.queryByTestId('person-profile-tab')).toBeNull();
-    // Their rank is anyone's to see; what earned it isn't, yet.
-    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Gold V.*2,250 AP/);
-    expect(screen.getByTestId('person-profile-rank')).not.toHaveTextContent(/achievements/);
+    // A private profile keeps its rank for the people it accepts, too.
+    expect(screen.queryByTestId('person-profile-rank')).toBeNull();
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('person-profile-follow'));

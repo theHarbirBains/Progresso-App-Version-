@@ -56,6 +56,7 @@ const row = {
   // Never set before the switch existed: the rank shows.
   show_rank: null,
   phone_e164: '+16045551234',
+  profile_visibility: 'private',
   findable_by_phone: null,
   training_priorities: ['glutes', 'back'],
   equipment_access: 'dumbbells',
@@ -118,6 +119,7 @@ describe('fetchMyProfile', () => {
       bio: 'Chasing progress.',
       showRank: true,
       phoneNumber: '+16045551234',
+      profileVisibility: 'private',
       findableByPhone: true,
       trainingPriorities: ['glutes', 'back'],
       equipmentAccess: 'dumbbells',

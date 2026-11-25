@@ -94,6 +94,9 @@ export interface ProfileResponse {
   findableByPhone: boolean;
   /** Whether people who open their profile see their achievement rank. */
   showRank: boolean;
+  /** Who sees their profile's training: accepted followers (private, the default) or everyone
+   * signed in (public) -- Settings > Account & Security > Privacy. */
+  profileVisibility: 'private' | 'public';
 }
 
 export interface UpdateProfileInput {
@@ -144,6 +147,7 @@ export interface UpdateProfileInput {
   phoneNumber?: string;
   findableByPhone?: boolean;
   showRank?: boolean;
+  profileVisibility?: 'private' | 'public';
 }
 
 export function updateMyProfile(

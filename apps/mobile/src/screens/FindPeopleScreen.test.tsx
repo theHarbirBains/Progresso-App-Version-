@@ -482,6 +482,33 @@ describe('FindPeopleScreen -- search', () => {
     expect(await screen.findByTestId('find-people-result-user-3-follow')).toBeTruthy();
   });
 
+  it('says which profiles are private, and following a public one follows at once', async () => {
+    mockSearchUsers.mockResolvedValue([
+      { ...bobResult, user: { ...bobResult.user, isPrivate: true } },
+      {
+        user: {
+          id: 'user-4',
+          username: 'pat',
+          displayName: 'Pat Doe',
+          avatarUrl: null,
+          isPrivate: false,
+        },
+        status: 'none' as const,
+      },
+    ]);
+    mockSendFollowRequest.mockResolvedValue({ status: 'accepted' });
+    renderScreen();
+    await typeSearch('o');
+
+    expect(await screen.findByTestId('find-people-result-user-3')).toHaveTextContent(
+      /Bob Smith.*@bob · Private/,
+    );
+    expect(screen.getByTestId('find-people-result-user-4')).not.toHaveTextContent(/Private/);
+
+    fireEvent.press(screen.getByTestId('find-people-result-user-4-follow'));
+    expect(await screen.findByTestId('find-people-result-user-4-following')).toBeTruthy();
+  });
+
   it('following sends a request and the button flips to Requested', async () => {
     mockSearchUsers.mockResolvedValue([bobResult]);
     mockSendFollowRequest.mockResolvedValue({ status: 'pending' });

@@ -167,6 +167,32 @@ describe('FollowsService', () => {
       });
     });
 
+    it('follows a public profile at once -- the database accepts it -- and tells them they have a new follower', async () => {
+      const client = createMockClient();
+      client.queue('users', { data: { id: 'user-2' }, error: null });
+      client.queue('follows', { data: null, error: null }); // no existing row
+      client.queue('follows', { data: { status: 'accepted' }, error: null }); // as written
+      const push = {
+        nameOf: jest.fn().mockResolvedValue('Harbir'),
+        notify: jest.fn().mockResolvedValue(undefined),
+      };
+      const service = new FollowsService(
+        { getClient: () => client } as unknown as SupabaseService,
+        push as unknown as SocialPushService,
+      );
+
+      await expect(service.sendRequest('user-1', 'user-2')).resolves.toEqual({
+        status: 'accepted',
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(push.notify).toHaveBeenCalledWith('user-2', 'follows', {
+        title: 'New follower',
+        body: 'Harbir started following you.',
+        path: 'people/user-1',
+      });
+    });
+
     it('treats someone who blocked you as no one at all, and never writes a request', async () => {
       const client = createMockClient();
       client.queue('users', { data: { id: 'user-2' }, error: null });

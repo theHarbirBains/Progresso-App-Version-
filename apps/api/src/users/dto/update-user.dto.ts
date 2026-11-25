@@ -317,6 +317,11 @@ export class UpdateUserDto {
   @IsBoolean()
   showRank?: boolean;
 
+  /** Settings > Account & Security > Privacy: a private profile (the default) or a public one. */
+  @IsOptional()
+  @IsIn(['private', 'public'])
+  profileVisibility?: 'private' | 'public';
+
   @IsOptional()
   @IsBoolean()
   emailOptIn?: boolean;

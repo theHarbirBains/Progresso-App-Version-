@@ -182,7 +182,8 @@ export interface PersonProfile {
   followingCount: number;
   /** Their last name, after their first (user.displayName) -- null with none. */
   lastName: string | null;
-  /** A line about themselves, for anyone who opens their profile -- null with none. */
+  /** A line about themselves -- for anyone who can see their activity; null with none, or when
+   * their profile is private to the viewer. */
   bio: string | null;
   /** The people the viewer follows who follow them too (none on their own profile). */
   mutuals: { count: number; people: FollowUserSummary[] };
@@ -195,7 +196,7 @@ export interface PersonProfile {
   /** Every exercise they've done, with its best set, the most-done first. Null when hidden. */
   exercises: ExerciseBest[] | null;
   /**
-   * Their lifetime AP, for their rank -- shown to anyone who can open their profile unless they
+   * Their lifetime AP, for their rank -- shown to anyone who can see their activity unless they
    * hide it (Settings > Privacy); always on their own.
    */
   rank: PersonRank | null;
@@ -262,7 +263,9 @@ export class PeopleService {
     } | null;
 
     const visible = canSeeActivity(relationship);
-    const showsRank = relationship.isSelf || aboutRow?.show_rank !== false;
+    // A private profile shows a stranger who it is -- name, username, photo, counts -- and nothing
+    // of their own words or training: their bio and rank too wait for an accepted follow.
+    const showsRank = relationship.isSelf || (visible && aboutRow?.show_rank !== false);
     // Their rank and achievements as of now, whether or not their own app has asked lately.
     if (showsRank || visible) await this.awardAchievements(personId, aboutRow?.time_zone ?? null);
     const [stats, exercises, achievements, rank, montage] = await Promise.all([
@@ -279,7 +282,7 @@ export class PeopleService {
       followerCount: followers.count ?? 0,
       followingCount: following.count ?? 0,
       lastName: aboutRow?.last_name ?? null,
-      bio: aboutRow?.bio ?? null,
+      bio: visible ? (aboutRow?.bio ?? null) : null,
       mutuals,
       canSeeActivity: visible,
       stats,

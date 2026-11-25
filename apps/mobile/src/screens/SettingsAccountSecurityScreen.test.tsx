@@ -31,6 +31,7 @@ let mockProfile: {
   findableByEmail: boolean;
   findableByPhone?: boolean;
   showRank?: boolean;
+  profileVisibility?: 'private' | 'public';
 } = { findableByEmail: true };
 jest.mock('../profile/ProfileProvider', () => ({
   useProfile: () => ({ profile: mockProfile, updateProfile: mockUpdateProfile }),
@@ -102,6 +103,56 @@ describe('SettingsAccountSecurityScreen', () => {
 
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({ showRank: false }));
     expect(screen.getByTestId('account-show-rank-toggle').props.value).toBe(false);
+  });
+
+  it('keeps a profile private until you choose public, asking first', async () => {
+    mockProfile = { findableByEmail: true, profileVisibility: 'private' };
+    mockUpdateProfile.mockReset().mockResolvedValue({});
+    renderScreen();
+
+    expect(screen.getByTestId('account-private-profile-toggle').props.value).toBe(true);
+    expect(screen.getByTestId('account-private-profile')).toHaveTextContent(
+      /Only people you approve see your workouts, stats and profile/,
+    );
+
+    // Turned down: nothing changes.
+    const declined = answerAlerts('Cancel');
+    fireEvent(screen.getByTestId('account-private-profile-toggle'), 'valueChange', false);
+    expect(declined.mock.calls[0]![0]).toBe('Make your profile public?');
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('account-private-profile-toggle').props.value).toBe(true);
+    declined.mockRestore();
+
+    answerAlerts('Make Public');
+    fireEvent(screen.getByTestId('account-private-profile-toggle'), 'valueChange', false);
+    await waitFor(() =>
+      expect(mockUpdateProfile).toHaveBeenCalledWith({ profileVisibility: 'public' }),
+    );
+    expect(screen.getByTestId('account-private-profile-toggle').props.value).toBe(false);
+    expect(screen.getByTestId('account-private-profile')).toHaveTextContent(
+      /everyone on Progresso sees your workouts and profile/,
+    );
+  });
+
+  it('makes a public profile private again, and puts it back when it does not save', async () => {
+    mockProfile = { findableByEmail: true, profileVisibility: 'public' };
+    mockUpdateProfile.mockReset().mockRejectedValue(new Error('offline'));
+    const alerts = answerAlerts('Make Private', 'OK');
+    renderScreen();
+
+    expect(screen.getByTestId('account-private-profile-toggle').props.value).toBe(false);
+    fireEvent(screen.getByTestId('account-private-profile-toggle'), 'valueChange', true);
+
+    await waitFor(() =>
+      expect(mockUpdateProfile).toHaveBeenCalledWith({ profileVisibility: 'private' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('account-private-profile-toggle').props.value).toBe(false),
+    );
+    expect(alerts.mock.calls.map((call) => call[0])).toEqual([
+      'Make your profile private?',
+      "Couldn't change your profile",
+    ]);
   });
 
   it('puts the switch back when it does not save', async () => {

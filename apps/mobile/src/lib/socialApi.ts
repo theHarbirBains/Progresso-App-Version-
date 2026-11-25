@@ -75,11 +75,14 @@ export interface PersonProfile {
   followsYou: boolean;
   /** Their request to follow you, waiting for your answer. */
   requestId: string | null;
+  /** Their profile is public: everyone sees it as a follower would, and following needs no
+   * request. Absent from an API from before profiles could be public. */
+  isPublic?: boolean;
   followerCount: number;
   followingCount: number;
   /** Their last name, after their first (user.displayName) -- null with none. */
   lastName: string | null;
-  /** A line about themselves -- null with none. */
+  /** A line about themselves -- null with none, or while their profile is private to you. */
   bio: string | null;
   /** The people you follow who follow them too: how many, and up to 50 of them. */
   mutuals: { count: number; people: FollowUser[] };

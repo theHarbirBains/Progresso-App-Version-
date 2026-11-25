@@ -69,6 +69,22 @@ export const personProfileStyles = StyleSheet.create({
     ...typeScale.body,
     color: colors.textPrimary,
   },
+  // "Private Profile" under the name of someone else's private profile: a quiet outlined pill.
+  privateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.glassBorderStrong,
+  },
+  privateBadgeText: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
   // "12 followers • 2 requests • 3 following", on one line (wrapping on a narrow phone).
   counts: {
     flexDirection: 'row',

@@ -48,11 +48,9 @@ type FriendsSubTab = 'friends' | 'suggested';
 
 const INVITE_MESSAGE = 'Join me on Progresso — track your workouts and nutrition.';
 
+/** A person's row: their name over "@username", "· Private" after it for a private profile. */
 function rowLabel(user: FollowUser): { title: string; subtitle: string | undefined } {
-  if (user.displayName) {
-    return { title: user.displayName, subtitle: user.username ? `@${user.username}` : undefined };
-  }
-  return { title: user.username ? `@${user.username}` : 'Someone', subtitle: undefined };
+  return personLabel(user);
 }
 
 /**

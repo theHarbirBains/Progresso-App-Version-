@@ -73,192 +73,209 @@ function serviceWith(client: ReturnType<typeof createMockClient>, feed: Partial<
   );
 }
 
-/** How ME stands with SAM: blocks, then follows either way. */
+/** How ME stands with SAM: blocks, then follows either way, then whether their profile is public. */
 function queueRelationship(
   client: ReturnType<typeof createMockClient>,
   follows: { id: string; follower_id: string; followee_id: string; status: string }[],
   blocks: { blocker_id: string; blocked_id: string }[] = [],
+  visibility: 'private' | 'public' = 'private',
 ) {
   client.queue('user_blocks', { data: blocks, error: null });
   client.queue('follows', { data: follows, error: null });
+  client.queue('users', { data: { profile_visibility: visibility }, error: null });
+}
+
+/** Your own profile's setting, read as your own relationship is worked out. */
+function queueOwnVisibility(client: ReturnType<typeof createMockClient>) {
+  client.queue('users', { data: { profile_visibility: 'private' }, error: null });
+}
+
+/** Everything a full profile of SAM reads, as someone ME follows -- awarding their achievements
+ * first, unless that's to fail. */
+function queueFullProfile(
+  client: ReturnType<typeof createMockClient>,
+  award = true,
+  showRank = true,
+) {
+  queueRelationship(client, [
+    { id: 'f1', follower_id: ME, followee_id: SAM, status: 'accepted' },
+    { id: 'f2', follower_id: SAM, followee_id: ME, status: 'pending' },
+  ]);
+  client.queue('users', { data: [user(SAM, 'Sam')], error: null });
+  // Who you follow comes first (for mutual friends), then the two counts.
+  client.queue('follows', {
+    data: [{ followee_id: SAM }, { followee_id: JO }, { followee_id: 'blocked-id' }],
+    error: null,
+  });
+  client.queue('follows', { data: null, error: null, count: 12 });
+  client.queue('follows', { data: null, error: null, count: 3 });
+  client.queue('users', {
+    data: { last_name: 'Lee', bio: 'Building strength.', show_rank: showRank },
+    error: null,
+  });
+  client.queue('follows', {
+    data: [{ follower_id: JO }, { follower_id: 'blocked-id' }],
+    error: null,
+  });
+  client.queue('user_blocks', {
+    data: [{ blocker_id: 'blocked-id', blocked_id: ME }],
+    error: null,
+  });
+  client.queue('users', { data: [user(JO, 'Jo')], error: null });
+  client.queue('workouts', { data: null, error: null, count: 40 });
+  client.queue('workouts', { data: null, error: null, count: 9 });
+  client.queue('rpc:person_profile_totals', {
+    data: [
+      {
+        total_volume_kg: '19400.50',
+        pr_count: 24,
+        best_month_workouts: 14,
+        total_sets: 900,
+        total_reps: 7200,
+        training_minutes: 2400,
+        one_rep_max_count: 3,
+        exercise_count: 18,
+        best_session_volume_kg: '9100.00',
+        bodyweight_reps: 640,
+        timed_seconds: 1800,
+        group_workouts: 4,
+        committed_months: 2,
+        strong_weeks: 11,
+        likes_received: 31,
+        likes_given: 27,
+      },
+    ],
+    error: null,
+  });
+  client.queue('rpc:person_exercise_bests', {
+    data: [
+      {
+        exercise_id: 'ex-row',
+        measurement_type: 'weight_reps',
+        weight_kg: '100.00',
+        reps: 5,
+        duration_seconds: null,
+        performed_at: '2026-11-01',
+        workouts: 12,
+        last_performed_at: '2026-11-10',
+      },
+      {
+        exercise_id: 'ex-plank',
+        measurement_type: 'timed',
+        weight_kg: null,
+        reps: null,
+        duration_seconds: 95,
+        performed_at: '2026-11-02',
+        workouts: 3,
+        last_performed_at: '2026-11-02',
+      },
+    ],
+    error: null,
+  });
+  client.queue('exercises', {
+    data: [
+      {
+        id: 'ex-row',
+        name: 'Seated Row',
+        photo_url: 'https://example.com/row.jpg',
+        gym: 'Downtown',
+        grip: null,
+        attachment: 'V-handle',
+      },
+      { id: 'ex-plank', name: 'Plank', photo_url: null, gym: null, attachment: null },
+    ],
+    error: null,
+  });
+  client.queue('achievement_definitions', {
+    data: [
+      {
+        id: 'first-steps',
+        title: 'First Steps',
+        description: 'Finish your first workout',
+        icon: 'play',
+        category: 'workouts',
+        kind: 'single',
+      },
+      {
+        id: 'guns-blazin',
+        title: "Guns Blazin'",
+        description: 'Lift weight on biceps exercises',
+        icon: 'zap',
+        category: 'muscles',
+        kind: 'levels',
+      },
+    ],
+    error: null,
+  });
+  client.queue('achievement_levels', {
+    data: [
+      { achievement_id: 'first-steps', level: 1 },
+      ...Array.from({ length: 8 }, (_, i) => ({ achievement_id: 'guns-blazin', level: i + 1 })),
+      { achievement_id: 'fuel-logger', level: 1 },
+    ],
+    error: null,
+  });
+  client.queue('achievement_awards', {
+    data: [
+      { achievement_id: 'first-steps', level: 1, ap: 25, awarded_at: '2026-01-02T10:00:00Z' },
+      { achievement_id: 'fuel-logger', level: 1, ap: 50, awarded_at: '2026-01-03T10:00:00Z' },
+      { achievement_id: 'guns-blazin', level: 1, ap: 20, awarded_at: '2026-01-04T10:00:00Z' },
+      { achievement_id: 'guns-blazin', level: 2, ap: 40, awarded_at: '2026-01-11T10:00:00Z' },
+    ],
+    error: null,
+  });
+  if (award) client.queue('rpc:award_achievements', { data: [], error: null });
+  client.queue('rpc:achievement_summary', {
+    data: [{ points: 1250, awards: 14 }],
+    error: null,
+  });
+  client.queue('profile_montage_items', {
+    data: [
+      {
+        id: 'm1',
+        kind: 'video',
+        storage_path: `${SAM}/clip.mp4`,
+        width: 1080,
+        height: 1920,
+        duration_seconds: '12.50',
+      },
+      {
+        id: 'm2',
+        kind: 'photo',
+        storage_path: `${SAM}/gym.jpg`,
+        width: 1600,
+        height: 1200,
+        duration_seconds: null,
+        frame_x: '0.3000',
+        frame_y: '0.6500',
+        frame_zoom: '1.50',
+      },
+      {
+        id: 'm3',
+        kind: 'photo',
+        storage_path: `${SAM}/gone.jpg`,
+        width: null,
+        height: null,
+        duration_seconds: null,
+      },
+    ],
+    error: null,
+  });
+  client.queue('sign:profile-montage', {
+    data: [
+      { path: `${SAM}/clip.mp4`, signedUrl: 'https://cdn.test/clip?token=1', error: null },
+      { path: `${SAM}/gym.jpg`, signedUrl: 'https://cdn.test/gym?token=2', error: null },
+      { path: `${SAM}/gone.jpg`, signedUrl: '', error: 'Object not found' },
+    ],
+    error: null,
+  });
 }
 
 describe('PeopleService', () => {
   describe('getProfile', () => {
     it('shows someone you follow in full: counts, workout figures and every exercise', async () => {
       const client = createMockClient();
-      queueRelationship(client, [
-        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'accepted' },
-        { id: 'f2', follower_id: SAM, followee_id: ME, status: 'pending' },
-      ]);
-      client.queue('users', { data: [user(SAM, 'Sam')], error: null });
-      // Who you follow comes first (for mutual friends), then the two counts.
-      client.queue('follows', {
-        data: [{ followee_id: SAM }, { followee_id: JO }, { followee_id: 'blocked-id' }],
-        error: null,
-      });
-      client.queue('follows', { data: null, error: null, count: 12 });
-      client.queue('follows', { data: null, error: null, count: 3 });
-      client.queue('users', {
-        data: { last_name: 'Lee', bio: 'Building strength.' },
-        error: null,
-      });
-      client.queue('follows', {
-        data: [{ follower_id: JO }, { follower_id: 'blocked-id' }],
-        error: null,
-      });
-      client.queue('user_blocks', {
-        data: [{ blocker_id: 'blocked-id', blocked_id: ME }],
-        error: null,
-      });
-      client.queue('users', { data: [user(JO, 'Jo')], error: null });
-      client.queue('workouts', { data: null, error: null, count: 40 });
-      client.queue('workouts', { data: null, error: null, count: 9 });
-      client.queue('rpc:person_profile_totals', {
-        data: [
-          {
-            total_volume_kg: '19400.50',
-            pr_count: 24,
-            best_month_workouts: 14,
-            total_sets: 900,
-            total_reps: 7200,
-            training_minutes: 2400,
-            one_rep_max_count: 3,
-            exercise_count: 18,
-            best_session_volume_kg: '9100.00',
-            bodyweight_reps: 640,
-            timed_seconds: 1800,
-            group_workouts: 4,
-            committed_months: 2,
-            strong_weeks: 11,
-            likes_received: 31,
-            likes_given: 27,
-          },
-        ],
-        error: null,
-      });
-      client.queue('rpc:person_exercise_bests', {
-        data: [
-          {
-            exercise_id: 'ex-row',
-            measurement_type: 'weight_reps',
-            weight_kg: '100.00',
-            reps: 5,
-            duration_seconds: null,
-            performed_at: '2026-11-01',
-            workouts: 12,
-            last_performed_at: '2026-11-10',
-          },
-          {
-            exercise_id: 'ex-plank',
-            measurement_type: 'timed',
-            weight_kg: null,
-            reps: null,
-            duration_seconds: 95,
-            performed_at: '2026-11-02',
-            workouts: 3,
-            last_performed_at: '2026-11-02',
-          },
-        ],
-        error: null,
-      });
-      client.queue('exercises', {
-        data: [
-          {
-            id: 'ex-row',
-            name: 'Seated Row',
-            photo_url: 'https://example.com/row.jpg',
-            gym: 'Downtown',
-            grip: null,
-            attachment: 'V-handle',
-          },
-          { id: 'ex-plank', name: 'Plank', photo_url: null, gym: null, attachment: null },
-        ],
-        error: null,
-      });
-      client.queue('achievement_definitions', {
-        data: [
-          {
-            id: 'first-steps',
-            title: 'First Steps',
-            description: 'Finish your first workout',
-            icon: 'play',
-            category: 'workouts',
-            kind: 'single',
-          },
-          {
-            id: 'guns-blazin',
-            title: "Guns Blazin'",
-            description: 'Lift weight on biceps exercises',
-            icon: 'zap',
-            category: 'muscles',
-            kind: 'levels',
-          },
-        ],
-        error: null,
-      });
-      client.queue('achievement_levels', {
-        data: [
-          { achievement_id: 'first-steps', level: 1 },
-          ...Array.from({ length: 8 }, (_, i) => ({ achievement_id: 'guns-blazin', level: i + 1 })),
-          { achievement_id: 'fuel-logger', level: 1 },
-        ],
-        error: null,
-      });
-      client.queue('achievement_awards', {
-        data: [
-          { achievement_id: 'first-steps', level: 1, ap: 25, awarded_at: '2026-01-02T10:00:00Z' },
-          { achievement_id: 'fuel-logger', level: 1, ap: 50, awarded_at: '2026-01-03T10:00:00Z' },
-          { achievement_id: 'guns-blazin', level: 1, ap: 20, awarded_at: '2026-01-04T10:00:00Z' },
-          { achievement_id: 'guns-blazin', level: 2, ap: 40, awarded_at: '2026-01-11T10:00:00Z' },
-        ],
-        error: null,
-      });
-      client.queue('rpc:award_achievements', { data: [], error: null });
-      client.queue('rpc:achievement_summary', {
-        data: [{ points: 1250, awards: 14 }],
-        error: null,
-      });
-      client.queue('profile_montage_items', {
-        data: [
-          {
-            id: 'm1',
-            kind: 'video',
-            storage_path: `${SAM}/clip.mp4`,
-            width: 1080,
-            height: 1920,
-            duration_seconds: '12.50',
-          },
-          {
-            id: 'm2',
-            kind: 'photo',
-            storage_path: `${SAM}/gym.jpg`,
-            width: 1600,
-            height: 1200,
-            duration_seconds: null,
-            frame_x: '0.3000',
-            frame_y: '0.6500',
-            frame_zoom: '1.50',
-          },
-          {
-            id: 'm3',
-            kind: 'photo',
-            storage_path: `${SAM}/gone.jpg`,
-            width: null,
-            height: null,
-            duration_seconds: null,
-          },
-        ],
-        error: null,
-      });
-      client.queue('sign:profile-montage', {
-        data: [
-          { path: `${SAM}/clip.mp4`, signedUrl: 'https://cdn.test/clip?token=1', error: null },
-          { path: `${SAM}/gym.jpg`, signedUrl: 'https://cdn.test/gym?token=2', error: null },
-          { path: `${SAM}/gone.jpg`, signedUrl: '', error: 'Object not found' },
-        ],
-        error: null,
-      });
+      queueFullProfile(client);
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
@@ -269,6 +286,7 @@ describe('PeopleService', () => {
         followStatus: 'accepted',
         followsYou: false,
         requestId: 'f2',
+        isPublic: false,
         followerCount: 12,
         followingCount: 3,
         // Their last name, after their first.
@@ -432,7 +450,7 @@ describe('PeopleService', () => {
       expect(client.rpc).toHaveBeenCalledWith('award_achievements', { p_user: SAM, p_zone: 'UTC' });
     });
 
-    it('shows only who someone is, and their counts, until they accept your follow', async () => {
+    it('shows only who someone is, and their counts, until they accept your follow -- not their bio or rank', async () => {
       const client = createMockClient();
       queueRelationship(client, [
         { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
@@ -441,76 +459,95 @@ describe('PeopleService', () => {
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
-      client.queue('users', { data: { bio: null }, error: null });
-      client.queue('rpc:award_achievements', { data: [], error: null });
-      client.queue('rpc:achievement_summary', { data: [{ points: 640, awards: 9 }], error: null });
+      client.queue('users', { data: { bio: 'Building strength.' }, error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
 
-      // Who they are and their rank -- but nothing of their training.
+      // Who they are and their counts -- but nothing of their own words or training.
       expect(profile).toMatchObject({
         followStatus: 'pending',
+        isPublic: false,
+        followerCount: 12,
+        followingCount: 3,
         bio: null,
         mutuals: { count: 0, people: [] },
         canSeeActivity: false,
         stats: null,
         bestLifts: null,
         exercises: null,
-        rank: { points: 640, awards: 9 },
+        rank: null,
         achievements: null,
         montage: null,
       });
-      // Brought up to date for their rank, which anyone may see.
-      expect(client.rpc).toHaveBeenCalledWith(
-        'award_achievements',
-        expect.objectContaining({ p_user: SAM }),
-      );
+      expect(client.rpc).not.toHaveBeenCalled();
       expect(client.from).not.toHaveBeenCalledWith('workouts');
       expect(client.from).not.toHaveBeenCalledWith('achievement_awards');
       expect(client.from).not.toHaveBeenCalledWith('profile_montage_items');
       expect(client.storage.from).not.toHaveBeenCalled();
     });
 
-    it('still shows the profile when bringing their achievements up to date fails', async () => {
+    it('shows a public profile in full to anyone, no follow needed', async () => {
       const client = createMockClient();
-      queueRelationship(client, [
-        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
-      ]);
+      queueRelationship(client, [], [], 'public');
       client.queue('users', { data: [user(SAM, 'Sam')], error: null });
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
-      client.queue('users', { data: { bio: null }, error: null });
-      // Nothing queued for award_achievements: it fails.
+      client.queue('users', { data: { bio: 'Building strength.' }, error: null });
+      // Their training as a follower would see it: figures, exercises, achievements, rank, montage.
+      client.queue('workouts', { data: null, error: null, count: 40 });
+      client.queue('workouts', { data: null, error: null, count: 9 });
+      client.queue('rpc:person_profile_totals', { data: [], error: null });
+      client.queue('rpc:person_exercise_bests', { data: [], error: null });
+      client.queue('achievement_definitions', { data: [], error: null });
+      client.queue('achievement_levels', { data: [], error: null });
+      client.queue('achievement_awards', { data: [], error: null });
+      client.queue('rpc:award_achievements', { data: [], error: null });
       client.queue('rpc:achievement_summary', { data: [{ points: 640, awards: 9 }], error: null });
-      const service = serviceWith(client);
-
-      await expect(service.getProfile(ME, SAM)).resolves.toMatchObject({
-        rank: { points: 640, awards: 9 },
-      });
-    });
-
-    it('hides the rank of someone who chose to hide it', async () => {
-      const client = createMockClient();
-      queueRelationship(client, [
-        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
-      ]);
-      client.queue('users', { data: [user(SAM, 'Sam')], error: null });
-      client.queue('follows', { data: [], error: null });
-      client.queue('follows', { data: null, error: null, count: 12 });
-      client.queue('follows', { data: null, error: null, count: 3 });
-      client.queue('users', { data: { bio: null, show_rank: false }, error: null });
+      client.queue('profile_montage_items', { data: [], error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
 
+      expect(profile).toMatchObject({
+        followStatus: 'none',
+        isPublic: true,
+        canSeeActivity: true,
+        bio: 'Building strength.',
+        rank: { points: 640, awards: 9 },
+      });
+      expect(profile.stats).not.toBeNull();
+      expect(profile.exercises).toEqual([]);
+    });
+
+    it('still shows the profile when bringing their achievements up to date fails', async () => {
+      const client = createMockClient();
+      // Nothing queued for award_achievements: it fails.
+      queueFullProfile(client, false);
+      const service = serviceWith(client);
+
+      await expect(service.getProfile(ME, SAM)).resolves.toMatchObject({
+        canSeeActivity: true,
+        rank: { points: 1250, awards: 14 },
+      });
+    });
+
+    it('hides the rank of someone who chose to hide it, even from a follower', async () => {
+      const client = createMockClient();
+      queueFullProfile(client, true, false);
+      const service = serviceWith(client);
+
+      const profile = await service.getProfile(ME, SAM);
+
+      expect(profile.canSeeActivity).toBe(true);
       expect(profile.rank).toBeNull();
-      expect(client.rpc).not.toHaveBeenCalled();
+      expect(client.rpc).not.toHaveBeenCalledWith('achievement_summary', expect.anything());
     });
 
     it("counts a trainer's logging on your own profile, with no mutual friends", async () => {
       const client = createMockClient();
+      queueOwnVisibility(client);
       client.queue('users', { data: [user(ME, 'Me')], error: null });
       client.queue('follows', { data: null, error: null, count: 2 });
       client.queue('follows', { data: null, error: null, count: 5 });
@@ -654,6 +691,7 @@ describe('PeopleService', () => {
 
     it("counts a trainer's logging on your own, with a bodyweight exercise's most reps", async () => {
       const client = createMockClient();
+      queueOwnVisibility(client);
       client.queue('rpc:person_exercise_history', {
         data: [
           {

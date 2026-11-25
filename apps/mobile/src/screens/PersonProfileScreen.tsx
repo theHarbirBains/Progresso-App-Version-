@@ -749,6 +749,18 @@ export function PersonProfilePage({
                     {subline}
                   </Text>
                 ) : null}
+                {/* Someone else's private profile says so, whether or not you can see it. */}
+                {!profile.isSelf && profile.isPublic === false ? (
+                  <View
+                    testID="person-profile-private-badge"
+                    style={styles.privateBadge}
+                    accessible
+                    accessibilityLabel="Private profile"
+                  >
+                    <Feather name="lock" size={12} color={colors.textSecondary} />
+                    <Text style={styles.privateBadgeText}>Private Profile</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
@@ -956,15 +968,16 @@ export function PersonProfilePage({
           {!profile.canSeeActivity ? (
             <EmptyState
               testID="person-profile-private"
+              icon={<Feather name="lock" size={28} color={colors.textSecondary} />}
               title={
                 profile.followStatus === 'pending'
                   ? 'Request sent'
-                  : `Follow ${firstName(profile)} to see their training`
+                  : `${firstName(profile)}'s profile is private`
               }
               description={
                 profile.followStatus === 'pending'
                   ? `You'll see ${firstName(profile)}'s workouts, stats and lifts once they accept.`
-                  : 'Their workouts, stats, achievements and lifts show here once they accept.'
+                  : 'Follow them to see their workouts, stats, achievements and lifts once they accept.'
               }
             />
           ) : (

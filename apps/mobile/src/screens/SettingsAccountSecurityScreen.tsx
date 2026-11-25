@@ -59,6 +59,46 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
     }
   }
 
+  // A private profile (the default): only people you approve see your training. Public:
+  // everyone signed in does, and following you needs no request. Asked before it changes.
+  const [isPrivate, setIsPrivate] = useState(profile?.profileVisibility !== 'public');
+  useEffect(() => {
+    if (profile) setIsPrivate(profile.profileVisibility !== 'public');
+  }, [profile]);
+
+  async function saveVisibility(makePrivate: boolean) {
+    const previous = isPrivate;
+    setIsPrivate(makePrivate);
+    try {
+      await updateProfile({ profileVisibility: makePrivate ? 'private' : 'public' });
+    } catch {
+      setIsPrivate(previous);
+      Alert.alert("Couldn't change your profile", 'Check your connection and try again.');
+    }
+  }
+
+  function handlePrivate(makePrivate: boolean) {
+    if (makePrivate) {
+      Alert.alert(
+        'Make your profile private?',
+        'Only people you approve will see your workouts, stats, achievements and montage. Everyone already following you still will.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Make Private', onPress: () => void saveVisibility(true) },
+        ],
+      );
+      return;
+    }
+    Alert.alert(
+      'Make your profile public?',
+      'Everyone on Progresso will be able to see your workouts, stats, achievements and montage, and follow you without asking. Requests waiting for you are accepted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Make Public', onPress: () => void saveVisibility(false) },
+      ],
+    );
+  }
+
   // Whether people who open your profile see your achievement rank.
   const [showRank, setShowRank] = useState(profile?.showRank ?? true);
   useEffect(() => {
@@ -157,7 +197,27 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
 
       <Section title="Privacy">
         <ListRow
+          testID="account-private-profile"
+          icon={isPrivate ? 'lock' : 'globe'}
+          title="Private Profile"
+          subtitle={
+            isPrivate
+              ? 'Only people you approve see your workouts, stats and profile.'
+              : 'Public: everyone on Progresso sees your workouts and profile, and can follow you without asking.'
+          }
+          trailing={
+            <Toggle
+              testID="account-private-profile-toggle"
+              value={isPrivate}
+              onValueChange={handlePrivate}
+              accentColor={theme.accent}
+              accessibilityLabel="Private profile"
+            />
+          }
+        />
+        <ListRow
           testID="account-findable"
+          divider
           icon="at-sign"
           title="Let people with my email find me"
           subtitle="When someone looks for friends in their contacts, you show up if your email is in them."
@@ -192,7 +252,7 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
           divider
           icon="award"
           title="Show my rank on my profile"
-          subtitle="Your achievement rank and AP, for anyone who opens your profile. You always see yours."
+          subtitle="Your achievement rank and AP, for anyone who can see your profile. You always see yours."
           trailing={
             <Toggle
               testID="account-show-rank-toggle"

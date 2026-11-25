@@ -11,6 +11,9 @@ export interface FollowUser {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Their profile is private: only accepted followers see their training. Absent from an API
+   * from before profiles could be public, when every one was. */
+  isPrivate?: boolean;
 }
 
 export interface FollowRequest {

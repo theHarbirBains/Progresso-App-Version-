@@ -7673,6 +7673,96 @@ async function main() {
     record('Only known movement patterns are accepted', patternRefused);
   }
 
+  console.log('\nRunning public and private profile tests...\n');
+  {
+    const [owner, fan, early, later] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8)', [
+      owner,
+      'owner@test.local',
+      fan,
+      'fan@test.local',
+      early,
+      'early@test.local',
+      later,
+      'later@test.local',
+    ]);
+    const visibility = async (id) =>
+      (await admin.query('select profile_visibility from public.users where id = $1', [id])).rows[0]
+        .profile_visibility;
+    const statusOf = async (follower, followee) =>
+      (
+        await admin.query(
+          'select status from public.follows where follower_id = $1 and followee_id = $2',
+          [follower, followee],
+        )
+      ).rows[0]?.status ?? null;
+    record('A profile starts private', (await visibility(owner)) === 'private');
+
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+      [early, owner],
+    );
+    record(
+      'Following a private profile waits for its owner',
+      (await statusOf(early, owner)) === 'pending',
+    );
+
+    await admin.query("update public.users set profile_visibility = 'public' where id = $1", [
+      owner,
+    ]);
+    record(
+      'Going public accepts the requests waiting',
+      (await statusOf(early, owner)) === 'accepted' &&
+        (
+          await admin.query(
+            'select responded_at from public.follows where follower_id = $1 and followee_id = $2',
+            [early, owner],
+          )
+        ).rows[0].responded_at !== null,
+    );
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+      [fan, owner],
+    );
+    record(
+      'Following a public profile is accepted at once',
+      (await statusOf(fan, owner)) === 'accepted',
+    );
+
+    await admin.query("update public.users set profile_visibility = 'private' where id = $1", [
+      owner,
+    ]);
+    record(
+      'Going private again keeps everyone already following',
+      (await statusOf(early, owner)) === 'accepted' && (await statusOf(fan, owner)) === 'accepted',
+    );
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+      [later, owner],
+    );
+    record(
+      'A new follower of a private profile waits again',
+      (await statusOf(later, owner)) === 'pending',
+    );
+    // Someone else's change of mind never touches the requests they've sent.
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+      [owner, later],
+    );
+    await admin.query("update public.users set profile_visibility = 'public' where id = $1", [
+      owner,
+    ]);
+    record(
+      "Going public accepts only requests to you, never the ones you've sent",
+      (await statusOf(owner, later)) === 'pending' && (await statusOf(later, owner)) === 'accepted',
+    );
+    await expectThrows(
+      admin.query("update public.users set profile_visibility = 'friends' where id = $1", [owner]),
+      'A profile is only ever private or public',
+      /users_profile_visibility_check/,
+    );
+  }
+
   await admin.end();
 }
 

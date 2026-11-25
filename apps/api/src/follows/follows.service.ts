@@ -17,6 +17,9 @@ export interface FollowUserSummary {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Their profile is private (the default): only accepted followers see their training. Absent
+   * where it isn't known. */
+  isPrivate?: boolean;
 }
 
 export interface FollowRequestSummary {
@@ -78,6 +81,8 @@ function toUserSummary(row: Record<string, unknown>): FollowUserSummary {
     username: (row.username as string | null) ?? null,
     displayName: (row.display_name as string | null) ?? null,
     avatarUrl: (row.avatar_url as string | null) ?? null,
+    isPrivate:
+      row.profile_visibility === undefined ? undefined : row.profile_visibility !== 'public',
   };
 }
 
@@ -148,15 +153,23 @@ export class FollowsService {
       return { status: existing.status as FollowStatus };
     }
 
-    const { error: insertError } = await client
+    // A public profile's follow is accepted as it's written (follows_accept_public): what the row
+    // became is the answer.
+    const { data: inserted, error: insertError } = await client
       .from('follows')
-      .insert({ follower_id: followerId, followee_id: followeeId, status: 'pending' });
+      .insert({ follower_id: followerId, followee_id: followeeId, status: 'pending' })
+      .select('status')
+      .maybeSingle();
     if (insertError) {
       throw new InternalServerErrorException('Failed to send follow request');
     }
+    const status: FollowStatus =
+      (inserted as { status?: FollowStatus } | null)?.status === 'accepted'
+        ? 'accepted'
+        : 'pending';
 
-    void this.pushFollow(followerId, followeeId, 'request');
-    return { status: 'pending' };
+    void this.pushFollow(followerId, followeeId, status === 'accepted' ? 'follower' : 'request');
+    return { status };
   }
 
   async respondToRequest(
@@ -371,8 +384,13 @@ export class FollowsService {
     ];
   }
 
-  /** A follow request, or a request accepted, pushed to the other person. */
-  private async pushFollow(fromId: string, toId: string, what: 'request' | 'accepted') {
+  /** A follow request, a request accepted, or a new follower of a public profile, pushed to the
+   * other person. */
+  private async pushFollow(
+    fromId: string,
+    toId: string,
+    what: 'request' | 'accepted' | 'follower',
+  ) {
     if (!this.socialPush) return;
     const name = await this.socialPush.nameOf(fromId);
     await this.socialPush.notify(
@@ -384,11 +402,17 @@ export class FollowsService {
             body: `${name} wants to follow you.`,
             path: 'notifications',
           }
-        : {
-            title: 'Follow request accepted',
-            body: `${name} accepted your follow request.`,
-            path: `people/${fromId}`,
-          },
+        : what === 'follower'
+          ? {
+              title: 'New follower',
+              body: `${name} started following you.`,
+              path: `people/${fromId}`,
+            }
+          : {
+              title: 'Follow request accepted',
+              body: `${name} accepted your follow request.`,
+              path: `people/${fromId}`,
+            },
     );
   }
 
@@ -512,14 +536,14 @@ export class FollowsService {
     const [byUsername, byDisplayName, blocks] = await Promise.all([
       client
         .from('users')
-        .select('id, username, display_name, avatar_url')
+        .select('id, username, display_name, avatar_url, profile_visibility')
         .ilike('username', pattern)
         .neq('id', userId)
         .not('onboarding_completed_at', 'is', null)
         .limit(SEARCH_RESULT_LIMIT),
       client
         .from('users')
-        .select('id, username, display_name, avatar_url')
+        .select('id, username, display_name, avatar_url, profile_visibility')
         .ilike('display_name', pattern)
         .neq('id', userId)
         .not('onboarding_completed_at', 'is', null)
@@ -589,7 +613,7 @@ export class FollowsService {
     // Only people with an account (see search).
     const { data, error } = await client
       .from('users')
-      .select('id, username, display_name, avatar_url')
+      .select('id, username, display_name, avatar_url, profile_visibility')
       .neq('id', userId)
       .not('onboarding_completed_at', 'is', null)
       .order('created_at', { ascending: false })
@@ -620,7 +644,7 @@ export class FollowsService {
 
     const { data, error } = await client
       .from('users')
-      .select('id, username, display_name, avatar_url')
+      .select('id, username, display_name, avatar_url, profile_visibility')
       .in('id', uniqueIds);
     if (error) throw new InternalServerErrorException('Failed to load user profiles');
 

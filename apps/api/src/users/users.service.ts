@@ -64,6 +64,9 @@ export interface UserProfile {
   findableByPhone: boolean;
   /** Whether people who open their profile see their achievement rank. */
   showRank: boolean;
+  /** Who sees their profile's training: accepted followers (private, the default) or every
+   * signed-in user (public). */
+  profileVisibility: 'private' | 'public';
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
@@ -78,7 +81,8 @@ const PROFILE_COLUMNS =
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
   'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
-  'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions';
+  'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions, ' +
+  'profile_visibility';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -126,6 +130,7 @@ function toProfile(data: any): UserProfile {
     phoneNumber: data.phone_e164,
     findableByPhone: data.findable_by_phone,
     showRank: data.show_rank,
+    profileVisibility: data.profile_visibility,
   };
 }
 
@@ -239,6 +244,9 @@ export class UsersService {
     if (dto.phoneNumber !== undefined) updatePayload.phone_e164 = dto.phoneNumber;
     if (dto.findableByPhone !== undefined) updatePayload.findable_by_phone = dto.findableByPhone;
     if (dto.showRank !== undefined) updatePayload.show_rank = dto.showRank;
+    if (dto.profileVisibility !== undefined) {
+      updatePayload.profile_visibility = dto.profileVisibility;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return this.getProfile(userId);

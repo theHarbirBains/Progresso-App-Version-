@@ -74,12 +74,17 @@ function setup() {
 }
 
 /** ME follows SAM (accepted), and nobody's blocked. */
-function queueFollowing(client: ReturnType<typeof createMockClient>, status = 'accepted') {
+function queueFollowing(
+  client: ReturnType<typeof createMockClient>,
+  status = 'accepted',
+  visibility: 'private' | 'public' = 'private',
+) {
   client.queue('user_blocks', { data: [], error: null });
   client.queue('follows', {
     data: [{ id: 'f1', follower_id: ME, followee_id: SAM, status }],
     error: null,
   });
+  client.queue('users', { data: { profile_visibility: visibility }, error: null });
 }
 
 describe('WorkoutSocialService', () => {
@@ -102,6 +107,23 @@ describe('WorkoutSocialService', () => {
         body: 'Harbir liked your workout Pull Day.',
         path: `workouts/${W}`,
       });
+    });
+
+    it("reaches a public profile's workout without a follow -- never a trainer's logging", async () => {
+      const { client, service } = setup();
+      client.queue('workouts', { data: workout(), error: null });
+      queueFollowing(client, 'pending', 'public');
+      client.queue('workout_likes', { data: null, error: null });
+      await service.like(ME, W);
+      expect(client.calls).toContainEqual({
+        table: 'workout_likes',
+        method: 'insert',
+        args: [{ workout_id: W, user_id: ME }],
+      });
+
+      client.queue('workouts', { data: workout({ logged_by: 'coach' }), error: null });
+      queueFollowing(client, 'pending', 'public');
+      await expect(service.like(ME, W)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('sends no second push for a workout already liked', async () => {

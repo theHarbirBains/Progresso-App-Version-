@@ -14,15 +14,21 @@ import {
 import { confirmUnfollow, unfollowName } from './confirmUnfollow';
 import { FollowButton } from './FollowButton';
 
-/** "Sam Lee" over "@sam", or "@sam" alone, or "Someone". */
+/** "Sam Lee" over "@sam", or "@sam" alone, or "Someone" -- and "Private" after it for a private
+ * profile ("@sam · Private"). */
 export function personLabel(user: FollowSearchResult['user']): {
   title: string;
   subtitle: string | undefined;
 } {
+  const privately = (line: string | undefined) =>
+    user.isPrivate ? (line ? `${line} · Private` : 'Private') : line;
   if (user.displayName) {
-    return { title: user.displayName, subtitle: user.username ? `@${user.username}` : undefined };
+    return {
+      title: user.displayName,
+      subtitle: privately(user.username ? `@${user.username}` : undefined),
+    };
   }
-  return { title: user.username ? `@${user.username}` : 'Someone', subtitle: undefined };
+  return { title: user.username ? `@${user.username}` : 'Someone', subtitle: privately(undefined) };
 }
 
 /**
