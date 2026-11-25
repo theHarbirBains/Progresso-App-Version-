@@ -46,6 +46,12 @@ export interface UserProfile {
   repRangeMin: number;
   repRangeMax: number;
   progressionCuesEnabled: boolean;
+  /** Up to three areas to prioritize in the gym (or Balanced Development alone). */
+  trainingPriorities: string[];
+  /** Where they train: full_gym, dumbbells or bodyweight. */
+  equipmentAccess: string | null;
+  /** What they'd rather not train directly. */
+  trainingExclusions: string[];
   /** Push for social activity: follow requests and accepts, likes, comments. */
   notifyFollows: boolean;
   notifyLikes: boolean;
@@ -72,7 +78,7 @@ const PROFILE_COLUMNS =
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
   'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
-  'phone_e164, findable_by_phone';
+  'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -110,6 +116,9 @@ function toProfile(data: any): UserProfile {
     repRangeMin: data.rep_range_min,
     repRangeMax: data.rep_range_max,
     progressionCuesEnabled: data.progression_cues_enabled,
+    trainingPriorities: data.training_priorities,
+    equipmentAccess: data.equipment_access,
+    trainingExclusions: data.training_exclusions,
     notifyFollows: data.notify_follows,
     notifyLikes: data.notify_likes,
     notifyComments: data.notify_comments,
@@ -216,6 +225,13 @@ export class UsersService {
     if (dto.progressionCuesEnabled !== undefined) {
       updatePayload.progression_cues_enabled = dto.progressionCuesEnabled;
     }
+    if (dto.trainingPriorities !== undefined) {
+      updatePayload.training_priorities = dto.trainingPriorities;
+    }
+    if (dto.equipmentAccess !== undefined) updatePayload.equipment_access = dto.equipmentAccess;
+    if (dto.trainingExclusions !== undefined) {
+      updatePayload.training_exclusions = dto.trainingExclusions;
+    }
     if (dto.notifyFollows !== undefined) updatePayload.notify_follows = dto.notifyFollows;
     if (dto.notifyLikes !== undefined) updatePayload.notify_likes = dto.notifyLikes;
     if (dto.notifyComments !== undefined) updatePayload.notify_comments = dto.notifyComments;
@@ -242,6 +258,20 @@ export class UsersService {
       }
       if (error.code === CHECK_VIOLATION && error.message.includes('users_rep_range_check')) {
         throw new BadRequestException('The bottom of your rep range has to be below the top');
+      }
+      if (
+        error.code === CHECK_VIOLATION &&
+        error.message.includes('users_training_priorities_check')
+      ) {
+        throw new BadRequestException(
+          'Pick up to three areas to prioritize, or Balanced Development on its own',
+        );
+      }
+      if (
+        error.code === CHECK_VIOLATION &&
+        error.message.includes('users_training_preferences_agree_check')
+      ) {
+        throw new BadRequestException("You can't prioritize an area you've chosen to leave out");
       }
       throw new InternalServerErrorException('Failed to update profile');
     }

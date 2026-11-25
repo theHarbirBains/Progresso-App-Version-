@@ -25,7 +25,6 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   WorkoutSplitForm: 'train',
   ChooseWorkoutSplit: 'train',
   WorkoutPrograms: 'train',
-  ProgramLibrary: 'train',
   ProgramDetail: 'train',
   ProgramDay: 'train',
   ProgramExercise: 'train',

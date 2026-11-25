@@ -7,7 +7,14 @@ import { Text } from '../design/Text';
 import { colors, fonts, spacing, typeScale } from '../design/theme';
 import { includesNutrition, membershipOption } from '../membership/membershipTiers';
 import { useAppTheme } from '../theme/appThemeContext';
-import { programById, splitNameFor, variationById } from '../programs/programs';
+import {
+  equipmentLabel,
+  PRIORITY_LABELS,
+  programById,
+  splitNameFor,
+  TRAINING_EXCLUSION_LABELS,
+  variationById,
+} from '../programs/programs';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
 import type { OnboardingDraft, OnboardingStep } from './onboardingDraft';
 import {
@@ -72,6 +79,34 @@ function itemsFor(draft: OnboardingDraft): Item[] {
       label: 'Experience',
       value: comfort.label,
       wide: true,
+    });
+  }
+  if (draft.trainingPriorities.length > 0) {
+    items.push({
+      step: 'trainingPriorities',
+      icon: 'crosshair',
+      label: draft.trainingPriorities.length === 1 ? 'Priority' : 'Priorities',
+      value: draft.trainingPriorities.map((area) => PRIORITY_LABELS[area]).join(', '),
+      wide: true,
+    });
+  }
+  if (draft.equipmentAccess) {
+    items.push({
+      step: 'equipmentAccess',
+      icon: 'map-pin',
+      label: 'Where You Train',
+      value: equipmentLabel(draft.equipmentAccess),
+    });
+  }
+  if (draft.trainingExclusions) {
+    items.push({
+      step: 'trainingExclusions',
+      icon: 'slash',
+      label: 'Left Out',
+      value:
+        draft.trainingExclusions.length > 0
+          ? draft.trainingExclusions.map((area) => TRAINING_EXCLUSION_LABELS[area]).join(', ')
+          : 'Nothing',
     });
   }
   const preset = WORKOUT_SPLIT_PRESETS.find((p) => p.id === draft.selectedSplitPresetId);

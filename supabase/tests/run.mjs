@@ -505,6 +505,83 @@ async function main() {
     /violates check constraint/i,
   );
 
+  // ---- training preferences, for program recommendations ----
+  const unanswered = await admin.query(
+    'select training_priorities, equipment_access, training_exclusions from public.users where id = $1',
+    [userA],
+  );
+  record(
+    'Training preferences start unanswered',
+    JSON.stringify(unanswered.rows[0]) ===
+      JSON.stringify({ training_priorities: [], equipment_access: null, training_exclusions: [] }),
+    JSON.stringify(unanswered.rows[0]),
+  );
+  await admin.query(
+    "update public.users set training_priorities = array['glutes', 'back', 'arms'], equipment_access = 'dumbbells', training_exclusions = array['chest'] where id = $1",
+    [userA],
+  );
+  const preferences = await admin.query(
+    'select training_priorities, equipment_access, training_exclusions from public.users where id = $1',
+    [userA],
+  );
+  record(
+    'Three priorities, where they train and what they leave out are saved in order',
+    JSON.stringify(preferences.rows[0]) ===
+      JSON.stringify({
+        training_priorities: ['glutes', 'back', 'arms'],
+        equipment_access: 'dumbbells',
+        training_exclusions: ['chest'],
+      }),
+    JSON.stringify(preferences.rows[0]),
+  );
+  await expectThrows(
+    admin.query(
+      "update public.users set training_priorities = array['glutes', 'back', 'arms', 'core'] where id = $1",
+      [userA],
+    ),
+    'More than three priorities are rejected',
+    /users_training_priorities_check/i,
+  );
+  await expectThrows(
+    admin.query(
+      "update public.users set training_priorities = array['balanced', 'glutes'] where id = $1",
+      [userA],
+    ),
+    'Balanced Development goes on its own, never with another priority',
+    /users_training_priorities_check/i,
+  );
+  await expectThrows(
+    admin.query("update public.users set training_priorities = array['neck'] where id = $1", [
+      userA,
+    ]),
+    'An unknown priority is rejected',
+    /users_training_priorities_check/i,
+  );
+  await expectThrows(
+    admin.query("update public.users set training_priorities = array['chest'] where id = $1", [
+      userA,
+    ]),
+    "A priority can't be something they'd rather not train",
+    /users_training_preferences_agree_check/i,
+  );
+  await expectThrows(
+    admin.query("update public.users set equipment_access = 'home_gym' where id = $1", [userA]),
+    'An unknown equipment answer is rejected',
+    /users_equipment_access_check/i,
+  );
+  await expectThrows(
+    admin.query("update public.users set training_exclusions = array['legs'] where id = $1", [
+      userA,
+    ]),
+    'Only chest and glutes can be left out',
+    /users_training_exclusions_check/i,
+  );
+  await admin.query(
+    "update public.users set training_priorities = array['balanced'], equipment_access = null, training_exclusions = '{}' where id = $1",
+    [userA],
+  );
+  await admin.query("update public.users set training_priorities = '{}' where id = $1", [userA]);
+
   // ---- membership tiers ----
   const tier = await admin.query('select membership_tier from public.users where id = $1', [userA]);
   record(

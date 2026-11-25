@@ -364,6 +364,33 @@ describe('UsersService', () => {
       expect(result.membershipTier).toBe('workouts_nutrition');
     });
 
+    it('saves the training preferences and reads them back', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          training_priorities: ['glutes', 'back'],
+          equipment_access: 'dumbbells',
+          training_exclusions: ['chest'],
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', {
+        trainingPriorities: ['glutes', 'back'],
+        equipmentAccess: 'dumbbells',
+        trainingExclusions: ['chest'],
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        training_priorities: ['glutes', 'back'],
+        equipment_access: 'dumbbells',
+        training_exclusions: ['chest'],
+      });
+      expect(result.trainingPriorities).toEqual(['glutes', 'back']);
+      expect(result.equipmentAccess).toBe('dumbbells');
+      expect(result.trainingExclusions).toEqual(['chest']);
+    });
+
     it('marks onboarding complete as a server-set timestamp, not a client-supplied value', async () => {
       const client = createMockClient({
         updateData: {
@@ -463,6 +490,39 @@ describe('UsersService', () => {
 
       await expect(service.updateProfile('user-1', { repRangeMin: 12 })).rejects.toThrow(
         new BadRequestException('The bottom of your rep range has to be below the top'),
+      );
+    });
+
+    it("explains a priority that is also something they'd leave out, or Balanced with others", async () => {
+      const agree = serviceWith(
+        createMockClient({
+          updateError: {
+            code: '23514',
+            message:
+              'new row for relation "users" violates check constraint "users_training_preferences_agree_check"',
+          },
+        }),
+      );
+      await expect(
+        agree.updateProfile('user-1', { trainingPriorities: ['chest'] }),
+      ).rejects.toThrow(
+        new BadRequestException("You can't prioritize an area you've chosen to leave out"),
+      );
+      const balanced = serviceWith(
+        createMockClient({
+          updateError: {
+            code: '23514',
+            message:
+              'new row for relation "users" violates check constraint "users_training_priorities_check"',
+          },
+        }),
+      );
+      await expect(
+        balanced.updateProfile('user-1', { trainingPriorities: ['balanced', 'chest'] }),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Pick up to three areas to prioritize, or Balanced Development on its own',
+        ),
       );
     });
 

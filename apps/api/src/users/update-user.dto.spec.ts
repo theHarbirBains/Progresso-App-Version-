@@ -63,3 +63,29 @@ describe('UpdateUserDto -- phone number', () => {
     expect(await errorsFor({ phoneNumber: null })).toEqual(['phoneNumber']);
   });
 });
+
+describe('UpdateUserDto -- training preferences', () => {
+  it('takes up to three different areas to prioritize, where they train and what to leave out', async () => {
+    expect(await errorsFor({ trainingPriorities: [] })).toEqual([]);
+    expect(await errorsFor({ trainingPriorities: ['balanced'] })).toEqual([]);
+    expect(await errorsFor({ trainingPriorities: ['chest', 'back', 'glutes'] })).toEqual([]);
+    for (const equipmentAccess of ['full_gym', 'dumbbells', 'bodyweight']) {
+      expect(await errorsFor({ equipmentAccess })).toEqual([]);
+    }
+    expect(await errorsFor({ trainingExclusions: ['chest', 'glutes'] })).toEqual([]);
+    expect(await errorsFor({ trainingExclusions: [] })).toEqual([]);
+  });
+
+  it('refuses a fourth area, a repeat, or anything it does not know', async () => {
+    expect(await errorsFor({ trainingPriorities: ['chest', 'back', 'glutes', 'arms'] })).toEqual([
+      'trainingPriorities',
+    ]);
+    expect(await errorsFor({ trainingPriorities: ['chest', 'chest'] })).toEqual([
+      'trainingPriorities',
+    ]);
+    expect(await errorsFor({ trainingPriorities: ['neck'] })).toEqual(['trainingPriorities']);
+    expect(await errorsFor({ equipmentAccess: 'home_gym' })).toEqual(['equipmentAccess']);
+    expect(await errorsFor({ trainingExclusions: ['legs'] })).toEqual(['trainingExclusions']);
+    expect(await errorsFor({ trainingExclusions: 'chest' })).toEqual(['trainingExclusions']);
+  });
+});

@@ -1,3 +1,4 @@
+import type { EquipmentAccess, PriorityArea, TrainingExclusion } from '../programs/programTypes';
 import { request } from './apiClient';
 
 // Thin client for the backend API — the only place profile writes go
@@ -74,6 +75,13 @@ export interface ProfileResponse {
   repRangeMax: number;
   /** Whether the live workout suggests when to go heavier or make an exercise harder. */
   progressionCuesEnabled: boolean;
+  /** Up to three areas they want to prioritize in the gym (or Balanced Development alone), for
+   * program recommendations -- empty until answered. */
+  trainingPriorities: PriorityArea[];
+  /** Where they train, for program recommendations -- null until answered. */
+  equipmentAccess: EquipmentAccess | null;
+  /** What they'd rather not train directly, for program recommendations. */
+  trainingExclusions: TrainingExclusion[];
   /** Push for social activity (Settings > Notifications > Social), each on unless turned off. */
   notifyFollows: boolean;
   notifyLikes: boolean;
@@ -124,6 +132,10 @@ export interface UpdateProfileInput {
   repRangeMin?: number;
   repRangeMax?: number;
   progressionCuesEnabled?: boolean;
+  /** Up to three, or ['balanced'] alone; never one of trainingExclusions. */
+  trainingPriorities?: PriorityArea[];
+  equipmentAccess?: EquipmentAccess;
+  trainingExclusions?: TrainingExclusion[];
   notifyFollows?: boolean;
   notifyLikes?: boolean;
   notifyComments?: boolean;

@@ -117,7 +117,12 @@ export function ProgramAddedScreen({ navigation, route }: Props) {
         <SecondaryButton
           testID="program-added-explore"
           label="Explore More Programs"
-          onPress={() => navigation.popTo('WorkoutPrograms')}
+          onPress={() =>
+            // In the app the programs are Workout Splits' Programs tab; onboarding's sheet starts on them.
+            host.mode === 'app'
+              ? navigation.popTo('WorkoutSplits', { tab: 'programs' })
+              : navigation.popTo('WorkoutPrograms')
+          }
         />
       </View>
     </Screen>

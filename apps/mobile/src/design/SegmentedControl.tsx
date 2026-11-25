@@ -20,6 +20,8 @@ interface Props<T extends string> {
   /** Defaults to the app theme's accent. */
   accentColor?: string;
   onAccentColor?: string;
+  /** Across the whole width, its segments sharing it equally (a row of many short choices). */
+  stretch?: boolean;
   testID?: string;
 }
 
@@ -34,6 +36,7 @@ export function SegmentedControl<T extends string>({
   disabled,
   accentColor: accentColorProp,
   onAccentColor: onAccentColorProp,
+  stretch = false,
   testID,
 }: Props<T>) {
   // Unless told otherwise, the app theme's accent and the ink that reads on it.
@@ -41,7 +44,10 @@ export function SegmentedControl<T extends string>({
   const accentColor = accentColorProp ?? themeAccent.accent;
   const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   return (
-    <View testID={testID} style={[styles.track, disabled && styles.disabled]}>
+    <View
+      testID={testID}
+      style={[styles.track, stretch && styles.stretchTrack, disabled && styles.disabled]}
+    >
       <GlassBackground />
       {options.map((option) => {
         const selected = option.value === value;
@@ -49,7 +55,11 @@ export function SegmentedControl<T extends string>({
           <TouchableOpacity
             key={option.value}
             testID={testID ? `${testID}-${option.value}` : undefined}
-            style={[styles.segment, selected && { backgroundColor: accentColor }]}
+            style={[
+              styles.segment,
+              stretch && styles.stretchSegment,
+              selected && { backgroundColor: accentColor },
+            ]}
             onPress={() => !disabled && onChange(option.value)}
             disabled={disabled}
             activeOpacity={0.8}
@@ -73,6 +83,9 @@ const styles = StyleSheet.create({
     padding: 4,
     overflow: 'hidden',
   },
+  stretchTrack: {
+    alignSelf: 'stretch',
+  },
   disabled: {
     opacity: 0.5,
   },
@@ -84,6 +97,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
     borderRadius: radii.pill,
+  },
+  stretchSegment: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs,
   },
   label: {
     ...typeScale.callout,

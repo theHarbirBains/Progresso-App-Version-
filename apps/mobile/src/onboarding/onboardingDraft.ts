@@ -27,6 +27,9 @@ import { defaultRepRange } from '../workouts/progression';
 import { activateProgram } from '../programs/programActivation';
 import type { ProgramChoice } from '../programs/programHost';
 import { programById, variationById } from '../programs/programs';
+import { preferencesFrom } from '../programs/programPreferences';
+import type { EquipmentAccess, PriorityArea, TrainingExclusion } from '../programs/programTypes';
+import type { ProgramPreferences } from '../programs/recommendations';
 
 /**
  * Everything onboarding collects, held entirely in local/draft state --
@@ -53,6 +56,16 @@ export interface OnboardingDraft {
   heightUnit: HeightUnit;
   /** Up to MAX_FITNESS_GOALS, in the order picked. */
   fitnessGoals: FitnessGoal[];
+  /** What they want to prioritize in the gym: up to three areas in the order picked, or
+   * Balanced Development alone -- for program recommendations. */
+  trainingPriorities: PriorityArea[];
+  prioritiesSkipped: boolean;
+  /** Where they train, for program recommendations. */
+  equipmentAccess: EquipmentAccess | null;
+  equipmentSkipped: boolean;
+  /** What they'd rather not train directly: null until answered, empty to train everything. */
+  trainingExclusions: TrainingExclusion[] | null;
+  exclusionsSkipped: boolean;
   /** Which parts of the app they'll use (membership/membershipTiers.ts). */
   membershipTier: MembershipTier | null;
   /** How active they are -- for the calorie estimate, with Nutrition in the membership. */
@@ -130,6 +143,12 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   heightValue: 170,
   heightUnit: 'cm',
   fitnessGoals: [],
+  trainingPriorities: [],
+  prioritiesSkipped: false,
+  equipmentAccess: null,
+  equipmentSkipped: false,
+  trainingExclusions: null,
+  exclusionsSkipped: false,
   membershipTier: null,
   activityLevel: null,
   nutritionTargets: null,
@@ -170,9 +189,14 @@ export const STEP_ORDER = [
   'weight',
   'height',
   'fitnessGoal',
+  // What they'd like to prioritize, where they train and what they'd leave out: what the
+  // workout programs are recommended from (programs/recommendations.ts).
+  'trainingPriorities',
   'trainingComfort',
   'workoutFrequency',
   'averageWorkoutLength',
+  'equipmentAccess',
+  'trainingExclusions',
   'membership',
   // With Nutrition in the membership: how active they are, then their daily targets.
   'activityLevel',
@@ -201,7 +225,15 @@ export const STEP_SECTIONS: readonly { title: string; steps: readonly Onboarding
   },
   {
     title: 'Your Training',
-    steps: ['fitnessGoal', 'trainingComfort', 'workoutFrequency', 'averageWorkoutLength'],
+    steps: [
+      'fitnessGoal',
+      'trainingPriorities',
+      'trainingComfort',
+      'workoutFrequency',
+      'averageWorkoutLength',
+      'equipmentAccess',
+      'trainingExclusions',
+    ],
   },
   {
     title: 'Your Plan',
@@ -328,6 +360,12 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.heightValue != null;
     case 'fitnessGoal':
       return draft.fitnessGoals.length > 0;
+    case 'trainingPriorities':
+      return draft.trainingPriorities.length > 0 || draft.prioritiesSkipped;
+    case 'equipmentAccess':
+      return draft.equipmentAccess != null || draft.equipmentSkipped;
+    case 'trainingExclusions':
+      return draft.trainingExclusions != null || draft.exclusionsSkipped;
     case 'membership':
       return draft.membershipTier != null;
     case 'activityLevel':
@@ -391,6 +429,14 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.heightValue != null) input.heightValue = draft.heightValue;
   input.heightUnit = draft.heightUnit;
   if (draft.fitnessGoals.length > 0) input.fitnessGoals = draft.fitnessGoals;
+  if (draft.trainingPriorities.length > 0) input.trainingPriorities = draft.trainingPriorities;
+  if (draft.equipmentAccess != null) input.equipmentAccess = draft.equipmentAccess;
+  if (draft.trainingExclusions && draft.trainingExclusions.length > 0) {
+    // Never one they prioritize (the database refuses it).
+    input.trainingExclusions = draft.trainingExclusions.filter(
+      (area) => !(draft.trainingPriorities as string[]).includes(area),
+    );
+  }
   if (draft.membershipTier != null) input.membershipTier = draft.membershipTier;
   if (draft.activityLevel != null) input.activityLevel = draft.activityLevel;
   if (draft.trainingComfort != null) {
@@ -410,6 +456,19 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.pendingLastName != null) input.lastName = draft.pendingLastName;
   if (draft.pendingPhoneNumber != null) input.phoneNumber = draft.pendingPhoneNumber;
   return input;
+}
+
+/** What onboarding's answers so far recommend programs from. */
+export function draftPreferences(draft: OnboardingDraft): ProgramPreferences {
+  return preferencesFrom({
+    workoutFrequencyDays: draft.workoutFrequencyDays,
+    trainingComfort: draft.trainingComfort,
+    fitnessGoals: draft.fitnessGoals,
+    averageWorkoutLength: draft.averageWorkoutLength,
+    trainingPriorities: draft.trainingPriorities,
+    equipmentAccess: draft.equipmentAccess,
+    trainingExclusions: draft.trainingExclusions ?? [],
+  });
 }
 
 /**

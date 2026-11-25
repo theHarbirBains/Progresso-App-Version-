@@ -5,13 +5,13 @@ import { SECOND_PROGRAM, TEST_PROGRAM } from '../programs/__fixtures__/programs'
 import { activateProgram } from '../programs/programActivation';
 import { ProgramHostProvider, type ProgramHost } from '../programs/programHost';
 import type { WorkoutProgram } from '../programs/programTypes';
+import { NO_PREFERENCES, type ProgramPreferences } from '../programs/recommendations';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ProgramAddedScreen } from './ProgramAddedScreen';
 import { ProgramDayScreen } from './ProgramDayScreen';
 import { ProgramDetailScreen } from './ProgramDetailScreen';
 import { ProgramExerciseScreen } from './ProgramExerciseScreen';
 import { ProgramGuidanceScreen } from './ProgramGuidanceScreen';
-import { ProgramLibraryScreen } from './ProgramLibraryScreen';
 import { ProgramVariationsScreen } from './ProgramVariationsScreen';
 import { WorkoutProgramsScreen } from './WorkoutProgramsScreen';
 
@@ -49,35 +49,133 @@ beforeEach(() => {
   jest.mocked(activateProgram).mockReset().mockResolvedValue({ id: 'split-9', name: 'x' });
 });
 
-describe('WorkoutProgramsScreen', () => {
-  it('offers every program, and by goal, frequency and focus', () => {
-    render(<WorkoutProgramsScreen {...props(undefined)} />);
+// The browser on its own page (onboarding's sheet starts on it; in the app it's Workout Splits'
+// Programs tab), with the host's preferences for Recommended for You.
+function renderBrowser(preferences: ProgramPreferences = NO_PREFERENCES) {
+  return render(
+    <ProgramHostProvider host={{ mode: 'onboarding', chosen: null, preferences, use: jest.fn() }}>
+      <WorkoutProgramsScreen {...props(undefined)} />
+    </ProgramHostProvider>,
+  );
+}
 
-    expect(screen.getByTestId('workout-programs-all')).toHaveTextContent(/All Programs.*2/);
-    expect(screen.getByTestId('workout-programs-by-frequency')).toHaveTextContent(
-      /3, 4 or 6 days a week/,
+describe('WorkoutProgramsScreen -- the programs browser', () => {
+  it('lists every program by days a week, each on its variation there, and opens one', () => {
+    renderBrowser();
+
+    // Every frequency a program has, then All -- on All with nothing to go on.
+    for (const days of ['3', '4', '6', 'all']) {
+      expect(screen.getByTestId(`workout-programs-browser-days-${days}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId('workout-programs-browser-days-5')).toBeNull();
+    expect(screen.getByTestId('workout-programs-browser-section-3')).toHaveTextContent(
+      /3 Days Per Week.*Test Split.*Balanced.*3 days a week · Traditional.*Beginner to Advanced/,
     );
-    fireEvent.press(screen.getByTestId('workout-programs-by-goal'));
-    expect(navigation.navigate).toHaveBeenCalledWith('ProgramLibrary', { by: 'goal' });
-    fireEvent.press(screen.getByTestId('workout-programs-all'));
-    expect(navigation.navigate).toHaveBeenCalledWith('ProgramLibrary');
+    expect(screen.getByTestId('workout-programs-browser-section-4')).toHaveTextContent(
+      /4 Days Per Week.*Second Program.*4 days a week · Bodybuilding.*Beginner/,
+    );
+    expect(screen.getByTestId('workout-programs-browser-section-6')).toHaveTextContent(
+      /6 Days Per Week.*Test Split/,
+    );
+    expect(screen.queryByTestId('workout-programs-browser-recommended')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('workout-programs-browser-card-6-test-split'));
+    expect(navigation.navigate).toHaveBeenCalledWith('ProgramDetail', {
+      programId: 'test-split',
+      variationId: 'six',
+    });
     expectNoBareText();
+  });
+
+  it('narrows to one frequency from the days across the top', () => {
+    renderBrowser();
+    fireEvent.press(screen.getByTestId('workout-programs-browser-days-4'));
+
+    expect(screen.queryByTestId('workout-programs-browser-section-3')).toBeNull();
+    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
+    expect(screen.getByTestId('workout-programs-browser-count')).toHaveTextContent(
+      '1 of 2 programs',
+    );
+  });
+
+  it('opens on their own days a week, with what is recommended for them and why', () => {
+    renderBrowser({ ...NO_PREFERENCES, daysPerWeek: 3, goals: ['build_muscle'] });
+
+    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
+    expect(screen.queryByTestId('workout-programs-browser-section-6')).toBeNull();
+    expect(screen.getByTestId('workout-programs-browser-recommended-test-split')).toHaveTextContent(
+      /Test Split.*Fits your 3 days a week.*Built for muscle/,
+    );
+    // Browsing another frequency leaves the recommendations out.
+    fireEvent.press(screen.getByTestId('workout-programs-browser-days-all'));
+    expect(screen.getByTestId('workout-programs-browser-recommended')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('workout-programs-browser-days-6'));
+    expect(screen.queryByTestId('workout-programs-browser-recommended')).toBeNull();
+  });
+
+  it('applies the filters together, offering only choices some program has', () => {
+    renderBrowser();
+
+    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-style'));
+    expect(screen.getByTestId('workout-programs-browser-option-strength')).toBeTruthy();
+    expect(screen.queryByTestId('workout-programs-browser-option-calisthenics')).toBeNull();
+    fireEvent.press(screen.getByTestId('workout-programs-browser-option-strength'));
+    expect(screen.getByTestId('workout-programs-browser-filter-style')).toHaveTextContent(
+      /Strength/,
+    );
+    // The strength focus, on its 3-day schedule only.
+    expect(screen.getByTestId('workout-programs-browser-section-3')).toHaveTextContent(
+      /Strength Focus/,
+    );
+    expect(screen.queryByTestId('workout-programs-browser-section-6')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-equipment'));
+    fireEvent.press(screen.getByTestId('workout-programs-browser-option-dumbbells'));
+    expect(screen.getByTestId('workout-programs-browser-none')).toHaveTextContent(
+      /No programs match/,
+    );
+
+    fireEvent.press(screen.getByTestId('workout-programs-browser-clear-all'));
+    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
+    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
+  });
+
+  it('filters by muscle focus and what a program leaves out, and clears them', () => {
+    renderBrowser();
+    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-exclusion'));
+    fireEvent.press(screen.getByTestId('workout-programs-browser-option-chest'));
+    expect(screen.queryByTestId('workout-programs-browser-section-3')).toBeNull();
+    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('workout-programs-browser-clear'));
+    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-emphasis'));
+    fireEvent.press(screen.getByTestId('workout-programs-browser-option-balanced'));
+    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
+    expect(screen.queryByTestId('workout-programs-browser-section-4')).toBeNull();
   });
 
   it('says programs are on their way while there are none', () => {
     mockPrograms = [];
-    render(<WorkoutProgramsScreen {...props(undefined)} />);
+    renderBrowser();
 
-    expect(screen.getByTestId('workout-programs-empty')).toHaveTextContent(
+    expect(screen.getByTestId('workout-programs-browser-empty')).toHaveTextContent(
       /Programs are on their way/,
     );
-    expect(screen.queryByTestId('workout-programs-all')).toBeNull();
+    expect(screen.queryByTestId('workout-programs-browser-days')).toBeNull();
   });
 
   it('closes the sheet from its first page in onboarding', () => {
     const close = jest.fn();
     render(
-      <ProgramHostProvider host={{ mode: 'onboarding', chosen: null, use: jest.fn(), close }}>
+      <ProgramHostProvider
+        host={{
+          mode: 'onboarding',
+          chosen: null,
+          preferences: NO_PREFERENCES,
+          use: jest.fn(),
+          close,
+        }}
+      >
         <WorkoutProgramsScreen {...props(undefined)} />
       </ProgramHostProvider>,
     );
@@ -87,55 +185,18 @@ describe('WorkoutProgramsScreen', () => {
   });
 });
 
-describe('ProgramLibraryScreen', () => {
-  it('lists every program, filters by experience, and opens one', () => {
-    render(<ProgramLibraryScreen {...props(undefined)} />);
-
-    expect(screen.getByTestId('program-card-test-split')).toHaveTextContent(
-      /Popular.*Test Split.*3 or 6 days · Balanced.*Beginner to Advanced/,
-    );
-    expect(screen.getByTestId('program-card-second-program')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('program-library-level-advanced'));
-    expect(screen.queryByTestId('program-card-second-program')).toBeNull();
-    expect(screen.getByText('1 of 2 programs')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('program-card-test-split'));
-    expect(navigation.navigate).toHaveBeenCalledWith('ProgramDetail', { programId: 'test-split' });
-  });
-
-  it("opens on a filter's choices from By Frequency, and narrows to them", () => {
-    render(<ProgramLibraryScreen {...props({ by: 'frequency' })} />);
-
-    expect(screen.getByTestId('program-library-sheet')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('program-library-option-4'));
-
-    expect(screen.getByTestId('program-library-frequency')).toHaveTextContent(/4 days a week/);
-    expect(screen.queryByTestId('program-card-test-split')).toBeNull();
-    expect(screen.getByTestId('program-card-second-program')).toBeTruthy();
-  });
-
-  it('says when nothing matches, with a way to clear the filters', () => {
-    render(<ProgramLibraryScreen {...props({ by: 'focus' })} />);
-    fireEvent.press(screen.getByTestId('program-library-option-arms'));
-
-    expect(screen.getByTestId('program-library-none')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('program-library-clear'));
-    expect(screen.getByTestId('program-card-test-split')).toBeTruthy();
-  });
-});
-
 describe('ProgramDetailScreen', () => {
   it('overviews the program: what it is, how often, who for, each day, and why', () => {
     render(<ProgramDetailScreen {...props({ programId: 'test-split' })} />);
 
     expect(screen.getByTestId('program-detail-hero')).toHaveTextContent(
-      /Popular.*Test Split.*3 or 6 days · Balanced.*Tag One.*Tag Two.*Use Program/,
+      /Popular.*Test Split.*3-Day · Balanced · Traditional.*Tag One.*Tag Two.*Use Program/,
     );
     const page = screen.getByTestId('program-detail');
     expect(page).toHaveTextContent(/A program made up for the tests\./);
     expect(page).toHaveTextContent(/Frequency.*3 or 6 days per week/);
-    expect(page).toHaveTextContent(/Experience.*Beginner to Advanced/);
+    expect(page).toHaveTextContent(/Experience.*Beginner to Advanced.*Equipment.*Full Gym/);
+    expect(screen.queryByTestId('program-detail-focus')).toBeNull();
     expect(page).toHaveTextContent(/Push.*Chest, Shoulders, Triceps.*Pull.*Back, Biceps/);
     expect(page).toHaveTextContent(/Why Choose This Split\?.*Benefit one.*Benefit two/);
     expectNoBareText();
@@ -228,7 +289,9 @@ describe('ProgramDetailScreen', () => {
   it('only remembers the choice in onboarding, without asking', async () => {
     const use = jest.fn().mockResolvedValue(null);
     render(
-      <ProgramHostProvider host={{ mode: 'onboarding', chosen: null, use }}>
+      <ProgramHostProvider
+        host={{ mode: 'onboarding', chosen: null, preferences: NO_PREFERENCES, use }}
+      >
         <ProgramDetailScreen {...props({ programId: 'test-split' })} />
       </ProgramHostProvider>,
     );
@@ -372,13 +435,20 @@ describe('ProgramAddedScreen', () => {
     );
     fireEvent.press(screen.getByTestId('program-added-view-split'));
     expect(navigation.navigate).toHaveBeenCalledWith('WorkoutSplitView', { splitId: 'split-9' });
+    // In the app the programs are Workout Splits' Programs tab.
     fireEvent.press(screen.getByTestId('program-added-explore'));
-    expect(navigation.popTo).toHaveBeenCalledWith('WorkoutPrograms');
+    expect(navigation.popTo).toHaveBeenCalledWith('WorkoutSplits', { tab: 'programs' });
   });
 
   it('goes on with onboarding once a program is chosen there', async () => {
     const finish = jest.fn();
-    const host: ProgramHost = { mode: 'onboarding', chosen: null, use: jest.fn(), finish };
+    const host: ProgramHost = {
+      mode: 'onboarding',
+      chosen: null,
+      preferences: NO_PREFERENCES,
+      use: jest.fn(),
+      finish,
+    };
     render(
       <ProgramHostProvider host={host}>
         <ProgramAddedScreen

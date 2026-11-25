@@ -44,8 +44,8 @@ interface Props {
   groups: readonly SplitMuscleGroup[];
   /** The figure's height; each side is as wide as it needs. */
   height: number;
-  /** Front only, or front and back side by side (the default). */
-  sides?: 'front' | 'both';
+  /** One side, or front and back side by side (the default). */
+  sides?: 'front' | 'back' | 'both';
   testID?: string;
 }
 
@@ -61,7 +61,7 @@ export const ProgramFigure = memo(function ProgramFigure({
   testID,
 }: Props) {
   const prefix = usePrefix();
-  const views = viewsFor(groups).filter((view) => sides === 'both' || view.side === 'front');
+  const views = viewsFor(groups).filter((view) => sides === 'both' || view.side === sides);
   return (
     <View
       testID={testID}

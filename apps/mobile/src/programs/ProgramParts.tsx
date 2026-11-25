@@ -15,46 +15,61 @@ import {
   exerciseInfo,
   levelsLabel,
   prescription,
+  programLevels,
   restLabel,
+  styleLabel,
   variationMuscles,
 } from './programs';
-import type { ProgramDay, WorkoutProgram } from './programTypes';
+import type { ProgramDay, ProgramVariation, WorkoutProgram } from './programTypes';
 
-/** A program in the library: its figure, badge, name, days and style, and who it suits. */
+/**
+ * A program in the library: its figure, badge, name, days and style, its variation's focus, and
+ * who it suits -- on the variation given (a frequency section's, a recommendation's), else its
+ * default. A recommendation's reasons show as pills under it.
+ */
 export function ProgramCard({
   program,
+  variation,
+  reasons,
   onPress,
   chosen = false,
   testID,
 }: {
   program: WorkoutProgram;
+  /** The variation it opens on; its days a week and focus are the card's. */
+  variation?: ProgramVariation;
+  /** Why it's recommended, a few words each. */
+  reasons?: string[];
   onPress: () => void;
   /** The one chosen already (onboarding): ticked. */
   chosen?: boolean;
   testID?: string;
 }) {
   const accent = useAppTheme().accent.accent;
+  const shown = variation ?? defaultVariation(program);
+  const days = variation
+    ? `${variation.daysPerWeek} ${variation.daysPerWeek === 1 ? 'day' : 'days'} a week`
+    : `${daysLabel(program)} a week`;
+  const levels = levelsLabel(variation ? variation.levels : programLevels(program));
+  const focus = variation?.focus;
   return (
     <AppCard
       testID={testID}
       onPress={onPress}
-      accessibilityLabel={`${program.name}. ${daysLabel(program)} a week, ${program.style}. ${levelsLabel(program.levels)}.${chosen ? ' Chosen.' : ''}`}
+      accessibilityLabel={`${program.name}${focus ? `, ${focus}` : ''}. ${days}, ${styleLabel(shown)}. ${levels}.${reasons && reasons.length > 0 ? ` ${reasons.join('. ')}.` : ''}${chosen ? ' Chosen.' : ''}`}
     >
       <View style={styles.cardRow}>
         <View style={[styles.figureWell, { backgroundColor: withAlpha(accent, 0.08) }]}>
-          <ProgramFigure
-            groups={variationMuscles(defaultVariation(program))}
-            height={68}
-            sides="front"
-          />
+          <ProgramFigure groups={variationMuscles(shown)} height={68} sides="front" />
         </View>
         <View style={styles.cardBody}>
           {program.badge ? <Badge label={program.badge} /> : null}
           <Text style={styles.cardName}>{program.name}</Text>
+          {focus ? <Text style={[styles.cardFocus, { color: accent }]}>{focus}</Text> : null}
           <Text style={styles.cardMeta}>
-            {daysLabel(program)} · {program.style}
+            {days} · {styleLabel(shown)}
           </Text>
-          <Text style={styles.cardLevels}>{levelsLabel(program.levels)}</Text>
+          <Text style={styles.cardLevels}>{levels}</Text>
         </View>
         {chosen ? (
           <Feather name="check-circle" size={20} color={accent} />
@@ -62,6 +77,15 @@ export function ProgramCard({
           <Feather name="chevron-right" size={18} color={colors.textMuted} />
         )}
       </View>
+      {reasons && reasons.length > 0 ? (
+        <View style={styles.reasons}>
+          {reasons.map((reason) => (
+            <View key={reason} style={programPartStyles.tag}>
+              <Text style={programPartStyles.tagText}>{reason}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </AppCard>
   );
 }
@@ -179,6 +203,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayHeavy,
     color: colors.textPrimary,
   },
+  cardFocus: {
+    ...typeScale.label,
+  },
   cardMeta: {
     ...typeScale.secondary,
     color: colors.textSecondaryBright,
@@ -186,6 +213,12 @@ const styles = StyleSheet.create({
   cardLevels: {
     ...typeScale.caption,
     color: colors.textMuted,
+  },
+  reasons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
   },
   badge: {
     alignSelf: 'flex-start',

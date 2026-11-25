@@ -1,8 +1,10 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { activateProgram } from './programActivation';
+import { preferencesFromProfile } from './programPreferences';
 import { programById, variationById } from './programs';
+import type { ProgramPreferences } from './recommendations';
 
 /** A program and the variation of it chosen. */
 export interface ProgramChoice {
@@ -19,6 +21,8 @@ export interface ProgramHost {
   mode: 'app' | 'onboarding';
   /** The one chosen already (onboarding, coming back to it), to mark it. */
   chosen: ProgramChoice | null;
+  /** What recommendations are worked out from: the profile's answers, or onboarding's so far. */
+  preferences: ProgramPreferences;
   /** Uses a program: in the app, makes it a split of their own and the active one (the split's
    * id); in onboarding, remembers it for when the account's made (null). */
   use: (choice: ProgramChoice) => Promise<string | null>;
@@ -44,12 +48,14 @@ export function ProgramHostProvider({
 /** The program pages' host: onboarding's when they're open there, else the app's. */
 export function useProgramHost(): ProgramHost {
   const { user } = useAuth();
-  const { updateProfile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const provided = useContext(ProgramHostContext);
+  const preferences = useMemo(() => preferencesFromProfile(profile), [profile]);
   if (provided) return provided;
   return {
     mode: 'app',
     chosen: null,
+    preferences,
     use: async ({ programId, variationId }) => {
       const program = programById(programId);
       if (!program || !user) throw new Error("That program couldn't be found.");

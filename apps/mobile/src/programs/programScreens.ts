@@ -5,7 +5,6 @@ import { ProgramDayScreen } from '../screens/ProgramDayScreen';
 import { ProgramDetailScreen } from '../screens/ProgramDetailScreen';
 import { ProgramExerciseScreen } from '../screens/ProgramExerciseScreen';
 import { ProgramGuidanceScreen } from '../screens/ProgramGuidanceScreen';
-import { ProgramLibraryScreen } from '../screens/ProgramLibraryScreen';
 import { ProgramVariationsScreen } from '../screens/ProgramVariationsScreen';
 import { WorkoutProgramsScreen } from '../screens/WorkoutProgramsScreen';
 
@@ -18,7 +17,6 @@ export const PROGRAM_SCREENS: readonly {
   component: ComponentType<any>;
 }[] = [
   { name: 'WorkoutPrograms', component: WorkoutProgramsScreen },
-  { name: 'ProgramLibrary', component: ProgramLibraryScreen },
   { name: 'ProgramDetail', component: ProgramDetailScreen },
   { name: 'ProgramDay', component: ProgramDayScreen },
   { name: 'ProgramExercise', component: ProgramExerciseScreen },

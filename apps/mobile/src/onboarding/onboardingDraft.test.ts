@@ -5,6 +5,7 @@ import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import {
   computeStartStepIndex,
+  draftPreferences,
   EMPTY_DRAFT,
   isOldEnough,
   isStepAnswered,
@@ -66,6 +67,9 @@ const FULL_DRAFT: OnboardingDraft = {
   weightValue: 80,
   heightValue: 180,
   fitnessGoals: ['build_muscle'],
+  trainingPriorities: ['glutes', 'back'],
+  equipmentAccess: 'dumbbells',
+  trainingExclusions: ['chest'],
   membershipTier: 'everything',
   activityLevel: 'moderately_active',
   nutritionTargets: { calories: 2400, proteinG: 141, carbsG: 290, fatG: 52 },
@@ -241,6 +245,9 @@ describe('submitOnboardingDraft', () => {
         repRangeMax: 12,
         workoutFrequencyDays: 4,
         averageWorkoutLength: '45_60',
+        trainingPriorities: ['glutes', 'back'],
+        equipmentAccess: 'dumbbells',
+        trainingExclusions: ['chest'],
         activeWorkoutSplitId: 'split-new',
         emailOptIn: true,
         pushNotificationsOptIn: false,
@@ -356,6 +363,68 @@ describe('submitOnboardingDraft', () => {
   });
 });
 
+describe('the questions programs are recommended from', () => {
+  it('is answered by an answer, or by Skip for now -- Train Everything is an answer too', () => {
+    expect(isStepAnswered('trainingPriorities', EMPTY_DRAFT)).toBe(false);
+    expect(
+      isStepAnswered('trainingPriorities', { ...EMPTY_DRAFT, trainingPriorities: ['core'] }),
+    ).toBe(true);
+    expect(isStepAnswered('trainingPriorities', { ...EMPTY_DRAFT, prioritiesSkipped: true })).toBe(
+      true,
+    );
+    expect(
+      isStepAnswered('equipmentAccess', { ...EMPTY_DRAFT, equipmentAccess: 'bodyweight' }),
+    ).toBe(true);
+    expect(isStepAnswered('equipmentAccess', { ...EMPTY_DRAFT, equipmentSkipped: true })).toBe(
+      true,
+    );
+    expect(isStepAnswered('trainingExclusions', EMPTY_DRAFT)).toBe(false);
+    expect(isStepAnswered('trainingExclusions', { ...EMPTY_DRAFT, trainingExclusions: [] })).toBe(
+      true,
+    );
+    expect(isStepAnswered('trainingExclusions', { ...EMPTY_DRAFT, exclusionsSkipped: true })).toBe(
+      true,
+    );
+  });
+
+  it('saves nothing for one skipped, and never leaves out what is put first', async () => {
+    mockUpdateMyProfile.mockClear();
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      trainingPriorities: [],
+      prioritiesSkipped: true,
+      equipmentAccess: null,
+      equipmentSkipped: true,
+      trainingExclusions: [],
+    });
+    const sent = mockUpdateMyProfile.mock.calls[0][1];
+    expect(sent).not.toHaveProperty('trainingPriorities');
+    expect(sent).not.toHaveProperty('equipmentAccess');
+    expect(sent).not.toHaveProperty('trainingExclusions');
+
+    mockUpdateMyProfile.mockClear();
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      trainingPriorities: ['glutes'],
+      trainingExclusions: ['chest', 'glutes'],
+    });
+    expect(mockUpdateMyProfile.mock.calls[0][1].trainingExclusions).toEqual(['chest']);
+  });
+
+  it('recommends from the answers so far', () => {
+    expect(draftPreferences(FULL_DRAFT)).toEqual({
+      daysPerWeek: 4,
+      level: 'beginner',
+      goals: ['build_muscle'],
+      priorities: ['glutes', 'back'],
+      equipment: 'dumbbells',
+      exclusions: ['chest'],
+      sessionMinutes: { min: 45, max: 60 },
+    });
+    expect(draftPreferences(EMPTY_DRAFT).exclusions).toEqual([]);
+  });
+});
+
 describe('onboarding in named parts', () => {
   it('puts every step in exactly one part, in the same order as the steps', () => {
     const inParts = STEP_SECTIONS.flatMap((part) => part.steps);
@@ -374,7 +443,8 @@ describe('onboarding in named parts', () => {
       stepsInSection: 3,
       progress: [
         { steps: 6, done: 6 },
-        { steps: 4, done: 4 },
+        // Goals, priorities, experience, days, length, where they train, what to leave out.
+        { steps: 7, done: 7 },
         { steps: 3, done: 2 },
         { steps: 2, done: 0 },
         // The trainer's code, Your plan is ready, and Create your account.

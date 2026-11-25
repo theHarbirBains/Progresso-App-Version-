@@ -38,6 +38,19 @@ const FITNESS_GOALS = [
 const TRAINING_EXPERIENCES = ['beginner', 'intermediate', 'advanced'] as const;
 // Which parts of the app a person uses (users.membership_tier): free, and theirs to change.
 const MEMBERSHIP_TIERS = ['workouts', 'workouts_nutrition', 'everything'] as const;
+// Program recommendations (supabase/migrations/20261217100000_training_preferences.sql).
+const TRAINING_PRIORITIES = [
+  'balanced',
+  'chest',
+  'back',
+  'shoulders',
+  'arms',
+  'legs',
+  'glutes',
+  'core',
+] as const;
+const EQUIPMENT_ACCESS = ['full_gym', 'dumbbells', 'bodyweight'] as const;
+const TRAINING_EXCLUSIONS = ['chest', 'glutes'] as const;
 // Mirrors apps/mobile/src/nutrition/calorieEstimationInput.ts's ACTIVITY_LEVELS
 // (the 5 Mifflin-St Jeor activity-multiplier tiers) -- kept as an
 // independent literal list here the same way GENDERS/FITNESS_GOALS already
@@ -241,6 +254,28 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   progressionCuesEnabled?: boolean;
+
+  /** What they want to prioritize in the gym: up to three areas, or Balanced Development alone
+   * (the database checks that, and that none is one of trainingExclusions). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsIn(TRAINING_PRIORITIES, { each: true })
+  trainingPriorities?: (typeof TRAINING_PRIORITIES)[number][];
+
+  /** Where they train. */
+  @IsOptional()
+  @IsIn(EQUIPMENT_ACCESS)
+  equipmentAccess?: (typeof EQUIPMENT_ACCESS)[number];
+
+  /** What they'd rather not train directly. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2)
+  @ArrayUnique()
+  @IsIn(TRAINING_EXCLUSIONS, { each: true })
+  trainingExclusions?: (typeof TRAINING_EXCLUSIONS)[number][];
 
   /** Social push notifications, each on unless turned off. */
   @IsOptional()

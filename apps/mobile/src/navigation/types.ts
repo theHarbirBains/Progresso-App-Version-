@@ -126,7 +126,8 @@ export type RootStackParamList = {
   NutrientDetail: { nutrientId: string; day: string; range: 'day' | 'week' };
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
-  WorkoutSplits: undefined;
+  /** Workout Splits, on its My Splits or Programs tab (My Splits when absent). */
+  WorkoutSplits: { tab?: 'splits' | 'programs' } | undefined;
   WorkoutSplitView: { splitId: string };
   /** One split day's planned exercises; `muscleGroups`, the day's, shown at its top. */
   SplitDayPlan: {
@@ -136,10 +137,9 @@ export type RootStackParamList = {
   };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
-  /** Workout Programs: ready-made splits with every workout planned (from Workout Splits). */
+  /** Workout Programs on a page of their own: onboarding's programs sheet (in the app they're
+   * Workout Splits' Programs tab). */
   WorkoutPrograms: undefined;
-  /** The program library; `by` opens it with that filter's choices showing. */
-  ProgramLibrary: { by?: 'goal' | 'frequency' | 'focus' } | undefined;
   /** One program, on the variation given (its default when absent) and the tab given. */
   ProgramDetail: {
     programId: string;

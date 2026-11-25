@@ -226,3 +226,75 @@ describe('SettingsWorkoutPreferencesScreen -- exercise ranges', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('RepRangeExceptions');
   });
 });
+
+describe('SettingsWorkoutPreferencesScreen -- program recommendations', () => {
+  it('says each is not set until answered', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('open-training-priorities')).toHaveTextContent(/Not set/);
+    expect(screen.getByTestId('open-equipment-access')).toHaveTextContent(/Not set/);
+    expect(screen.getByTestId('open-training-exclusions')).toHaveTextContent(/Nothing/);
+  });
+
+  it('picks up to three priorities and saves them, taking a priority off what is left out', async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      ...baseProfile,
+      trainingPriorities: ['back'],
+      equipmentAccess: null,
+      trainingExclusions: ['glutes'],
+    });
+    mockUpdateMyProfile.mockResolvedValue({
+      ...baseProfile,
+      trainingPriorities: ['back', 'glutes'],
+      trainingExclusions: [],
+    });
+    renderScreen();
+    expect(await screen.findByTestId('open-training-priorities')).toHaveTextContent(/Back/);
+
+    fireEvent.press(screen.getByTestId('open-training-priorities'));
+    fireEvent.press(screen.getByTestId('training-priority-glutes'));
+    fireEvent.press(screen.getByTestId('training-priorities-save'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      trainingPriorities: ['back', 'glutes'],
+      trainingExclusions: [],
+    });
+    expect(await screen.findByTestId('open-training-priorities')).toHaveTextContent(/Back, Glutes/);
+  });
+
+  it('saves where they train from its sheet', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, equipmentAccess: 'dumbbells' });
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-equipment-access'));
+    fireEvent.press(screen.getByTestId('equipment-access-dumbbells'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { equipmentAccess: 'dumbbells' });
+    expect(await screen.findByTestId('open-equipment-access')).toHaveTextContent(/Dumbbells Only/);
+  });
+
+  it('leaves out an area, but never one they prioritize', async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      ...baseProfile,
+      trainingPriorities: ['glutes'],
+      trainingExclusions: [],
+    });
+    mockUpdateMyProfile.mockResolvedValue({
+      ...baseProfile,
+      trainingPriorities: ['glutes'],
+      trainingExclusions: ['chest'],
+    });
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-training-exclusions'));
+
+    expect(screen.getByTestId('training-exclusion-glutes')).toBeDisabled();
+    fireEvent.press(screen.getByTestId('training-exclusion-chest'));
+    fireEvent.press(screen.getByTestId('training-exclusions-save'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      trainingExclusions: ['chest'],
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('open-training-exclusions')).toHaveTextContent(/No Direct Chest/),
+    );
+  });
+});

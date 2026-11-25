@@ -285,6 +285,9 @@ describe('OnboardingScreen', () => {
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
         },
       }),
     );
@@ -331,6 +334,9 @@ describe('OnboardingScreen', () => {
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -372,6 +378,9 @@ describe('OnboardingScreen', () => {
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
         },
       }),
     );
@@ -430,6 +439,19 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-get_stronger'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
+    // Up to three priorities, each on the figure; Balanced Development is an answer on its own.
+    await screen.findByTestId('onboarding-step-training-priorities');
+    expect(screen.getByText('What would you like to prioritize in the gym?')).toBeTruthy();
+    expect(screen.getByText(/you'll still train everything/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-priority-glutes'));
+    fireEvent.press(screen.getByTestId('onboarding-priority-back'));
+    fireEvent.press(screen.getByTestId('onboarding-priority-arms'));
+    expect(screen.getByTestId('onboarding-priority-core')).toBeDisabled();
+    fireEvent.press(screen.getByTestId('onboarding-priority-arms'));
+    expect(screen.getByTestId('onboarding-priority-core')).not.toBeDisabled();
+    expect(screen.getByTestId('onboarding-skip-training-priorities')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
     await screen.findByTestId('onboarding-step-training-comfort');
     expect(
       screen.getByText('How confident are you in planning and progressing your workouts?'),
@@ -442,6 +464,15 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-average-workout-length');
     fireEvent.press(screen.getByTestId('onboarding-workout-length-45_60'));
+
+    await screen.findByTestId('onboarding-step-equipment-access');
+    expect(screen.getByText('Where do you train?')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-equipment-full_gym'));
+
+    // Glutes is a priority, so it can't be left out; Train Everything answers and moves on.
+    await screen.findByTestId('onboarding-step-training-exclusions');
+    expect(screen.getByTestId('onboarding-exclusion-glutes')).toBeDisabled();
+    fireEvent.press(screen.getByTestId('onboarding-exclusion-none'));
 
     await screen.findByTestId('onboarding-step-membership');
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts_nutrition'));
@@ -522,6 +553,8 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes', 'back'],
+          equipmentAccess: 'full_gym',
           // 176 lb, typed.
           weightValue: expect.closeTo(79.83, 2),
           weightUnit: 'lb',
@@ -578,6 +611,9 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -666,6 +702,9 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -735,6 +774,9 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
         },
       }),
     );
@@ -821,6 +863,9 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          trainingPriorities: ['glutes'],
+          equipmentAccess: 'full_gym',
+          trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -874,6 +919,9 @@ describe('OnboardingScreen', () => {
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
+    trainingPriorities: ['glutes'],
+    equipmentAccess: 'full_gym',
+    trainingExclusions: [],
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
     pushNotificationsOptIn: false,
@@ -949,6 +997,9 @@ describe('OnboardingScreen -- notifications step', () => {
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
+    trainingPriorities: ['glutes'],
+    equipmentAccess: 'full_gym',
+    trainingExclusions: [],
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
   };
@@ -1041,6 +1092,9 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
+    trainingPriorities: ['glutes'],
+    equipmentAccess: 'full_gym',
+    trainingExclusions: [],
     membershipTier: 'workouts_nutrition',
     activityLevel: 'moderately_active',
     skippedNutritionTargets: true,
@@ -1067,8 +1121,8 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     );
 
     fireEvent.press(screen.getByTestId('onboarding-programs-open'));
-    fireEvent.press(await screen.findByTestId('workout-programs-all'));
-    fireEvent.press(await screen.findByTestId('program-card-test-split'));
+    // The sheet opens on the programs, by days a week.
+    fireEvent.press(await screen.findByTestId('workout-programs-browser-card-3-test-split'));
     await act(async () => {
       fireEvent.press(await screen.findByTestId('program-detail-use'));
     });
@@ -1082,6 +1136,74 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
       expect(stored.draft).toMatchObject({
         selectedProgram: { programId: 'test-split', variationId: 'three-balanced' },
         selectedSplitPresetId: null,
+      });
+    });
+  });
+
+  it('recommends programs from their answers on the split question, each opening its page', async () => {
+    await startAt('workoutSplit', { selectedSplitPresetId: null, skippedSplit: false });
+    // Four days a week: the 3-day version, one fewer, is the one that fits.
+    expect(await screen.findByTestId('onboarding-recommended-test-split')).toHaveTextContent(
+      /Test Split.*3 days a week/,
+    );
+    expect(screen.getByTestId('onboarding-recommended')).toHaveTextContent(/Recommended for You/);
+    // Skip for now is still there.
+    expect(screen.getByTestId('onboarding-skip-workout-split')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('onboarding-recommended-test-split'));
+    expect(await screen.findByTestId('program-detail')).toBeTruthy();
+    expect(screen.getByTestId('program-detail-hero')).toHaveTextContent(/3-Day/);
+  });
+
+  it('recommends nothing on the split question when no program fits', async () => {
+    // Bodyweight only: the made-up program needs a gym.
+    await startAt('workoutSplit', {
+      selectedSplitPresetId: null,
+      skippedSplit: false,
+      equipmentAccess: 'bodyweight',
+    });
+    await screen.findByTestId('onboarding-programs-open');
+    expect(screen.queryByTestId('onboarding-recommended')).toBeNull();
+  });
+
+  it('lets each of the new questions be skipped, saving nothing for it', async () => {
+    await startAt('trainingPriorities', { trainingPriorities: [] });
+    fireEvent.press(await screen.findByTestId('onboarding-skip-training-priorities'));
+    await screen.findByTestId('onboarding-step-training-comfort');
+
+    await startAt('equipmentAccess', { equipmentAccess: null });
+    fireEvent.press(await screen.findByTestId('onboarding-skip-equipment-access'));
+    await screen.findByTestId('onboarding-step-training-exclusions');
+    fireEvent.press(screen.getByTestId('onboarding-skip-training-exclusions'));
+    await screen.findByTestId('onboarding-step-membership');
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        equipmentAccess: null,
+        equipmentSkipped: true,
+        trainingExclusions: null,
+        exclusionsSkipped: true,
+      });
+    });
+  });
+
+  it('keeps Balanced Development on its own, and never leaves out a priority', async () => {
+    await startAt('trainingPriorities', { trainingPriorities: [], trainingExclusions: ['glutes'] });
+    await screen.findByTestId('onboarding-step-training-priorities');
+    fireEvent.press(screen.getByTestId('onboarding-priority-chest'));
+    fireEvent.press(screen.getByTestId('onboarding-priority-balanced'));
+    expect(
+      screen.getByTestId('onboarding-priority-balanced').props.accessibilityState,
+    ).toMatchObject({ selected: true });
+    expect(screen.getByTestId('onboarding-priority-chest').props.accessibilityState).toMatchObject({
+      selected: false,
+    });
+    fireEvent.press(screen.getByTestId('onboarding-priority-glutes'));
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        trainingPriorities: ['glutes'],
+        trainingExclusions: [],
       });
     });
   });
@@ -1307,6 +1429,9 @@ describe('OnboardingScreen -- finding your way', () => {
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
+    trainingPriorities: ['glutes'],
+    equipmentAccess: 'full_gym',
+    trainingExclusions: [],
     membershipTier: 'workouts',
   };
 
@@ -1335,8 +1460,10 @@ describe('OnboardingScreen -- finding your way', () => {
   it('takes an answered question forward with Continue after going back to it', async () => {
     await startAt('trainingComfort', { trainingComfort: null });
     await screen.findByTestId('onboarding-step-training-comfort');
-    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('Your Training · 2 of 4');
+    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('Your Training · 3 of 7');
 
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-training-priorities');
     fireEvent.press(screen.getByTestId('onboarding-back'));
     await screen.findByTestId('onboarding-step-fitness-goal');
     fireEvent.press(screen.getByTestId('onboarding-back'));

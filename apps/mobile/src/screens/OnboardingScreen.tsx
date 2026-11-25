@@ -35,6 +35,7 @@ import {
 } from '../onboarding/onboardingOptions';
 import {
   computeStartStepIndex,
+  draftPreferences,
   EMPTY_DRAFT,
   isOldEnough,
   isStepAnswered,
@@ -68,7 +69,19 @@ import { OnboardingTiles } from '../onboarding/OnboardingTiles';
 import { PlanSummary } from '../onboarding/PlanSummary';
 import { OnboardingPrograms } from '../programs/OnboardingPrograms';
 import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
-import { programById, splitNameFor, variationById } from '../programs/programs';
+import { WORKOUT_PROGRAMS } from '../programs/programCatalog';
+import type { ProgramChoice } from '../programs/programHost';
+import { ProgramCard } from '../programs/ProgramParts';
+import {
+  EQUIPMENT_ACCESS_OPTIONS,
+  MAX_PRIORITIES,
+  programById,
+  splitNameFor,
+  variationById,
+} from '../programs/programs';
+import { ExclusionTiles, PriorityTiles } from '../programs/PriorityChoices';
+import { recommendPrograms } from '../programs/recommendations';
+import { SectionHeader } from '../design/SectionHeader';
 import { setWelcomeStage } from '../onboarding/welcomeStage';
 import { TextInput } from '../design/TextInput';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
@@ -92,8 +105,11 @@ const CONTINUE_STEPS = new Set<OnboardingStep>([
   'birthday',
   'weight',
   'height',
-  // Several goals can be picked, so a tap can't be the answer.
+  // Several goals can be picked, so a tap can't be the answer -- nor up to three priorities, or
+  // the areas to leave out.
   'fitnessGoal',
+  'trainingPriorities',
+  'trainingExclusions',
   // The trainer's code is typed.
   'trainerCode',
   // How ranks work is read, then moved on from.
@@ -149,6 +165,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const [locating, setLocating] = useState(false);
   const [ranksOpen, setRanksOpen] = useState(false);
   const [programsOpen, setProgramsOpen] = useState(false);
+  // The program the sheet opens on: a recommendation tapped (null opens on the programs).
+  const [programsInitial, setProgramsInitial] = useState<ProgramChoice | null>(null);
   const [saving, setSaving] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -441,6 +459,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       ? splitNameFor(chosenProgram, variationById(chosenProgram, draft.selectedProgram.variationId))
       : null;
 
+  // What the programs are recommended from, and the best few, for the split question.
+  const preferences = draftPreferences(draft);
+  const recommended =
+    step === 'workoutSplit' ? recommendPrograms(WORKOUT_PROGRAMS, preferences) : [];
+
   // Shown under the birthday wheels as they turn.
   const age = draft.birthday ? ageFromBirthday(draft.birthday) : null;
 
@@ -667,6 +690,44 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             </>
           ) : null}
 
+          {step === 'trainingPriorities' ? (
+            <>
+              <Text style={styles.stepTitle}>What would you like to prioritize in the gym?</Text>
+              <Text style={styles.stepExplanation}>
+                Pick up to {MAX_PRIORITIES}. These get extra attention in the programs we suggest --
+                you&apos;ll still train everything.
+              </Text>
+              <PriorityTiles
+                testID="onboarding-step-training-priorities"
+                tilePrefix="onboarding-priority"
+                value={draft.trainingPriorities}
+                onChange={(trainingPriorities) =>
+                  updateDraft({
+                    trainingPriorities,
+                    prioritiesSkipped: false,
+                    // Never leave out what's put first.
+                    trainingExclusions:
+                      draft.trainingExclusions === null
+                        ? null
+                        : draft.trainingExclusions.filter(
+                            (area) => !(trainingPriorities as string[]).includes(area),
+                          ),
+                  })
+                }
+              />
+              <View style={styles.footer}>
+                <TextButton
+                  testID="onboarding-skip-training-priorities"
+                  label="Skip for now"
+                  onPress={() => {
+                    updateDraft({ trainingPriorities: [], prioritiesSkipped: true });
+                    advance();
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
+
           {step === 'trainingComfort' ? (
             <>
               <Text style={styles.stepTitle}>
@@ -714,6 +775,79 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 isSelected={(value) => draft.averageWorkoutLength === value}
                 onPress={(averageWorkoutLength) => choose({ averageWorkoutLength })}
               />
+            </>
+          ) : null}
+
+          {step === 'equipmentAccess' ? (
+            <>
+              <Text style={styles.stepTitle}>Where do you train?</Text>
+              <Text style={styles.stepExplanation}>
+                So the programs we suggest fit what you have.
+              </Text>
+              <View testID="onboarding-step-equipment-access" style={local.cards}>
+                {EQUIPMENT_ACCESS_OPTIONS.map((option) => (
+                  <RiseIn key={option.value}>
+                    <ChoiceCard
+                      testID={`onboarding-equipment-${option.value}`}
+                      leading={
+                        <GlyphWell icon={option.icon} accentColor={accent.accent} size={40} />
+                      }
+                      title={option.label}
+                      description={option.description}
+                      selected={draft.equipmentAccess === option.value}
+                      onPress={() =>
+                        choose({ equipmentAccess: option.value, equipmentSkipped: false })
+                      }
+                    />
+                  </RiseIn>
+                ))}
+              </View>
+              <View style={styles.footer}>
+                <TextButton
+                  testID="onboarding-skip-equipment-access"
+                  label="Skip for now"
+                  onPress={() => {
+                    updateDraft({ equipmentAccess: null, equipmentSkipped: true });
+                    advance();
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
+
+          {step === 'trainingExclusions' ? (
+            <>
+              <Text style={styles.stepTitle}>Anything you&apos;d rather not train directly?</Text>
+              <Text style={styles.stepExplanation}>
+                Some programs leave out direct work for an area. Pick any you&apos;d like left out.
+                {draft.trainingPriorities.some((area) => area === 'chest' || area === 'glutes')
+                  ? " An area you're prioritizing can't be left out."
+                  : ''}
+              </Text>
+              <ExclusionTiles
+                testID="onboarding-step-training-exclusions"
+                tilePrefix="onboarding-exclusion"
+                value={draft.trainingExclusions}
+                priorities={draft.trainingPriorities}
+                onChange={(trainingExclusions, tapped) => {
+                  // Train Everything is an answer of its own, and moves on; the areas need Continue.
+                  if (tapped === 'none') {
+                    choose({ trainingExclusions, exclusionsSkipped: false });
+                  } else {
+                    updateDraft({ trainingExclusions, exclusionsSkipped: false });
+                  }
+                }}
+              />
+              <View style={styles.footer}>
+                <TextButton
+                  testID="onboarding-skip-training-exclusions"
+                  label="Skip for now"
+                  onPress={() => {
+                    updateDraft({ trainingExclusions: null, exclusionsSkipped: true });
+                    advance();
+                  }}
+                />
+              </View>
             </>
           ) : null}
 
@@ -814,20 +948,52 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               <Text style={styles.stepExplanation}>
                 Start from a workout program or a ready-made split, or build your own.
               </Text>
+              {/* The programs that fit their answers best, each opening its page in the sheet. */}
+              {recommended.length > 0 ? (
+                <View testID="onboarding-recommended" style={local.cards}>
+                  <SectionHeader label="Recommended for You" />
+                  {recommended.map((recommendation) => (
+                    <RiseIn key={recommendation.program.id}>
+                      <ProgramCard
+                        testID={`onboarding-recommended-${recommendation.program.id}`}
+                        program={recommendation.program}
+                        variation={recommendation.variation}
+                        reasons={recommendation.reasons}
+                        chosen={
+                          draft.selectedProgram?.programId === recommendation.program.id &&
+                          draft.selectedProgram.variationId === recommendation.variation.id
+                        }
+                        onPress={() => {
+                          setProgramsInitial({
+                            programId: recommendation.program.id,
+                            variationId: recommendation.variation.id,
+                          });
+                          setProgramsOpen(true);
+                        }}
+                      />
+                    </RiseIn>
+                  ))}
+                </View>
+              ) : null}
               {/* Workout Programs: the app's own program pages, in a sheet. */}
               <RiseIn>
                 <View style={local.programsEntry}>
                   <ProgramsEntryCard
-                    hero
+                    hero={recommended.length === 0}
                     testID="onboarding-programs-open"
                     chosen={chosenProgramName}
-                    onPress={() => setProgramsOpen(true)}
+                    onPress={() => {
+                      setProgramsInitial(null);
+                      setProgramsOpen(true);
+                    }}
                   />
                 </View>
               </RiseIn>
               <OnboardingPrograms
                 visible={programsOpen}
                 chosen={draft.selectedProgram}
+                preferences={preferences}
+                initial={programsInitial}
                 onChoose={(selectedProgram) =>
                   updateDraft({
                     selectedProgram,

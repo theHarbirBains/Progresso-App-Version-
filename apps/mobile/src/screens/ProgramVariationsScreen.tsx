@@ -8,7 +8,13 @@ import { spacing } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ChoiceCard } from '../onboarding/ChoiceCard';
 import { InfoNote } from '../programs/ProgramParts';
-import { programById, schedulesOf, variationById, variationsOn } from '../programs/programs';
+import {
+  programById,
+  schedulesOf,
+  variationById,
+  variationLabel,
+  variationsOn,
+} from '../programs/programs';
 import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'ProgramVariations'>;
@@ -55,8 +61,8 @@ export function ProgramVariationsScreen({ navigation, route }: Props) {
                   size={40}
                 />
               }
-              title={`${variation.focus ?? variation.schedule}${variation.default ? ' (Default)' : ''}`}
-              pill={`${variation.days.length} days a week`}
+              title={`${variationLabel(variation)}${variation.default ? ' (Default)' : ''}`}
+              pill={`${variation.daysPerWeek} days a week`}
               description={variation.focusNote ?? variation.note}
               selected={variation.id === current.id}
               onPress={() =>

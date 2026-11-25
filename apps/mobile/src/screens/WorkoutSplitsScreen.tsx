@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +18,9 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
-import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
+import { SegmentedControl } from '../design/SegmentedControl';
+import { ProgramBrowser } from '../programs/ProgramBrowser';
+import { preferencesFromProfile } from '../programs/programPreferences';
 import {
   deleteWorkoutSplit,
   duplicateWorkoutSplit,
@@ -29,17 +31,29 @@ import { workoutSplitStyles as styles } from './workoutSplitStyles';
 
 type Props = RootStackScreenProps<'WorkoutSplits'>;
 
-// Every saved split as its own widget, the active one the hero card. A split
-// only ever holds day names + muscle groups (see workoutSplitQueries.ts) --
-// exercises are chosen when the workout is actually performed. Tapping a split
-// opens its read-only view; Edit / Duplicate / Delete sit quietly beneath it
-// inside the widget, and "Create Workout Split" is the one primary action.
-export function WorkoutSplitsScreen({ navigation }: Props) {
+type Tab = 'splits' | 'programs';
+
+// Two tabs under the header. My Splits: every saved split as its own widget, the active one the
+// hero card -- tapping a split opens its read-only view; Edit / Duplicate / Delete sit quietly
+// beneath it inside the widget, and "Create Workout Split" is the one primary action -- then the
+// ready-made splits to start from. Programs: every workout program (programs/ProgramBrowser.tsx),
+// with a way to tell us what to recommend from while nothing's been said.
+export function WorkoutSplitsScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
-  const { updateProfile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const { openMenu } = useAppMenu();
+  const preferences = useMemo(() => preferencesFromProfile(profile), [profile]);
+  const [tab, setTab] = useState<Tab>(route.params?.tab ?? 'splits');
+  // Explore More Programs comes back here on Programs.
+  const requestedTab = route.params?.tab;
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
+  // A profile handed back by an API from before these were asked has none of them.
+  const noPreferences =
+    (profile?.trainingPriorities ?? []).length === 0 && (profile?.equipmentAccess ?? null) === null;
 
   const [splits, setSplits] = useState<WorkoutSplitSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -165,128 +179,159 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
         />
       }
     >
-      {error ? (
-        <Text testID="workout-splits-error" style={styles.errorText}>
-          {error}
-        </Text>
-      ) : null}
-
-      {splits.length === 0 ? (
-        <EmptyState
-          testID="workout-splits-empty"
-          title="Create a split to plan your training days."
-        />
-      ) : (
-        splits.map((split) => {
-          const isActive = split.id === activeId;
-          const busy = busySplitId === split.id;
-          return (
-            <AppCard
-              key={split.id}
-              testID={`workout-split-${split.id}`}
-              hero={isActive}
-              topAccent={isActive ? theme.accent : undefined}
-            >
-              <ListRow
-                testID={`workout-split-view-${split.id}`}
-                title={split.name}
-                onPress={() => navigation.navigate('WorkoutSplitView', { splitId: split.id })}
-                disabled={busy}
-                trailing={
-                  <View style={styles.activeToggleWrap}>
-                    {isActive ? (
-                      <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
-                    ) : null}
-                    <Toggle
-                      testID={`workout-split-activate-${split.id}`}
-                      value={isActive}
-                      // Turning an inactive split's toggle on makes it the
-                      // active one (same confirmation as before); the
-                      // already-active split's own toggle is disabled --
-                      // there's no "no split active at all" state today,
-                      // only switching which one is active, so it can't be
-                      // turned off in place, only superseded by another.
-                      onValueChange={(next) => {
-                        if (next) confirmSelectActive(split);
-                      }}
-                      accentColor={theme.accent}
-                      onAccentColor={theme.onAccent}
-                      accessibilityLabel={isActive ? 'Active workout split' : 'Set as active split'}
-                      disabled={busy || isActive}
-                    />
-                  </View>
-                }
-              />
-              <View style={styles.splitActions}>
-                <TouchableOpacity
-                  testID={`workout-split-edit-${split.id}`}
-                  style={styles.splitAction}
-                  onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: split.id })}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit split"
-                  hitSlop={8}
-                >
-                  <Feather name="edit-2" size={18} color={colors.textSecondary} />
-                  <Text style={styles.splitActionLabel}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID={`workout-split-duplicate-${split.id}`}
-                  style={styles.splitAction}
-                  onPress={() => handleDuplicate(split)}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  accessibilityLabel="Duplicate split"
-                  hitSlop={8}
-                >
-                  <Feather name="copy" size={18} color={colors.textSecondary} />
-                  <Text style={styles.splitActionLabel}>Duplicate</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID={`workout-split-delete-${split.id}`}
-                  style={styles.splitAction}
-                  onPress={() => confirmDelete(split)}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete split"
-                  hitSlop={8}
-                >
-                  <Feather name="trash-2" size={18} color={colors.destructive} />
-                  <Text style={[styles.splitActionLabel, styles.splitActionDestructive]}>
-                    Delete
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </AppCard>
-          );
-        })
-      )}
-
-      <PrimaryButton
-        testID="workout-splits-create"
-        label="Create Workout Split"
-        onPress={() => navigation.navigate('WorkoutSplitForm', {})}
+      <SegmentedControl<Tab>
+        testID="workout-splits-tabs"
+        stretch
+        options={[
+          { value: 'splits', label: 'My Splits' },
+          { value: 'programs', label: 'Programs' },
+        ]}
+        value={tab}
+        onChange={setTab}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
       />
 
-      <View style={styles.presetsSectionWrap}>
-        <SectionHeader label="Workout Programs" />
-      </View>
-      <ProgramsEntryCard
-        testID="workout-splits-programs"
-        onPress={() => navigation.navigate('WorkoutPrograms')}
-      />
+      {tab === 'programs' ? (
+        <>
+          {noPreferences ? (
+            <AppCard>
+              <ListRow
+                testID="workout-splits-preferences"
+                icon="sliders"
+                title="Get recommendations"
+                subtitle="Tell us what to prioritize and where you train."
+                onPress={() => navigation.navigate('SettingsWorkoutPreferences')}
+              />
+            </AppCard>
+          ) : null}
+          <ProgramBrowser
+            testID="workout-splits-programs"
+            preferences={preferences}
+            chosen={null}
+            onOpen={(choice) => navigation.navigate('ProgramDetail', choice)}
+          />
+        </>
+      ) : (
+        <>
+          {error ? (
+            <Text testID="workout-splits-error" style={styles.errorText}>
+              {error}
+            </Text>
+          ) : null}
 
-      <View style={styles.presetsSectionWrap}>
-        <SectionHeader label="Browse Splits" />
-      </View>
-      <WorkoutSplitPresetPicker
-        testID="workout-splits-presets"
-        userId={userId}
-        theme={theme}
-        onPresetActivated={handlePresetActivated}
-      />
+          {splits.length === 0 ? (
+            <EmptyState
+              testID="workout-splits-empty"
+              title="Create a split to plan your training days."
+            />
+          ) : (
+            splits.map((split) => {
+              const isActive = split.id === activeId;
+              const busy = busySplitId === split.id;
+              return (
+                <AppCard
+                  key={split.id}
+                  testID={`workout-split-${split.id}`}
+                  hero={isActive}
+                  topAccent={isActive ? theme.accent : undefined}
+                >
+                  <ListRow
+                    testID={`workout-split-view-${split.id}`}
+                    title={split.name}
+                    onPress={() => navigation.navigate('WorkoutSplitView', { splitId: split.id })}
+                    disabled={busy}
+                    trailing={
+                      <View style={styles.activeToggleWrap}>
+                        {isActive ? (
+                          <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
+                        ) : null}
+                        <Toggle
+                          testID={`workout-split-activate-${split.id}`}
+                          value={isActive}
+                          // Turning an inactive split's toggle on makes it the
+                          // active one (same confirmation as before); the
+                          // already-active split's own toggle is disabled --
+                          // there's no "no split active at all" state today,
+                          // only switching which one is active, so it can't be
+                          // turned off in place, only superseded by another.
+                          onValueChange={(next) => {
+                            if (next) confirmSelectActive(split);
+                          }}
+                          accentColor={theme.accent}
+                          onAccentColor={theme.onAccent}
+                          accessibilityLabel={
+                            isActive ? 'Active workout split' : 'Set as active split'
+                          }
+                          disabled={busy || isActive}
+                        />
+                      </View>
+                    }
+                  />
+                  <View style={styles.splitActions}>
+                    <TouchableOpacity
+                      testID={`workout-split-edit-${split.id}`}
+                      style={styles.splitAction}
+                      onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: split.id })}
+                      disabled={busy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit split"
+                      hitSlop={8}
+                    >
+                      <Feather name="edit-2" size={18} color={colors.textSecondary} />
+                      <Text style={styles.splitActionLabel}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      testID={`workout-split-duplicate-${split.id}`}
+                      style={styles.splitAction}
+                      onPress={() => handleDuplicate(split)}
+                      disabled={busy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Duplicate split"
+                      hitSlop={8}
+                    >
+                      <Feather name="copy" size={18} color={colors.textSecondary} />
+                      <Text style={styles.splitActionLabel}>Duplicate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      testID={`workout-split-delete-${split.id}`}
+                      style={styles.splitAction}
+                      onPress={() => confirmDelete(split)}
+                      disabled={busy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete split"
+                      hitSlop={8}
+                    >
+                      <Feather name="trash-2" size={18} color={colors.destructive} />
+                      <Text style={[styles.splitActionLabel, styles.splitActionDestructive]}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </AppCard>
+              );
+            })
+          )}
+
+          <PrimaryButton
+            testID="workout-splits-create"
+            label="Create Workout Split"
+            onPress={() => navigation.navigate('WorkoutSplitForm', {})}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+
+          <View style={styles.presetsSectionWrap}>
+            <SectionHeader label="Browse Splits" />
+          </View>
+          <WorkoutSplitPresetPicker
+            testID="workout-splits-presets"
+            userId={userId}
+            theme={theme}
+            onPresetActivated={handlePresetActivated}
+          />
+        </>
+      )}
     </Screen>
   );
 }

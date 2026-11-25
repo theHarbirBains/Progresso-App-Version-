@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
+import { PrimaryButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { Toggle } from '../design/Toggle';
-import { colors, spacing } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 import type { TrainingComfort, UpdateProfileInput } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
@@ -25,6 +26,15 @@ import {
   type ExerciseProgressionSetting,
 } from '../workouts/exerciseSettingsQueries';
 import { formatRepRange, type RepRange } from '../workouts/progression';
+import { ExclusionTiles, PriorityTiles } from '../programs/PriorityChoices';
+import {
+  EQUIPMENT_ACCESS_OPTIONS,
+  MAX_PRIORITIES,
+  PRIORITY_LABELS,
+  TRAINING_EXCLUSION_LABELS,
+} from '../programs/programs';
+import type { EquipmentAccess, PriorityArea, TrainingExclusion } from '../programs/programTypes';
+import { useAppTheme } from '../theme/appThemeContext';
 
 // Any range from 1 rep up to 50, as the database allows: the bottom never above the top. A
 // range of one number (5-5) is a fixed target.
@@ -41,6 +51,8 @@ type Props = RootStackScreenProps<'SettingsWorkoutPreferences'>;
  * comfort answer doesn't change the range: onboarding only starts it from
  * there. Rest-timer, set-logging, and workout-completion preferences aren't
  * built into the app yet, so there's nothing real to add for them here.
+ * Program Recommendations: what to prioritize, where they train and what to leave out --
+ * onboarding's questions, answered or changed here (programs/recommendations.ts).
  */
 export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
   const { profile, loading, updateProfile } = useProfile();
@@ -69,6 +81,13 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [comfortSheetOpen, setComfortSheetOpen] = useState(false);
   const [rangeDraft, setRangeDraft] = useState<RepRange | null>(null);
+  // An open sheet's picks, saved with its Save button (null: closed).
+  const [prioritiesDraft, setPrioritiesDraft] = useState<PriorityArea[] | null>(null);
+  const [exclusionsDraft, setExclusionsDraft] = useState<TrainingExclusion[] | null | undefined>(
+    undefined,
+  );
+  const [equipmentSheetOpen, setEquipmentSheetOpen] = useState(false);
+  const { accent } = useAppTheme();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -101,6 +120,34 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     setComfortSheetOpen(false);
     await save({ trainingComfort: value });
   }
+
+  async function handleSavePriorities(next: PriorityArea[]) {
+    setPrioritiesDraft(null);
+    const exclusions = profile?.trainingExclusions ?? [];
+    const kept = exclusions.filter((area) => !(next as string[]).includes(area));
+    // Putting an area first takes it off what's left out, in the same save.
+    await save(
+      kept.length === exclusions.length
+        ? { trainingPriorities: next }
+        : { trainingPriorities: next, trainingExclusions: kept },
+    );
+  }
+
+  async function handleSelectEquipment(value: EquipmentAccess) {
+    setEquipmentSheetOpen(false);
+    await save({ equipmentAccess: value });
+  }
+
+  async function handleSaveExclusions(next: TrainingExclusion[]) {
+    setExclusionsDraft(undefined);
+    await save({ trainingExclusions: next });
+  }
+
+  const priorities = profile?.trainingPriorities ?? [];
+  const exclusions = profile?.trainingExclusions ?? [];
+  const equipment = EQUIPMENT_ACCESS_OPTIONS.find(
+    (option) => option.value === profile?.equipmentAccess,
+  );
 
   async function handleSaveRange(next: RepRange) {
     setRangeDraft(null);
@@ -182,6 +229,43 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         />
       </Section>
 
+      <Section title="Program Recommendations">
+        <ListRow
+          testID="open-training-priorities"
+          icon="crosshair"
+          title="Training Priorities"
+          subtitle={
+            priorities.length > 0
+              ? priorities.map((area) => PRIORITY_LABELS[area]).join(', ')
+              : 'Not set'
+          }
+          onPress={() => setPrioritiesDraft(priorities)}
+          disabled={saving}
+        />
+        <ListRow
+          testID="open-equipment-access"
+          icon="map-pin"
+          title="Where You Train"
+          value={equipment ? equipment.label : 'Not set'}
+          onPress={() => setEquipmentSheetOpen(true)}
+          disabled={saving}
+          divider
+        />
+        <ListRow
+          testID="open-training-exclusions"
+          icon="slash"
+          title="Leave Out"
+          subtitle={
+            exclusions.length > 0
+              ? exclusions.map((area) => TRAINING_EXCLUSION_LABELS[area]).join(', ')
+              : 'Nothing'
+          }
+          onPress={() => setExclusionsDraft(exclusions)}
+          disabled={saving}
+          divider
+        />
+      </Section>
+
       {saveError ? (
         <Text testID="settings-workout-preferences-error" style={styles.errorText}>
           {saveError}
@@ -228,6 +312,92 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         </View>
       </BottomSheet>
 
+      <BottomSheet
+        visible={prioritiesDraft !== null}
+        onClose={() => setPrioritiesDraft(null)}
+        testID="training-priorities-sheet"
+      >
+        <ScrollView>
+          <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+            What would you like to prioritize in the gym?
+          </Text>
+          <Text style={localStyles.sheetLine}>
+            Up to {MAX_PRIORITIES}. They get extra attention in the programs we suggest -- you still
+            train everything.
+          </Text>
+          <View style={localStyles.sheetBody}>
+            <PriorityTiles
+              testID="training-priorities"
+              tilePrefix="training-priority"
+              value={prioritiesDraft ?? []}
+              onChange={setPrioritiesDraft}
+            />
+          </View>
+          <PrimaryButton
+            testID="training-priorities-save"
+            label="Save"
+            onPress={() => void handleSavePriorities(prioritiesDraft ?? [])}
+            accentColor={accent.accent}
+            onAccentColor={accent.onAccent}
+          />
+        </ScrollView>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={equipmentSheetOpen}
+        onClose={() => setEquipmentSheetOpen(false)}
+        testID="equipment-access-sheet"
+      >
+        <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Where do you train?</Text>
+        {EQUIPMENT_ACCESS_OPTIONS.map((option, index) => (
+          <ListRow
+            key={option.value}
+            testID={`equipment-access-${option.value}`}
+            icon={option.icon}
+            title={option.label}
+            subtitle={option.description}
+            chevron={false}
+            divider={index > 0}
+            trailing={
+              option.value === profile?.equipmentAccess ? (
+                <Text style={{ color: colors.textSecondary }}>✓</Text>
+              ) : undefined
+            }
+            onPress={() => void handleSelectEquipment(option.value)}
+          />
+        ))}
+      </BottomSheet>
+
+      <BottomSheet
+        visible={exclusionsDraft !== undefined}
+        onClose={() => setExclusionsDraft(undefined)}
+        testID="training-exclusions-sheet"
+      >
+        <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+          Anything you&apos;d rather not train directly?
+        </Text>
+        <Text style={localStyles.sheetLine}>
+          Programs that leave it out are suggested first. An area you prioritize can&apos;t be left
+          out.
+        </Text>
+        <View style={localStyles.sheetBody}>
+          <ExclusionTiles
+            testID="training-exclusions"
+            tilePrefix="training-exclusion"
+            value={exclusionsDraft ?? null}
+            priorities={priorities}
+            onChange={(next) => setExclusionsDraft(next)}
+          />
+        </View>
+        <PrimaryButton
+          testID="training-exclusions-save"
+          label="Save"
+          onPress={() => void handleSaveExclusions(exclusionsDraft ?? [])}
+          accentColor={accent.accent}
+          onAccentColor={accent.onAccent}
+        />
+      </BottomSheet>
+
       <RepRangeSheet
         draft={rangeDraft}
         onChangeDraft={setRangeDraft}
@@ -241,5 +411,13 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
 const localStyles = StyleSheet.create({
   comfortOptions: {
     marginTop: spacing.md,
+  },
+  sheetLine: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  sheetBody: {
+    marginVertical: spacing.md,
   },
 });

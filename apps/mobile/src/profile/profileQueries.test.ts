@@ -57,6 +57,10 @@ const row = {
   show_rank: null,
   phone_e164: '+16045551234',
   findable_by_phone: null,
+  training_priorities: ['glutes', 'back'],
+  equipment_access: 'dumbbells',
+  // An answer never given reads as none.
+  training_exclusions: null,
 };
 
 beforeEach(() => {
@@ -115,6 +119,9 @@ describe('fetchMyProfile', () => {
       showRank: true,
       phoneNumber: '+16045551234',
       findableByPhone: true,
+      trainingPriorities: ['glutes', 'back'],
+      equipmentAccess: 'dumbbells',
+      trainingExclusions: [],
     });
   });
 

@@ -24,12 +24,16 @@ import {
 } from '../programs/ProgramParts';
 import {
   daysLabel,
+  equipmentLabel,
+  focusSummary,
   GUIDANCE_TOPICS,
   levelsLabel,
   musclesText,
   programById,
   schedulesOf,
+  styleLabel,
   variationById,
+  variationLabel,
   variationMuscles,
   variationsOn,
 } from '../programs/programs';
@@ -167,7 +171,9 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
             {program.badge ? <Badge label={program.badge} /> : null}
             <Text style={styles.name}>{program.name}</Text>
             <Text style={styles.meta}>
-              {daysLabel(program)} · {program.style}
+              {[variation.schedule, variation.focus, styleLabel(variation)]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
             {program.tags && program.tags.length > 0 ? (
               <View style={styles.tags}>
@@ -182,9 +188,11 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
           </AppCard>
 
           <SectionHeader label="Overview" />
-          <AppCard>
-            <Text style={styles.body}>{program.description}</Text>
-          </AppCard>
+          {program.description ? (
+            <AppCard>
+              <Text style={styles.body}>{program.description}</Text>
+            </AppCard>
+          ) : null}
           <AppCard style={styles.rows}>
             <ListRow
               icon="calendar"
@@ -194,9 +202,24 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
             <ListRow
               icon="bar-chart-2"
               title="Experience"
-              subtitle={levelsLabel(program.levels)}
+              subtitle={levelsLabel(variation.levels)}
               divider
             />
+            <ListRow
+              icon="tool"
+              title="Equipment"
+              subtitle={equipmentLabel(variation.equipment)}
+              divider
+            />
+            {focusSummary(variation) ? (
+              <ListRow
+                testID="program-detail-focus"
+                icon="crosshair"
+                title="Focus"
+                subtitle={focusSummary(variation)!}
+                divider
+              />
+            ) : null}
           </AppCard>
 
           <SectionHeader label="Muscle Group Targets" />
@@ -249,7 +272,7 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
                 testID="program-detail-variation"
                 icon="sliders"
                 title="Variation"
-                value={variation.focus ?? variation.schedule}
+                value={variationLabel(variation)}
                 onPress={() =>
                   navigation.navigate('ProgramVariations', {
                     programId: program.id,

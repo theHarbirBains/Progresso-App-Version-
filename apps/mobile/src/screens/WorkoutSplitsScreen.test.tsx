@@ -13,6 +13,8 @@ import {
 } from '../workouts/workoutSplitQueries';
 import { WorkoutSplitsScreen } from './WorkoutSplitsScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { TEST_PROGRAM } from '../programs/__fixtures__/programs';
+import type { WorkoutProgram } from '../programs/programTypes';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -24,6 +26,14 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
+}));
+
+// The catalogue is empty until the programs are written; a test stands one in.
+let mockPrograms: WorkoutProgram[] = [];
+jest.mock('../programs/programCatalog', () => ({
+  get WORKOUT_PROGRAMS() {
+    return mockPrograms;
+  },
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -70,7 +80,7 @@ const navigation: any = {
     return jest.fn();
   }),
 };
-const route = {} as never;
+let route = {} as never;
 
 const mockOpenMenu = jest.fn();
 
@@ -115,6 +125,8 @@ beforeEach(() => {
   mockNavigate.mockClear();
   mockGoBack.mockClear();
   mockOpenMenu.mockClear();
+  mockPrograms = [];
+  route = {} as never;
 });
 
 describe('WorkoutSplitsScreen', () => {
@@ -281,11 +293,9 @@ describe('WorkoutSplitsScreen background refresh on focus', () => {
   });
 });
 
-/** The split widgets: every widget but Workout Programs'. */
+/** The split widgets: every widget on My Splits. */
 function splitCards() {
-  return screen
-    .UNSAFE_queryAllByType(AppCard)
-    .filter((card) => card.props.testID !== 'workout-splits-programs');
+  return screen.UNSAFE_queryAllByType(AppCard);
 }
 
 describe('WorkoutSplitsScreen -- one widget per split', () => {
@@ -293,7 +303,7 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    // One widget per split (Workout Programs' widget sits apart, under its own heading).
+    // One widget per split.
     expect(splitCards()).toHaveLength(2);
     const block = within(screen.getByTestId('workout-split-split-1'));
     expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - Hypertrophy/);
@@ -307,7 +317,6 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     await screen.findByTestId('workout-split-split-1');
 
     expect(splitCards().map((c) => Boolean(c.props.hero))).toEqual([true, false]);
-    expect(screen.getByTestId('workout-splits-programs')).toBeTruthy();
   });
 
   it('bands only the active split in the Workout accent, never the others', async () => {
@@ -370,11 +379,50 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
   });
 });
 
-describe('WorkoutSplitsScreen -- Workout Programs', () => {
-  it('opens Workout Programs from its widget', async () => {
+describe('WorkoutSplitsScreen -- Programs', () => {
+  it('opens on My Splits, with Programs a tab away -- the browser, not a page of its own', async () => {
     renderScreen();
-    fireEvent.press(await screen.findByTestId('workout-splits-programs'));
+    await screen.findByTestId('workout-split-split-1');
+    expect(screen.queryByTestId('workout-splits-programs')).toBeNull();
 
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutPrograms');
+    fireEvent.press(screen.getByTestId('workout-splits-tabs-programs'));
+    expect(screen.queryByTestId('workout-split-split-1')).toBeNull();
+    expect(screen.queryByTestId('workout-splits-create')).toBeNull();
+    // Nothing written yet: they're on their way.
+    expect(screen.getByTestId('workout-splits-programs-empty')).toHaveTextContent(
+      /Programs are on their way/,
+    );
+  });
+
+  it('asks what to recommend from until they have said, from Workout Preferences', async () => {
+    route = { params: { tab: 'programs' } } as never;
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('workout-splits-preferences'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsWorkoutPreferences');
+  });
+
+  it('recommends from what they have said, and opens a program on its variation', async () => {
+    mockPrograms = [TEST_PROGRAM];
+    mockFetchMyProfile.mockResolvedValue({
+      ...baseProfile,
+      workoutFrequencyDays: 6,
+      trainingPriorities: ['chest'],
+      equipmentAccess: 'full_gym',
+      trainingExclusions: [],
+      fitnessGoals: ['build_muscle'],
+    });
+    route = { params: { tab: 'programs' } } as never;
+    renderScreen();
+
+    expect(
+      await screen.findByTestId('workout-splits-programs-recommended-test-split'),
+    ).toHaveTextContent(/Fits your 6 days a week/);
+    expect(screen.queryByTestId('workout-splits-preferences')).toBeNull();
+    fireEvent.press(screen.getByTestId('workout-splits-programs-card-6-test-split'));
+    expect(mockNavigate).toHaveBeenCalledWith('ProgramDetail', {
+      programId: 'test-split',
+      variationId: 'six',
+    });
   });
 });

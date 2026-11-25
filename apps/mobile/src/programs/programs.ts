@@ -10,14 +10,20 @@ import {
   SPLIT_MUSCLE_GROUP_LABELS,
   type SplitMuscleGroup,
 } from '../workouts/splitMuscleGroups';
+import { isReadyContent } from './programAssembly';
 import { WORKOUT_PROGRAMS } from './programCatalog';
 import type {
   Amount,
+  CatalogProgram,
+  EquipmentAccess,
   GuidanceTopic,
+  PriorityArea,
+  ProgramContent,
   ProgramExercise,
-  ProgramFocus,
   ProgramLevel,
   ProgramVariation,
+  TrainingExclusion,
+  TrainingStyle,
   WorkoutProgram,
 } from './programTypes';
 
@@ -34,22 +40,144 @@ export const PROGRAM_LEVEL_LABELS: Record<ProgramLevel, string> = {
   advanced: 'Advanced',
 };
 
-export const PROGRAM_FOCUSES: readonly ProgramFocus[] = [
-  'full_body',
-  'upper_body',
-  'lower_body',
-  'glutes',
+/** What someone can prioritize, in the order onboarding asks it. */
+export const PRIORITY_AREAS: readonly PriorityArea[] = [
+  'balanced',
+  'chest',
+  'back',
+  'shoulders',
   'arms',
+  'legs',
+  'glutes',
   'core',
 ];
 
-export const PROGRAM_FOCUS_LABELS: Record<ProgramFocus, string> = {
-  full_body: 'Full Body',
-  upper_body: 'Upper Body',
-  lower_body: 'Lower Body',
-  glutes: 'Glutes',
+export const PRIORITY_LABELS: Record<PriorityArea, string> = {
+  balanced: 'Balanced Development',
+  chest: 'Chest',
+  back: 'Back',
+  shoulders: 'Shoulders',
   arms: 'Arms',
+  legs: 'Legs',
+  glutes: 'Glutes',
   core: 'Core',
+};
+
+/** The split muscle groups each area covers -- what its anatomy figure shows. */
+export const PRIORITY_GROUPS: Record<PriorityArea, readonly SplitMuscleGroup[]> = {
+  balanced: SPLIT_MUSCLE_GROUPS,
+  chest: ['chest'],
+  back: ['back'],
+  shoulders: ['shoulders'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  legs: ['quads', 'hamstrings', 'adductors', 'calves'],
+  glutes: ['glutes'],
+  core: ['abs'],
+};
+
+/** Which side of the figure shows an area best. */
+export const PRIORITY_SIDE: Record<PriorityArea, 'front' | 'back'> = {
+  balanced: 'front',
+  chest: 'front',
+  back: 'back',
+  shoulders: 'front',
+  arms: 'front',
+  legs: 'front',
+  glutes: 'back',
+  core: 'front',
+};
+
+/** The most areas someone prioritizes. */
+export const MAX_PRIORITIES = 3;
+
+/**
+ * Priorities with `area` tapped: Balanced Development is an answer on its own (it replaces the
+ * rest, and any other replaces it), the others go on in the order tapped up to MAX_PRIORITIES
+ * (one more is ignored), and one tapped again comes off.
+ */
+export function togglePriority(
+  current: readonly PriorityArea[],
+  area: PriorityArea,
+): PriorityArea[] {
+  if (current.includes(area)) return current.filter((picked) => picked !== area);
+  if (area === 'balanced') return ['balanced'];
+  const others = current.filter((picked) => picked !== 'balanced');
+  return others.length >= MAX_PRIORITIES ? [...others] : [...others, area];
+}
+
+/** Whether a tap on `area` would do nothing: already three others picked. */
+export function priorityFull(current: readonly PriorityArea[], area: PriorityArea): boolean {
+  return (
+    !current.includes(area) &&
+    area !== 'balanced' &&
+    current.filter((picked) => picked !== 'balanced').length >= MAX_PRIORITIES
+  );
+}
+
+/** Where someone trains, from the most equipment to the least. */
+export const EQUIPMENT_ACCESS_OPTIONS: readonly {
+  value: EquipmentAccess;
+  label: string;
+  description: string;
+  icon: Glyph;
+}[] = [
+  {
+    value: 'full_gym',
+    label: 'Full Gym',
+    description: 'Barbells, dumbbells, cables and machines.',
+    icon: 'map-pin',
+  },
+  {
+    value: 'dumbbells',
+    label: 'Dumbbells Only',
+    description: 'A set of dumbbells and a bench, at home or a small gym.',
+    icon: 'home',
+  },
+  {
+    value: 'bodyweight',
+    label: 'Bodyweight Only',
+    description: 'No equipment, or just a bar to pull up on.',
+    icon: 'user',
+  },
+];
+
+// More equipment fits everything less needs.
+const EQUIPMENT_RANK: Record<EquipmentAccess, number> = {
+  bodyweight: 0,
+  dumbbells: 1,
+  full_gym: 2,
+};
+
+/** Whether a variation needing `need` can be done with `access`. */
+export function equipmentFits(need: EquipmentAccess, access: EquipmentAccess): boolean {
+  return EQUIPMENT_RANK[need] <= EQUIPMENT_RANK[access];
+}
+
+export const TRAINING_EXCLUSIONS: readonly TrainingExclusion[] = ['chest', 'glutes'];
+
+export const TRAINING_EXCLUSION_LABELS: Record<TrainingExclusion, string> = {
+  chest: 'No Direct Chest',
+  glutes: 'No Direct Glutes',
+};
+
+export const TRAINING_STYLES: readonly TrainingStyle[] = [
+  'general',
+  'bodybuilding',
+  'strength',
+  'powerbuilding',
+  'athletic',
+  'hybrid',
+  'calisthenics',
+];
+
+export const TRAINING_STYLE_LABELS: Record<TrainingStyle, string> = {
+  general: 'Traditional',
+  bodybuilding: 'Bodybuilding',
+  strength: 'Strength',
+  powerbuilding: 'Powerbuilding',
+  athletic: 'Athletic',
+  hybrid: 'Hybrid',
+  calisthenics: 'Calisthenics',
 };
 
 /** The guidance topics, in the order the Guidance tab lists them. */
@@ -148,6 +276,39 @@ export function levelInitial(levels: readonly ProgramLevel[]): string | null {
   return lowest ? PROGRAM_LEVEL_LABELS[lowest][0]! : null;
 }
 
+/** A variation's name among its program's: its focus, or Standard. */
+export function variationLabel(variation: ProgramVariation): string {
+  return variation.focus ?? 'Standard';
+}
+
+/** Everyone a program's variations suit, in level order -- empty when one suits any level. */
+export function programLevels(program: WorkoutProgram): ProgramLevel[] {
+  if (program.variations.some((variation) => variation.levels.length === 0)) return [];
+  const levels = new Set(program.variations.flatMap((variation) => variation.levels));
+  return PROGRAM_LEVELS.filter((level) => levels.has(level));
+}
+
+/** How a variation trains, in a word ("Bodybuilding"). */
+export function styleLabel(variation: ProgramVariation): string {
+  return TRAINING_STYLE_LABELS[variation.style];
+}
+
+/** Where a variation can be done, from the least it needs ("Dumbbells Only"). */
+export function equipmentLabel(need: EquipmentAccess): string {
+  return EQUIPMENT_ACCESS_OPTIONS.find((option) => option.value === need)!.label;
+}
+
+/** What a variation puts first and leaves out, in a line ("Glutes first · No Direct Chest"), or
+ * null for a balanced one that leaves nothing out. */
+export function focusSummary(variation: ProgramVariation): string | null {
+  const parts: string[] = [];
+  if (variation.emphasis.length > 0) {
+    parts.push(`${variation.emphasis.map((area) => PRIORITY_LABELS[area]).join(', ')} first`);
+  }
+  for (const exclusion of variation.excludes) parts.push(TRAINING_EXCLUSION_LABELS[exclusion]);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 function amountText(amount: Amount): string {
   return typeof amount === 'number' ? String(amount) : `${amount.min}–${amount.max}`;
 }
@@ -209,39 +370,107 @@ export function isActiveBuiltin(slug: string): boolean {
   return slug in BUILTIN_CATALOG && slug in BUILTIN_GUIDES;
 }
 
-/** The library's filters; null is any. */
+/** The library's filters; null is any. They all apply together, to the same variation. */
 export interface ProgramFilters {
-  level: ProgramLevel | null;
   daysPerWeek: number | null;
-  focus: ProgramFocus | null;
+  level: ProgramLevel | null;
   goal: FitnessGoal | null;
+  /** What it puts first; `balanced` is a program that puts nothing first. */
+  emphasis: PriorityArea | null;
+  style: TrainingStyle | null;
+  /** Where they train: a program needing no more than this. */
+  equipment: EquipmentAccess | null;
+  /** A program that leaves this out. */
+  exclusion: TrainingExclusion | null;
 }
 
 export const NO_FILTERS: ProgramFilters = {
-  level: null,
   daysPerWeek: null,
-  focus: null,
+  level: null,
   goal: null,
+  emphasis: null,
+  style: null,
+  equipment: null,
+  exclusion: null,
 };
 
-export function matchesFilters(program: WorkoutProgram, filters: ProgramFilters): boolean {
-  if (filters.level && !program.levels.includes(filters.level)) return false;
-  if (filters.focus && !program.focuses.includes(filters.focus)) return false;
-  if (filters.goal && !program.goals.includes(filters.goal)) return false;
-  if (
-    filters.daysPerWeek !== null &&
-    !schedulesOf(program).some((s) => s.daysPerWeek === filters.daysPerWeek)
-  ) {
+/** How many filters other than days a week are set. */
+export function filtersSet(filters: ProgramFilters): number {
+  return [
+    filters.level,
+    filters.goal,
+    filters.emphasis,
+    filters.style,
+    filters.equipment,
+    filters.exclusion,
+  ].filter((value) => value !== null).length;
+}
+
+/** Whether one variation fits every filter set. */
+export function variationMatches(variation: ProgramVariation, filters: ProgramFilters): boolean {
+  if (filters.daysPerWeek !== null && variation.daysPerWeek !== filters.daysPerWeek) return false;
+  if (filters.level && variation.levels.length > 0 && !variation.levels.includes(filters.level)) {
     return false;
   }
+  if (filters.goal && !variation.goals.includes(filters.goal)) return false;
+  if (filters.emphasis) {
+    const fits =
+      filters.emphasis === 'balanced'
+        ? variation.emphasis.length === 0
+        : variation.emphasis.includes(filters.emphasis);
+    if (!fits) return false;
+  }
+  if (filters.style && variation.style !== filters.style) return false;
+  if (filters.equipment && !equipmentFits(variation.equipment, filters.equipment)) return false;
+  if (filters.exclusion && !variation.excludes.includes(filters.exclusion)) return false;
   return true;
 }
 
-/** The days-a-week a filter can pick: every schedule's in the catalogue, fewest first. */
+/** A program's variations that fit the filters, its default first. */
+export function matchingVariations(
+  program: WorkoutProgram,
+  filters: ProgramFilters,
+): ProgramVariation[] {
+  const fit = program.variations.filter((variation) => variationMatches(variation, filters));
+  return [...fit.filter((v) => v.default), ...fit.filter((v) => !v.default)];
+}
+
+export function matchesFilters(program: WorkoutProgram, filters: ProgramFilters): boolean {
+  return matchingVariations(program, filters).length > 0;
+}
+
+/** The days-a-week a filter can pick: every variation's in the catalogue, fewest first. */
 export function frequencyChoices(programs: readonly WorkoutProgram[]): number[] {
-  return [...new Set(programs.flatMap((p) => schedulesOf(p).map((s) => s.daysPerWeek)))].sort(
+  return [...new Set(programs.flatMap((p) => p.variations.map((v) => v.daysPerWeek)))].sort(
     (a, b) => a - b,
   );
+}
+
+/** A program as a list shows it: on the variation that fits best there. */
+export interface ProgramEntry {
+  program: WorkoutProgram;
+  variation: ProgramVariation;
+}
+
+/**
+ * The library by days a week ("3 Days Per Week"): each section every program with a variation
+ * that fits the filters at that many days, on that variation -- so a program with 3- and 6-day
+ * versions is in both. With days a week set, only its section.
+ */
+export function frequencySections(
+  programs: readonly WorkoutProgram[],
+  filters: ProgramFilters,
+): { daysPerWeek: number; entries: ProgramEntry[] }[] {
+  const days = filters.daysPerWeek !== null ? [filters.daysPerWeek] : frequencyChoices(programs);
+  return days
+    .map((daysPerWeek) => ({
+      daysPerWeek,
+      entries: programs.flatMap((program) => {
+        const variation = matchingVariations(program, { ...filters, daysPerWeek })[0];
+        return variation ? [{ program, variation }] : [];
+      }),
+    }))
+    .filter((section) => section.entries.length > 0);
 }
 
 /** The goals a filter can pick, in onboarding's order, with their names. */
@@ -267,8 +496,9 @@ export function programProblems(program: WorkoutProgram): string[] {
   const where = (rest: string) => problems.push(`${program.id}: ${rest}`);
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(program.id)) where('id must be lowercase words joined by -');
   if (!program.name.trim()) where('has no name');
-  if (!program.description.trim()) where('has no description');
-  if (program.levels.length === 0) where('names no level');
+  if (program.description !== undefined && !program.description.trim()) {
+    where('has an empty description');
+  }
   if (program.variations.length === 0) where('has no variations');
   const ids = new Set<string>();
   for (const variation of program.variations) {
@@ -276,6 +506,10 @@ export function programProblems(program: WorkoutProgram): string[] {
     if (ids.has(variation.id)) where(`${at} is listed twice`);
     ids.add(variation.id);
     if (variation.days.length === 0) where(`${at} has no days`);
+    if (variation.daysPerWeek !== variation.days.length) {
+      where(`${at} says ${variation.daysPerWeek} days a week but has ${variation.days.length}`);
+    }
+    if (variation.days.length > 7) where(`${at} has more than 7 days`);
     variation.days.forEach((day, d) => {
       const dayAt = `${at}, day ${d + 1} (${day.name})`;
       if (!day.name.trim()) where(`${dayAt} has no name`);
@@ -316,4 +550,77 @@ export function programProblems(program: WorkoutProgram): string[] {
     if (defaults.length > 1) where(`schedule ${schedule.schedule} has more than one default`);
   }
   return problems;
+}
+
+const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * Everything wrong with the catalogue and its content, as a line each: ids badly made or
+ * repeated, a program or variation listed twice, content for something the catalogue hasn't
+ * got, a variation's days a week not its content's, a variation half written (hidden until it's
+ * done), and every ready program's programProblems.
+ */
+export function catalogProblems(
+  catalog: readonly CatalogProgram[],
+  content: Readonly<Record<string, ProgramContent>>,
+  assembled: readonly WorkoutProgram[],
+): string[] {
+  const problems: string[] = [];
+  const programIds = new Set<string>();
+  const names = new Set<string>();
+  for (const program of catalog) {
+    const where = (rest: string) => problems.push(`${program.id}: ${rest}`);
+    if (!ID_PATTERN.test(program.id)) where('id must be lowercase words joined by -');
+    if (programIds.has(program.id)) where('is listed twice');
+    programIds.add(program.id);
+    const name = program.name.trim().toLowerCase();
+    if (!name) where('has no name');
+    if (names.has(name)) where(`the name ${program.name} is used twice`);
+    names.add(name);
+    if (program.variations.length === 0) where('has no variations');
+    if (program.variations.filter((v) => v.default).length > 1) where('has more than one default');
+    const variationIds = new Set<string>();
+    const kinds = new Set<string>();
+    const words = content[program.id];
+    for (const variation of program.variations) {
+      const at = `variation ${variation.id}`;
+      if (!ID_PATTERN.test(variation.id)) where(`${at}: id must be lowercase words joined by -`);
+      if (variationIds.has(variation.id)) where(`${at} is listed twice`);
+      variationIds.add(variation.id);
+      const kind = `${variation.daysPerWeek ?? '?'}|${variation.focus ?? ''}`;
+      if (kinds.has(kind)) where(`${at} repeats another variation's days and focus`);
+      kinds.add(kind);
+      if (
+        variation.daysPerWeek !== undefined &&
+        (!Number.isInteger(variation.daysPerWeek) ||
+          variation.daysPerWeek < 1 ||
+          variation.daysPerWeek > 7)
+      ) {
+        where(`${at}: days a week must be 1 to 7`);
+      }
+      const made = words?.variations[variation.id];
+      if (!made) continue;
+      if (made.days.length > 0 && !isReadyContent(made)) {
+        where(`${at} has a day with no exercises, so it isn't shown`);
+      }
+      if (
+        isReadyContent(made) &&
+        variation.daysPerWeek !== undefined &&
+        made.days.length !== variation.daysPerWeek
+      ) {
+        where(
+          `${at} is ${variation.daysPerWeek} days a week, but its content has ${made.days.length} days`,
+        );
+      }
+    }
+    for (const id of Object.keys(words?.variations ?? {})) {
+      if (!variationIds.has(id)) {
+        where(`content for variation ${id}, which the catalogue hasn't got`);
+      }
+    }
+  }
+  for (const id of Object.keys(content)) {
+    if (!programIds.has(id)) problems.push(`${id}: content for a program the catalogue hasn't got`);
+  }
+  return [...problems, ...assembled.flatMap(programProblems)];
 }
