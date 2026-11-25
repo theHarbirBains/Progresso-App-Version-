@@ -31,6 +31,7 @@ jest.mock('../profile/profileQueries', () => ({
 // The catalogue is empty until the programs are written; a test stands one in.
 let mockPrograms: WorkoutProgram[] = [];
 jest.mock('../programs/programCatalog', () => ({
+  PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   get WORKOUT_PROGRAMS() {
     return mockPrograms;
   },
@@ -293,9 +294,11 @@ describe('WorkoutSplitsScreen background refresh on focus', () => {
   });
 });
 
-/** The split widgets: every widget on My Splits. */
+/** The split widgets: My Splits' widgets but the Split Library's. */
 function splitCards() {
-  return screen.UNSAFE_queryAllByType(AppCard);
+  return screen
+    .UNSAFE_queryAllByType(AppCard)
+    .filter((card) => String(card.props.testID ?? '').startsWith('workout-split-'));
 }
 
 describe('WorkoutSplitsScreen -- one widget per split', () => {
@@ -379,8 +382,42 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
   });
 });
 
-describe('WorkoutSplitsScreen -- Programs', () => {
-  it('opens on My Splits, with Programs a tab away -- the browser, not a page of its own', async () => {
+describe('WorkoutSplitsScreen -- the page, top to bottom', () => {
+  it('puts the active split first under its own heading, then the rest, then ways to find one', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: 'split-2' });
+    renderScreen();
+    await screen.findByTestId('workout-split-split-2');
+
+    await waitFor(() =>
+      expect(splitCards().map((card) => card.props.testID)).toEqual([
+        'workout-split-split-2',
+        'workout-split-split-1',
+      ]),
+    );
+    expect(screen.getByTestId('workout-splits-heading-active')).toHaveTextContent('Active Split');
+    expect(screen.getByTestId('workout-splits-heading-others')).toHaveTextContent(
+      'Your Other Splits',
+    );
+    expect(screen.getByTestId('workout-splits-library')).toHaveTextContent(
+      /Split Library.*133 splits in 9 categories\. Workouts coming soon\./,
+    );
+    expect(screen.getByTestId('workout-splits-presets')).toBeTruthy();
+  });
+
+  it('calls them Your Splits while none is active', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+    renderScreen();
+    await screen.findByTestId('workout-split-split-1');
+
+    expect(screen.queryByTestId('workout-splits-heading-active')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByTestId('workout-splits-heading-others')).toHaveTextContent('Your Splits'),
+    );
+  });
+});
+
+describe('WorkoutSplitsScreen -- Split Library', () => {
+  it('opens on My Splits, with the Split Library a tab away -- the browser, not a page of its own', async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
     expect(screen.queryByTestId('workout-splits-programs')).toBeNull();
@@ -388,10 +425,19 @@ describe('WorkoutSplitsScreen -- Programs', () => {
     fireEvent.press(screen.getByTestId('workout-splits-tabs-programs'));
     expect(screen.queryByTestId('workout-split-split-1')).toBeNull();
     expect(screen.queryByTestId('workout-splits-create')).toBeNull();
-    // Nothing written yet: they're on their way.
-    expect(screen.getByTestId('workout-splits-programs-empty')).toHaveTextContent(
-      /Programs are on their way/,
+    // Every title listed, though nothing's written yet.
+    expect(screen.getByTestId('workout-splits-programs-intro')).toHaveTextContent(
+      /133 splits in 9 categories/,
     );
+    expect(screen.getByTestId('workout-splits-programs-section-traditional')).toBeTruthy();
+  });
+
+  it("goes to the library from My Splits' Split Library widget", async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('workout-splits-library'));
+
+    expect(screen.getByTestId('workout-splits-programs-intro')).toBeTruthy();
+    expect(screen.queryByTestId('workout-split-split-1')).toBeNull();
   });
 
   it('asks what to recommend from until they have said, from Workout Preferences', async () => {
@@ -419,7 +465,7 @@ describe('WorkoutSplitsScreen -- Programs', () => {
       await screen.findByTestId('workout-splits-programs-recommended-test-split'),
     ).toHaveTextContent(/Fits your 6 days a week/);
     expect(screen.queryByTestId('workout-splits-preferences')).toBeNull();
-    fireEvent.press(screen.getByTestId('workout-splits-programs-card-6-test-split'));
+    fireEvent.press(screen.getByTestId('workout-splits-programs-recommended-test-split'));
     expect(mockNavigate).toHaveBeenCalledWith('ProgramDetail', {
       programId: 'test-split',
       variationId: 'six',

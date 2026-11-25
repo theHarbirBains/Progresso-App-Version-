@@ -9,8 +9,6 @@ import {
   exerciseInfo,
   filtersSet,
   focusSummary,
-  frequencyChoices,
-  frequencySections,
   levelInitial,
   levelsLabel,
   matchesFilters,
@@ -147,32 +145,6 @@ describe('filtering the library', () => {
     expect(filtersSet({ ...NO_FILTERS, daysPerWeek: 3, goal: 'lose_fat', style: 'strength' })).toBe(
       2,
     );
-  });
-
-  it('offers every days-a-week a program has', () => {
-    expect(frequencyChoices(programs)).toEqual([3, 4, 6]);
-  });
-
-  it('lists the programs by days a week, each on its variation that fits there', () => {
-    const sections = frequencySections(programs, NO_FILTERS);
-    expect(
-      sections.map((section) => ({
-        days: section.daysPerWeek,
-        entries: section.entries.map((e) => `${e.program.id}:${e.variation.id}`),
-      })),
-    ).toEqual([
-      { days: 3, entries: ['test-split:three-balanced'] },
-      { days: 4, entries: ['second-program:four'] },
-      { days: 6, entries: ['test-split:six'] },
-    ]);
-    // A program in two sections; with days set, only that section.
-    expect(frequencySections(programs, { ...NO_FILTERS, daysPerWeek: 6 })).toHaveLength(1);
-    // A filter that rules a variation out picks the next that fits.
-    expect(
-      frequencySections(programs, { ...NO_FILTERS, style: 'strength' })[0]!.entries[0]!.variation
-        .id,
-    ).toBe('three-strength');
-    expect(frequencySections(programs, { ...NO_FILTERS, exclusion: 'glutes' })).toEqual([]);
   });
 
   it('knows what each equipment answer can do', () => {

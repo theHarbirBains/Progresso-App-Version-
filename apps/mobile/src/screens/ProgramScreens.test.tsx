@@ -15,9 +15,11 @@ import { ProgramGuidanceScreen } from './ProgramGuidanceScreen';
 import { ProgramVariationsScreen } from './ProgramVariationsScreen';
 import { WorkoutProgramsScreen } from './WorkoutProgramsScreen';
 
-// The catalogue is empty until the programs are written; these tests stand in made-up ones.
+// Nothing is written yet; these tests stand in made-up programs. The catalogue itself is the
+// real one: the library lists it before anything is written.
 let mockPrograms: WorkoutProgram[] = [];
 jest.mock('../programs/programCatalog', () => ({
+  PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   get WORKOUT_PROGRAMS() {
     return mockPrograms;
   },
@@ -59,109 +61,161 @@ function renderBrowser(preferences: ProgramPreferences = NO_PREFERENCES) {
   );
 }
 
-describe('WorkoutProgramsScreen -- the programs browser', () => {
-  it('lists every program by days a week, each on its variation there, and opens one', () => {
+// Push / Pull / Legs as if written: a made-up program under the catalogue's ids, so the library's
+// titles for it open.
+const WRITTEN_PPL: WorkoutProgram = {
+  ...TEST_PROGRAM,
+  id: 'push-pull-legs',
+  name: 'Push / Pull / Legs',
+  variations: [
+    { ...TEST_PROGRAM.variations[0]!, id: '3-day', default: true },
+    { ...TEST_PROGRAM.variations[2]!, id: '6-day', default: false },
+  ],
+};
+
+describe('WorkoutProgramsScreen -- the Split Library', () => {
+  const id = (rest: string) => `workout-programs-browser-${rest}`;
+
+  it("lists the library's sections in order, each title with its days a week", () => {
+    mockPrograms = [];
     renderBrowser();
 
-    // Every frequency a program has, then All -- on All with nothing to go on.
-    for (const days of ['3', '4', '6', 'all']) {
-      expect(screen.getByTestId(`workout-programs-browser-days-${days}`)).toBeTruthy();
+    expect(screen.getByTestId(id('intro'))).toHaveTextContent(
+      '133 splits in 9 categories. Each one opens here once its workouts are in.',
+    );
+    // 2 to 7 days a week, then All -- on All with nothing to go on.
+    for (const days of ['2', '3', '4', '5', '6', '7', 'all']) {
+      expect(screen.getByTestId(id(`days-${days}`))).toBeTruthy();
     }
-    expect(screen.queryByTestId('workout-programs-browser-days-5')).toBeNull();
-    expect(screen.getByTestId('workout-programs-browser-section-3')).toHaveTextContent(
-      /3 Days Per Week.*Test Split.*Balanced.*3 days a week · Traditional.*Beginner to Advanced/,
+    expect(screen.getByTestId(id('section-traditional'))).toHaveTextContent(
+      /Traditional Workout Splits.*The classic ways to split a training week\.16Push \/ Pull \/ Legs36Arnold Split36Upper \/ Lower24Full Body234/,
     );
-    expect(screen.getByTestId('workout-programs-browser-section-4')).toHaveTextContent(
-      /4 Days Per Week.*Second Program.*4 days a week · Bodybuilding.*Beginner/,
+    expect(screen.getByTestId(id('section-traditional-0')).props.accessibilityLabel).toBe(
+      'Push / Pull / Legs. 3 or 6 days a week. Workouts coming soon.',
     );
-    expect(screen.getByTestId('workout-programs-browser-section-6')).toHaveTextContent(
-      /6 Days Per Week.*Test Split/,
+    // The words in brackets as their own line.
+    expect(screen.getByTestId(id('section-upper-lower-1'))).toHaveTextContent(
+      /^Upper \/ LowerChest Emphasis4$/,
     );
-    expect(screen.queryByTestId('workout-programs-browser-recommended')).toBeNull();
+    expect(screen.getByTestId(id('section-athletic-hybrid'))).toBeTruthy();
+    expect(screen.queryByTestId(id('recommended'))).toBeNull();
 
-    fireEvent.press(screen.getByTestId('workout-programs-browser-card-6-test-split'));
-    expect(navigation.navigate).toHaveBeenCalledWith('ProgramDetail', {
-      programId: 'test-split',
-      variationId: 'six',
-    });
+    // A title isn't opened before its workouts are in.
+    fireEvent.press(screen.getByTestId(id('section-traditional-0')));
+    expect(navigation.navigate).not.toHaveBeenCalled();
     expectNoBareText();
   });
 
-  it('narrows to one frequency from the days across the top', () => {
+  it('shows a few titles of each section, and the rest on Show All', () => {
     renderBrowser();
-    fireEvent.press(screen.getByTestId('workout-programs-browser-days-4'));
 
-    expect(screen.queryByTestId('workout-programs-browser-section-3')).toBeNull();
-    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
-    expect(screen.getByTestId('workout-programs-browser-count')).toHaveTextContent(
-      '1 of 2 programs',
+    expect(screen.getByTestId(id('section-traditional-3'))).toBeTruthy();
+    expect(screen.queryByTestId(id('section-traditional-4'))).toBeNull();
+    expect(screen.getByTestId(id('section-traditional-more'))).toHaveTextContent(/Show All 16/);
+
+    fireEvent.press(screen.getByTestId(id('section-traditional-more')));
+    expect(screen.getByTestId(id('section-traditional-15'))).toHaveTextContent(
+      /Upper \/ Lower \/ Full Body A \/ B/,
+    );
+    expect(screen.getByTestId(id('section-traditional-more'))).toHaveTextContent(/Show Less/);
+    fireEvent.press(screen.getByTestId(id('section-traditional-more')));
+    expect(screen.queryByTestId(id('section-traditional-4'))).toBeNull();
+  });
+
+  it('narrows to one frequency, and says when there is none', () => {
+    renderBrowser();
+    fireEvent.press(screen.getByTestId(id('days-2')));
+
+    expect(screen.getByTestId(id('section-traditional'))).toBeTruthy();
+    expect(screen.getByTestId(id('section-time-efficient'))).toBeTruthy();
+    expect(screen.queryByTestId(id('section-strength'))).toBeNull();
+    // The same four titles in both sections.
+    expect(screen.getByTestId(id('count'))).toHaveTextContent('4 of 133 splits');
+
+    fireEvent.press(screen.getByTestId(id('days-7')));
+    expect(screen.getByTestId(id('none'))).toHaveTextContent(/No 7-day splits yet/);
+    fireEvent.press(screen.getByTestId(id('clear-all')));
+    expect(screen.getByTestId(id('section-strength'))).toBeTruthy();
+  });
+
+  it('opens a title once its workouts are in, on the days chosen', () => {
+    mockPrograms = [WRITTEN_PPL];
+    renderBrowser();
+
+    expect(screen.getByTestId(id('section-traditional-0')).props.accessibilityLabel).toBe(
+      'Push / Pull / Legs. 3 or 6 days a week. Opens it.',
+    );
+    fireEvent.press(screen.getByTestId(id('section-traditional-0')));
+    expect(navigation.navigate).toHaveBeenLastCalledWith('ProgramDetail', {
+      programId: 'push-pull-legs',
+      variationId: '3-day',
+    });
+
+    fireEvent.press(screen.getByTestId(id('days-6')));
+    fireEvent.press(screen.getByTestId(id('section-traditional-0')));
+    expect(navigation.navigate).toHaveBeenLastCalledWith('ProgramDetail', {
+      programId: 'push-pull-legs',
+      variationId: '6-day',
+    });
+    // Its other variations aren't written: Glute-Focused PPL stays as it is.
+    fireEvent.press(screen.getByTestId(id('days-all')));
+    fireEvent.press(screen.getByTestId(id('section-glutes-lower-body-more')));
+    expect(screen.getByTestId(id('section-glutes-lower-body-15')).props.accessibilityLabel).toBe(
+      'Glute-Focused PPL. 3 or 6 days a week. Workouts coming soon.',
     );
   });
 
   it('opens on their own days a week, with what is recommended for them and why', () => {
     renderBrowser({ ...NO_PREFERENCES, daysPerWeek: 3, goals: ['build_muscle'] });
 
-    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
-    expect(screen.queryByTestId('workout-programs-browser-section-6')).toBeNull();
-    expect(screen.getByTestId('workout-programs-browser-recommended-test-split')).toHaveTextContent(
+    expect(screen.getByTestId(id('count'))).toHaveTextContent(/of 133 splits/);
+    expect(screen.queryByTestId(id('section-traditional-0'))).toHaveTextContent(
+      /Push \/ Pull \/ Legs/,
+    );
+    expect(screen.getByTestId(id('recommended-test-split'))).toHaveTextContent(
       /Test Split.*Fits your 3 days a week.*Built for muscle/,
     );
     // Browsing another frequency leaves the recommendations out.
-    fireEvent.press(screen.getByTestId('workout-programs-browser-days-all'));
-    expect(screen.getByTestId('workout-programs-browser-recommended')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('workout-programs-browser-days-6'));
-    expect(screen.queryByTestId('workout-programs-browser-recommended')).toBeNull();
+    fireEvent.press(screen.getByTestId(id('days-all')));
+    expect(screen.getByTestId(id('recommended'))).toBeTruthy();
+    fireEvent.press(screen.getByTestId(id('days-6')));
+    expect(screen.queryByTestId(id('recommended'))).toBeNull();
   });
 
-  it('applies the filters together, offering only choices some program has', () => {
+  it('applies the filters together, offering only choices some split has', () => {
     renderBrowser();
 
-    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-style'));
-    expect(screen.getByTestId('workout-programs-browser-option-strength')).toBeTruthy();
-    expect(screen.queryByTestId('workout-programs-browser-option-calisthenics')).toBeNull();
-    fireEvent.press(screen.getByTestId('workout-programs-browser-option-strength'));
-    expect(screen.getByTestId('workout-programs-browser-filter-style')).toHaveTextContent(
-      /Strength/,
+    fireEvent.press(screen.getByTestId(id('filter-style')));
+    fireEvent.press(screen.getByTestId(id('option-calisthenics')));
+    expect(screen.getByTestId(id('filter-style'))).toHaveTextContent(/Calisthenics/);
+    expect(screen.getByTestId(id('section-athletic-hybrid'))).toHaveTextContent(
+      /Calisthenics PPL.*Calisthenics Upper \/ Lower.*Calisthenics Full Body/,
     );
-    // The strength focus, on its 3-day schedule only.
-    expect(screen.getByTestId('workout-programs-browser-section-3')).toHaveTextContent(
-      /Strength Focus/,
-    );
-    expect(screen.queryByTestId('workout-programs-browser-section-6')).toBeNull();
+    expect(screen.queryByTestId(id('section-traditional'))).toBeNull();
+    expect(screen.getByTestId(id('count'))).toHaveTextContent('3 of 133 splits');
 
-    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-equipment'));
-    fireEvent.press(screen.getByTestId('workout-programs-browser-option-dumbbells'));
-    expect(screen.getByTestId('workout-programs-browser-none')).toHaveTextContent(
-      /No programs match/,
-    );
-
-    fireEvent.press(screen.getByTestId('workout-programs-browser-clear-all'));
-    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
-    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
+    fireEvent.press(screen.getByTestId(id('days-2')));
+    expect(screen.getByTestId(id('none'))).toHaveTextContent(/No splits match/);
+    fireEvent.press(screen.getByTestId(id('clear-all')));
+    expect(screen.getByTestId(id('section-traditional'))).toBeTruthy();
   });
 
-  it('filters by muscle focus and what a program leaves out, and clears them', () => {
+  it('filters by muscle focus and what a split leaves out, and clears them', () => {
     renderBrowser();
-    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-exclusion'));
-    fireEvent.press(screen.getByTestId('workout-programs-browser-option-chest'));
-    expect(screen.queryByTestId('workout-programs-browser-section-3')).toBeNull();
-    expect(screen.getByTestId('workout-programs-browser-section-4')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('workout-programs-browser-clear'));
-    fireEvent.press(screen.getByTestId('workout-programs-browser-filter-emphasis'));
-    fireEvent.press(screen.getByTestId('workout-programs-browser-option-balanced'));
-    expect(screen.getByTestId('workout-programs-browser-section-3')).toBeTruthy();
-    expect(screen.queryByTestId('workout-programs-browser-section-4')).toBeNull();
-  });
-
-  it('says programs are on their way while there are none', () => {
-    mockPrograms = [];
-    renderBrowser();
-
-    expect(screen.getByTestId('workout-programs-browser-empty')).toHaveTextContent(
-      /Programs are on their way/,
+    fireEvent.press(screen.getByTestId(id('filter-exclusion')));
+    fireEvent.press(screen.getByTestId(id('option-chest')));
+    expect(screen.queryByTestId(id('section-traditional'))).toBeNull();
+    expect(screen.getByTestId(id('section-upper-lower'))).toHaveTextContent(
+      /No Chest.*No Direct Chest or Glutes/,
     );
-    expect(screen.queryByTestId('workout-programs-browser-days')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(id('clear')));
+    fireEvent.press(screen.getByTestId(id('filter-emphasis')));
+    fireEvent.press(screen.getByTestId(id('option-core')));
+    expect(screen.getByTestId(id('section-muscle-specialization'))).toHaveTextContent(
+      /Core Specialization/,
+    );
+    expect(screen.queryByTestId(id('section-strength'))).toBeNull();
   });
 
   it('closes the sheet from its first page in onboarding', () => {

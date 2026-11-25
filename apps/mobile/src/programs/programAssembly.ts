@@ -1,7 +1,9 @@
 import type {
   CatalogProgram,
+  CatalogVariation,
   ProgramContent,
   ProgramVariation,
+  ResolvedVariation,
   VariationContent,
   WorkoutProgram,
 } from './programTypes';
@@ -13,6 +15,26 @@ export function isReadyContent(content: VariationContent | undefined): content i
     content.days.length > 0 &&
     content.days.every((day) => day.exercises.length > 0)
   );
+}
+
+/** A catalogue variation's whole profile: its program's, changed where the variation says so. */
+export function resolveVariation(
+  program: CatalogProgram,
+  variation: CatalogVariation,
+): ResolvedVariation {
+  return {
+    id: variation.id,
+    daysPerWeek: variation.daysPerWeek,
+    focus: variation.focus,
+    default: variation.default,
+    categories: variation.categories ?? program.profile.categories,
+    style: variation.style ?? program.profile.style,
+    goals: variation.goals ?? program.profile.goals,
+    levels: variation.levels ?? program.profile.levels ?? [],
+    equipment: variation.equipment ?? program.profile.equipment ?? 'full_gym',
+    emphasis: variation.emphasis ?? program.profile.emphasis ?? [],
+    excludes: variation.excludes ?? program.profile.excludes ?? [],
+  };
 }
 
 /**
@@ -35,22 +57,13 @@ export function assemblePrograms(
       if (!isReadyContent(made)) continue;
       const daysPerWeek = made.days.length;
       variations.push({
-        id: variation.id,
+        ...resolveVariation(program, variation),
         daysPerWeek,
         schedule: `${daysPerWeek}-Day`,
-        focus: variation.focus,
-        default: variation.default,
         scheduleNote: made.scheduleNote,
         focusNote: made.focusNote,
         note: made.note,
         sessionMinutes: made.sessionMinutes,
-        categories: variation.categories ?? program.profile.categories,
-        style: variation.style ?? program.profile.style,
-        goals: variation.goals ?? program.profile.goals,
-        levels: variation.levels ?? program.profile.levels ?? [],
-        equipment: variation.equipment ?? program.profile.equipment ?? 'full_gym',
-        emphasis: variation.emphasis ?? program.profile.emphasis ?? [],
-        excludes: variation.excludes ?? program.profile.excludes ?? [],
         days: made.days,
       });
     }

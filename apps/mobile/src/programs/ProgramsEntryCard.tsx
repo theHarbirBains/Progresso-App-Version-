@@ -6,11 +6,13 @@ import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useAppTheme } from '../theme/appThemeContext';
 import { WORKOUT_PROGRAMS } from './programCatalog';
+import { LIBRARY_SPLIT_COUNT, PROGRAM_LIBRARY, readySplitCount } from './programLibrary';
 
 /**
- * The way into Workout Programs, as one widget: an `award` glyph, "Workout Programs" and how
- * many there are (or that they're coming soon) -- or, once one's chosen in onboarding, which.
- * On Workout Splits, and on onboarding's split question.
+ * The way into the Split Library, as one widget: a `book-open` glyph, "Split Library", how many
+ * splits it has and how many are ready to use (or that their workouts are coming) -- or, once
+ * one's chosen in onboarding, which. On Workout Splits' My Splits, and on onboarding's split
+ * question.
  */
 export function ProgramsEntryCard({
   onPress,
@@ -27,23 +29,24 @@ export function ProgramsEntryCard({
   testID?: string;
 }) {
   const accent = useAppTheme().accent.accent;
-  const count = WORKOUT_PROGRAMS.length;
+  const ready = readySplitCount(WORKOUT_PROGRAMS);
+  const library = `${LIBRARY_SPLIT_COUNT} splits in ${PROGRAM_LIBRARY.length} categories`;
   const line = chosen
     ? `Chosen: ${chosen}`
-    : count > 0
-      ? `${count} ready-made ${count === 1 ? 'program' : 'programs'}, every workout planned`
-      : 'Coming soon: ready-made programs with every workout planned';
+    : ready > 0
+      ? `${library}, ${ready} ready to use`
+      : `${library}. Workouts coming soon.`;
   return (
     <AppCard
       hero={hero}
       testID={testID}
       onPress={onPress}
-      accessibilityLabel={`Workout Programs. ${line}`}
+      accessibilityLabel={`Split Library. ${line}`}
     >
       <View style={styles.row}>
-        <GlyphWell icon="award" accentColor={accent} size={44} />
+        <GlyphWell icon="book-open" accentColor={accent} size={44} />
         <View style={styles.text}>
-          <Text style={styles.title}>Workout Programs</Text>
+          <Text style={styles.title}>Split Library</Text>
           <Text style={styles.line}>{line}</Text>
         </View>
         <Feather

@@ -53,6 +53,7 @@ jest.mock('../lib/legalLinks', () => ({ openLegalPage: jest.fn() }));
 jest.mock('../programs/programActivation', () => ({ activateProgram: jest.fn() }));
 // A made-up program in place of the catalogue, which is empty until the programs are written.
 jest.mock('../programs/programCatalog', () => ({
+  PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   WORKOUT_PROGRAMS: [jest.requireActual('../programs/__fixtures__/programs').TEST_PROGRAM],
 }));
 
@@ -1117,12 +1118,12 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
   it('chooses a workout program in a sheet of its own, made their split with the account', async () => {
     await startAt('workoutSplit', { selectedSplitPresetId: null, skippedSplit: false });
     expect(await screen.findByTestId('onboarding-programs-open')).toHaveTextContent(
-      /Workout Programs.*1 ready-made program/,
+      /Split Library.*133 splits in 9 categories/,
     );
 
     fireEvent.press(screen.getByTestId('onboarding-programs-open'));
-    // The sheet opens on the programs, by days a week.
-    fireEvent.press(await screen.findByTestId('workout-programs-browser-card-3-test-split'));
+    // The sheet opens on the Split Library, with what's recommended for them first.
+    fireEvent.press(await screen.findByTestId('workout-programs-browser-recommended-test-split'));
     await act(async () => {
       fireEvent.press(await screen.findByTestId('program-detail-use'));
     });

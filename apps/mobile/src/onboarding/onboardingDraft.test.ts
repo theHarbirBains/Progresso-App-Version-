@@ -38,6 +38,7 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
 jest.mock('../programs/programActivation', () => ({ activateProgram: jest.fn() }));
 // A made-up program in place of the catalogue, which is empty until the programs are written.
 jest.mock('../programs/programCatalog', () => ({
+  PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   WORKOUT_PROGRAMS: [jest.requireActual('../programs/__fixtures__/programs').TEST_PROGRAM],
 }));
 

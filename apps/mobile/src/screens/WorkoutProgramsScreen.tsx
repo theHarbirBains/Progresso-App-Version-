@@ -7,10 +7,10 @@ import { useProgramHost } from '../programs/programHost';
 type Props = RootStackScreenProps<'WorkoutPrograms'>;
 
 /**
- * Workout Programs on a page of their own: the programs browser (programs/ProgramBrowser.tsx) --
- * days a week, filters, Recommended for You and every program by days a week. The first page of
- * onboarding's programs sheet (its `x` closes it); in the app the same browser is Workout Splits'
- * Programs tab, and this page is only reached by a link.
+ * The Split Library on a page of its own (programs/ProgramBrowser.tsx) -- days a week, filters,
+ * Recommended for You and the library's sections. The first page of onboarding's programs sheet
+ * (its `x` closes it); in the app the same browser is Workout Splits' Split Library tab, and this
+ * page is only reached by a link.
  */
 export function WorkoutProgramsScreen({ navigation }: Props) {
   const host = useProgramHost();
@@ -20,7 +20,7 @@ export function WorkoutProgramsScreen({ navigation }: Props) {
       testID="workout-programs"
       header={
         <AppHeader
-          title="Workout Programs"
+          title="Split Library"
           onBack={host.mode === 'app' ? () => navigation.goBack() : undefined}
           leftAction={
             host.mode === 'onboarding' && host.close

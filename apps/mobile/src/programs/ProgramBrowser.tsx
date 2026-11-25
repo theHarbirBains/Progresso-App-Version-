@@ -1,9 +1,11 @@
 import { Feather } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppCard } from '../design/AppCard';
 import { BottomSheet } from '../design/BottomSheet';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
+import { GlyphWell } from '../design/GlyphWell';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -13,12 +15,24 @@ import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
 import { WORKOUT_PROGRAMS } from './programCatalog';
 import type { ProgramChoice } from './programHost';
+import {
+  daysText,
+  entryChoice,
+  entryDays,
+  entryVariations,
+  LIBRARY_FREQUENCIES,
+  LIBRARY_SPLIT_COUNT,
+  librarySections,
+  PROGRAM_LIBRARY,
+  readySplitCount,
+  splitTitle,
+  type LibraryEntry,
+  type LibrarySection,
+} from './programLibrary';
 import { ProgramCard } from './ProgramParts';
 import {
   EQUIPMENT_ACCESS_OPTIONS,
   filtersSet,
-  frequencyChoices,
-  frequencySections,
   GOAL_CHOICES,
   NO_FILTERS,
   PRIORITY_AREAS,
@@ -32,10 +46,12 @@ import {
   variationMatches,
   type ProgramFilters,
 } from './programs';
+import type { ResolvedVariation } from './programTypes';
 import { recommendPrograms, type ProgramPreferences } from './recommendations';
-import type { WorkoutProgram } from './programTypes';
 
 const PILL_HEIGHT = minTouchTarget - 8;
+/** A section shows this many titles until Show All; one with a title more shows them all. */
+const COLLAPSED_ROWS = 4;
 
 type FilterKey = Exclude<keyof ProgramFilters, 'daysPerWeek'>;
 type Days = 'all' | `${number}`;
@@ -64,11 +80,25 @@ const FILTER_ORDER: readonly FilterKey[] = [
   'exclusion',
 ];
 
-/** A filter's choices, each only where some program has it -- never one that finds nothing. */
-function choicesFor(key: FilterKey, programs: readonly WorkoutProgram[]): Choice[] {
-  const variations = programs.flatMap((program) => program.variations);
+// Every variation the library lists, each once, with its whole profile -- what the filters read.
+const LIBRARY_VARIATIONS: readonly ResolvedVariation[] = (() => {
+  const seen = new Map<string, ResolvedVariation>();
+  for (const section of PROGRAM_LIBRARY) {
+    for (const entry of section.entries) {
+      for (const variation of entryVariations(entry)) {
+        seen.set(`${entry.program}/${variation.id}`, variation);
+      }
+    }
+  }
+  return [...seen.values()];
+})();
+
+/** A filter's choices, each only where some split has it -- never one that finds nothing. */
+function choicesFor(key: FilterKey): Choice[] {
   const finds = (patch: Partial<ProgramFilters>) =>
-    variations.some((variation) => variationMatches(variation, { ...NO_FILTERS, ...patch }));
+    LIBRARY_VARIATIONS.some((variation) =>
+      variationMatches(variation, { ...NO_FILTERS, ...patch }),
+    );
   switch (key) {
     case 'level':
       return PROGRAM_LEVELS.filter((level) => finds({ level })).map((level) => ({
@@ -141,6 +171,171 @@ function FilterPill({
   );
 }
 
+/** A title's days a week as small rings ("3", "6"), the one chosen above filled in the accent. */
+function DayMarks({ days, chosen }: { days: readonly number[]; chosen: number | null }) {
+  const { accent } = useAppTheme();
+  return (
+    <View
+      style={styles.dayMarks}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+    >
+      {days.map((count) => {
+        const on = count === chosen;
+        return (
+          <View
+            key={count}
+            style={[
+              styles.dayMark,
+              on && { backgroundColor: accent.accent, borderColor: accent.accent },
+            ]}
+          >
+            <Text style={[styles.dayMarkText, on && { color: accent.onAccent }]}>{count}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** One title: its name, the words in brackets after it in the accent, its days a week -- and a
+ * chevron once it can be opened. */
+function SplitRow({
+  entry,
+  daysPerWeek,
+  choice,
+  chosen,
+  divider,
+  onOpen,
+  testID,
+}: {
+  entry: LibraryEntry;
+  daysPerWeek: number | null;
+  choice: ProgramChoice | null;
+  chosen: boolean;
+  divider: boolean;
+  onOpen: (choice: ProgramChoice) => void;
+  testID: string;
+}) {
+  const { accent } = useAppTheme();
+  const { name, detail } = splitTitle(entry.title);
+  const days = entryDays(entry);
+  const label = `${entry.title}. ${daysText(days)} a week. ${
+    choice ? (chosen ? 'Chosen.' : 'Opens it.') : 'Workouts coming soon.'
+  }`;
+  const body = (
+    <>
+      <View style={styles.rowWords}>
+        <Text style={styles.rowName}>{name}</Text>
+        {detail ? <Text style={[styles.rowDetail, { color: accent.accent }]}>{detail}</Text> : null}
+      </View>
+      <DayMarks days={days} chosen={daysPerWeek} />
+      {choice ? (
+        <Feather
+          name={chosen ? 'check-circle' : 'chevron-right'}
+          size={chosen ? 20 : 18}
+          color={chosen ? accent.accent : colors.textMuted}
+        />
+      ) : null}
+    </>
+  );
+  const style = [styles.row, divider && styles.rowDivider];
+  return choice ? (
+    <TouchableOpacity
+      testID={testID}
+      style={style}
+      onPress={() => onOpen(choice)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {body}
+    </TouchableOpacity>
+  ) : (
+    <View testID={testID} style={style} accessible accessibilityLabel={label}>
+      {body}
+    </View>
+  );
+}
+
+/** One of the library's sections: its glyph, title and line, then its titles in one widget --
+ * the first few, and the rest behind Show All. */
+function LibrarySectionBlock({
+  section,
+  entries,
+  daysPerWeek,
+  expanded,
+  onToggle,
+  isChosen,
+  onOpen,
+  testID,
+}: {
+  section: LibrarySection;
+  entries: LibraryEntry[];
+  daysPerWeek: number | null;
+  expanded: boolean;
+  onToggle: () => void;
+  isChosen: (choice: ProgramChoice | null) => boolean;
+  onOpen: (choice: ProgramChoice) => void;
+  testID: string;
+}) {
+  const { accent } = useAppTheme();
+  const folds = entries.length > COLLAPSED_ROWS + 1;
+  const shown = folds && !expanded ? entries.slice(0, COLLAPSED_ROWS) : entries;
+  return (
+    <View style={styles.section} testID={testID}>
+      <View style={styles.sectionHead} accessibilityRole="header">
+        <GlyphWell icon={section.icon} accentColor={accent.accent} />
+        <View style={styles.sectionWords}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <Text style={styles.sectionBlurb}>{section.blurb}</Text>
+        </View>
+        <Text style={styles.sectionCount} accessibilityLabel={`${entries.length} splits`}>
+          {entries.length}
+        </Text>
+      </View>
+      <AppCard style={styles.listCard}>
+        {shown.map((entry, i) => {
+          const choice = entryChoice(entry, WORKOUT_PROGRAMS, daysPerWeek);
+          return (
+            <SplitRow
+              key={entry.title}
+              testID={`${testID}-${i}`}
+              entry={entry}
+              daysPerWeek={daysPerWeek}
+              choice={choice}
+              chosen={isChosen(choice)}
+              divider={i > 0}
+              onOpen={onOpen}
+            />
+          );
+        })}
+        {folds ? (
+          <TouchableOpacity
+            testID={`${testID}-more`}
+            style={[styles.row, styles.rowDivider, styles.moreRow]}
+            onPress={onToggle}
+            accessibilityRole="button"
+            accessibilityLabel={
+              expanded
+                ? `Show fewer ${section.title}`
+                : `Show all ${entries.length} ${section.title}`
+            }
+          >
+            <Text style={[styles.moreText, { color: accent.accent }]}>
+              {expanded ? 'Show Less' : `Show All ${entries.length}`}
+            </Text>
+            <Feather
+              name={expanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={accent.accent}
+            />
+          </TouchableOpacity>
+        ) : null}
+      </AppCard>
+    </View>
+  );
+}
+
 interface Props {
   /** Opens a program, on a variation of it. */
   onOpen: (choice: ProgramChoice) => void;
@@ -148,65 +343,85 @@ interface Props {
   preferences: ProgramPreferences;
   /** The one chosen already (onboarding), to tick. */
   chosen: ProgramChoice | null;
+  /** Where Recommended for You goes while there's nothing to recommend (Workout Splits' way to
+   * Workout Preferences). */
+  recommendationsPrompt?: ReactNode;
   testID?: string;
 }
 
 /**
- * Every workout program, to browse: how many days a week across the top (every frequency some
- * program has, then All -- opening on the person's own days where there are programs for them),
- * compact filters under it (experience, goal, muscle focus, style, equipment, what's left out),
- * all applying together, then Recommended for You from what they've told us and the programs
- * by days a week ("3 Days Per Week"). Until the first programs are written, it says they're on
- * their way. Workout Splits' Programs tab and onboarding's programs sheet.
+ * The Workout Split Library (programs/programLibrary.ts), to browse: a line on what's in it, how
+ * many days a week across the top (2 to 7, then All -- opening on the person's own days), compact
+ * filters under it (experience, goal, muscle focus, style, equipment, what's left out), all
+ * applying together, then Recommended for You from what they've told us, then the library's
+ * sections in Harbir's order -- each its titles in one widget, a few at a time, each title's days
+ * a week beside it. A title opens its program once its workouts are in. Workout Splits' Programs
+ * tab and onboarding's programs sheet.
  */
-export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-browser' }: Props) {
+export function ProgramBrowser({
+  onOpen,
+  preferences,
+  chosen,
+  recommendationsPrompt,
+  testID = 'program-browser',
+}: Props) {
   const { accent } = useAppTheme();
   const programs = WORKOUT_PROGRAMS;
-  const frequencies = useMemo(() => frequencyChoices(programs), [programs]);
   const ownDays = preferences.daysPerWeek !== null ? Math.max(2, preferences.daysPerWeek) : null;
-  const [days, setDays] = useState<Days>(
-    ownDays !== null && frequencies.includes(ownDays) ? `${ownDays}` : 'all',
+  const [days, setDays] = useState<Days>(() =>
+    ownDays !== null &&
+    LIBRARY_FREQUENCIES.includes(ownDays) &&
+    librarySections({ ...NO_FILTERS, daysPerWeek: ownDays }).length > 0
+      ? `${ownDays}`
+      : 'all',
   );
   const [filters, setFilters] = useState<ProgramFilters>(NO_FILTERS);
   const [sheet, setSheet] = useState<FilterKey | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   const recommendations = useMemo(
     () => recommendPrograms(programs, preferences),
     [programs, preferences],
   );
 
-  if (programs.length === 0) {
-    return (
-      <EmptyState
-        testID={`${testID}-empty`}
-        title="Programs are on their way"
-        description="Progresso's workout programs are being written, every workout planned. Until then, start from a ready-made split or build your own."
-      />
-    );
-  }
-
   const daysPerWeek = days === 'all' ? null : Number(days);
   const applied: ProgramFilters = { ...filters, daysPerWeek };
-  const sections = frequencySections(programs, applied);
+  const sections = librarySections(applied);
   const extra = filtersSet(filters);
   const showRecommended =
     recommendations.length > 0 && extra === 0 && (daysPerWeek === null || daysPerWeek === ownDays);
-  const shownCount = new Set(
-    sections.flatMap((section) => section.entries.map((entry) => entry.program.id)),
-  ).size;
+  const shownCount = new Set(sections.flatMap((shown) => shown.entries.map((entry) => entry.title)))
+    .size;
+  const allReady = readySplitCount(programs) === LIBRARY_SPLIT_COUNT;
 
   function choose(key: FilterKey, value: string | null) {
     setFilters((current) => ({ ...current, [key]: value }));
     setSheet(null);
   }
 
-  const isChosen = (programId: string, variationId: string) =>
-    chosen?.programId === programId && chosen.variationId === variationId;
+  function toggle(sectionId: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  }
 
-  const sheetChoices = sheet ? choicesFor(sheet, programs) : [];
+  const isChosen = (choice: ProgramChoice | null) =>
+    choice !== null &&
+    chosen?.programId === choice.programId &&
+    chosen.variationId === choice.variationId;
+
+  const sheetChoices = sheet ? choicesFor(sheet) : [];
 
   return (
     <View testID={testID} style={styles.browser}>
+      <Text testID={`${testID}-intro`} style={styles.intro}>
+        {`${LIBRARY_SPLIT_COUNT} splits in ${PROGRAM_LIBRARY.length} categories.`}
+        {allReady ? '' : ' Each one opens here once its workouts are in.'}
+      </Text>
+
       {/* How many days a week: the first thing to choose. */}
       <View style={styles.days}>
         <Text style={styles.kicker}>DAYS PER WEEK</Text>
@@ -214,12 +429,12 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
           testID={`${testID}-days`}
           stretch
           options={[
-            ...frequencies.map((count) => ({
+            ...LIBRARY_FREQUENCIES.map((count) => ({
               value: `${count}` as Days,
               label: String(count),
               accessibilityLabel: `${count} days a week`,
             })),
-            { value: 'all', label: 'All', accessibilityLabel: 'Any days a week' },
+            { value: 'all', label: 'All', accessibilityLabel: 'All frequencies' },
           ]}
           value={days}
           onChange={setDays}
@@ -234,7 +449,7 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
           const label =
             value === null
               ? FILTER_TITLES[key].pill
-              : (choicesFor(key, programs).find((choice) => choice.value === value)?.label ??
+              : (choicesFor(key).find((choice) => choice.value === value)?.label ??
                 FILTER_TITLES[key].pill);
           return (
             <FilterPill
@@ -256,7 +471,7 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
       </View>
 
       {showRecommended ? (
-        <View style={styles.section} testID={`${testID}-recommended`}>
+        <View style={styles.recommended} testID={`${testID}-recommended`}>
           <SectionHeader label="Recommended for You" />
           {recommendations.map((recommendation) => (
             <ProgramCard
@@ -265,7 +480,10 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
               program={recommendation.program}
               variation={recommendation.variation}
               reasons={recommendation.reasons}
-              chosen={isChosen(recommendation.program.id, recommendation.variation.id)}
+              chosen={isChosen({
+                programId: recommendation.program.id,
+                variationId: recommendation.variation.id,
+              })}
               onPress={() =>
                 onOpen({
                   programId: recommendation.program.id,
@@ -275,15 +493,23 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
             />
           ))}
         </View>
-      ) : null}
+      ) : (
+        (recommendationsPrompt ?? null)
+      )}
 
       {sections.length === 0 ? (
         <EmptyState
           testID={`${testID}-none`}
-          title="No programs match"
-          description="Try another day count or fewer filters."
+          title={
+            daysPerWeek !== null && extra === 0
+              ? `No ${daysPerWeek}-day splits yet`
+              : 'No splits match'
+          }
+          description={
+            extra === 0 ? 'Try another day count.' : 'Try another day count or fewer filters.'
+          }
           action={{
-            label: 'Clear Filters',
+            label: extra === 0 ? 'Show All' : 'Clear Filters',
             onPress: () => {
               setFilters(NO_FILTERS);
               setDays('all');
@@ -292,32 +518,24 @@ export function ProgramBrowser({ onOpen, preferences, chosen, testID = 'program-
           }}
         />
       ) : (
-        sections.map((section) => (
-          <View
-            key={section.daysPerWeek}
-            style={styles.section}
-            testID={`${testID}-section-${section.daysPerWeek}`}
-          >
-            <SectionHeader
-              label={`${section.daysPerWeek} ${section.daysPerWeek === 1 ? 'Day' : 'Days'} Per Week`}
-            />
-            {section.entries.map(({ program, variation }) => (
-              <ProgramCard
-                key={program.id}
-                testID={`${testID}-card-${section.daysPerWeek}-${program.id}`}
-                program={program}
-                variation={variation}
-                chosen={isChosen(program.id, variation.id)}
-                onPress={() => onOpen({ programId: program.id, variationId: variation.id })}
-              />
-            ))}
-          </View>
+        sections.map(({ section, entries }) => (
+          <LibrarySectionBlock
+            key={section.id}
+            testID={`${testID}-section-${section.id}`}
+            section={section}
+            entries={entries}
+            daysPerWeek={daysPerWeek}
+            expanded={expanded.has(section.id)}
+            onToggle={() => toggle(section.id)}
+            isChosen={isChosen}
+            onOpen={onOpen}
+          />
         ))
       )}
 
-      {extra > 0 || daysPerWeek !== null ? (
+      {sections.length > 0 && (extra > 0 || daysPerWeek !== null) ? (
         <Text testID={`${testID}-count`} style={styles.count}>
-          {shownCount} of {programs.length} {programs.length === 1 ? 'program' : 'programs'}
+          {shownCount} of {LIBRARY_SPLIT_COUNT} splits
         </Text>
       ) : null}
 
@@ -355,6 +573,10 @@ const styles = StyleSheet.create({
   browser: {
     gap: spacing.lg,
   },
+  intro: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
   days: {
     gap: spacing.sm,
   },
@@ -384,8 +606,90 @@ const styles = StyleSheet.create({
     ...typeScale.label,
     color: colors.textSecondaryBright,
   },
+  recommended: {
+    gap: spacing.sm,
+  },
   section: {
     gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionWords: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  sectionTitle: {
+    ...typeScale.cardTitle,
+    fontFamily: fonts.displayHeavy,
+    color: colors.textPrimary,
+  },
+  sectionBlurb: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  sectionCount: {
+    ...typeScale.statSmall,
+    color: colors.textMuted,
+  },
+  listCard: {
+    paddingVertical: spacing.xs,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: minTouchTarget + 8,
+    paddingVertical: spacing.sm,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  rowWords: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  rowName: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  rowDetail: {
+    ...typeScale.label,
+  },
+  dayMarks: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  dayMark: {
+    width: 24,
+    height: 24,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.glassBorderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayMarkText: {
+    ...typeScale.caption,
+    fontFamily: fonts.monoBold,
+    color: colors.textSecondaryBright,
+  },
+  moreRow: {
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: minTouchTarget,
+  },
+  moreText: {
+    ...typeScale.label,
+    fontFamily: fonts.semibold,
   },
   count: {
     ...typeScale.caption,

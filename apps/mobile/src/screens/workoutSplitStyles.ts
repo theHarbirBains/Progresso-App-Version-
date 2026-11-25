@@ -61,6 +61,19 @@ export const workoutSplitStyles = StyleSheet.create({
   presetsSectionWrap: {
     paddingHorizontal: 6,
   },
+  // A heading after a widget: more room above it than between widgets, so each part of the page
+  // (the active split, the rest, finding one) reads as its own.
+  sectionGap: {
+    marginTop: spacing.lg,
+  },
+  // Create Workout Split, a little apart from the last split above it.
+  createWrap: {
+    marginTop: spacing.sm,
+  },
+  // The Split Library tab starts a little below the tabs, as My Splits' first heading does.
+  libraryTab: {
+    marginTop: spacing.sm,
+  },
 
   // ---- Split view (read-only) ----------------------------------------------
   dayName: {

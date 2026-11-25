@@ -143,12 +143,21 @@ export interface WorkoutProgram {
 
 // ---- The catalogue: what each program and variation is -----------------------------------------
 
-/** A variation in the catalogue: its days a week where known, its focus, and how it differs from
- * its program's profile. */
+/** A variation in the catalogue: its days a week, its focus, and how it differs from its
+ * program's profile. */
 export interface CatalogVariation extends Partial<VariationProfile> {
   id: string;
-  /** Days a week, where the catalogue names it; else its content's days decide. */
-  daysPerWeek?: number;
+  /** Days a week, as the library names it; its content must have this many days. */
+  daysPerWeek: number;
+  focus?: string;
+  default?: boolean;
+}
+
+/** A catalogue variation with its whole profile worked out (its program's, changed where it says
+ * so) -- what the library's filters read before anything is written. */
+export interface ResolvedVariation extends VariationProfile {
+  id: string;
+  daysPerWeek: number;
   focus?: string;
   default?: boolean;
 }

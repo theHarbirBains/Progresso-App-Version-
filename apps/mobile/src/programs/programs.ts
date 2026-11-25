@@ -24,6 +24,7 @@ import type {
   ProgramVariation,
   TrainingExclusion,
   TrainingStyle,
+  VariationProfile,
   WorkoutProgram,
 } from './programTypes';
 
@@ -406,8 +407,12 @@ export function filtersSet(filters: ProgramFilters): number {
   ].filter((value) => value !== null).length;
 }
 
-/** Whether one variation fits every filter set. */
-export function variationMatches(variation: ProgramVariation, filters: ProgramFilters): boolean {
+/** Whether one variation fits every filter set -- a ready one, or a catalogue variation before
+ * it's written (programLibrary.ts). */
+export function variationMatches(
+  variation: Pick<ProgramVariation, keyof VariationProfile | 'daysPerWeek'>,
+  filters: ProgramFilters,
+): boolean {
   if (filters.daysPerWeek !== null && variation.daysPerWeek !== filters.daysPerWeek) return false;
   if (filters.level && variation.levels.length > 0 && !variation.levels.includes(filters.level)) {
     return false;
@@ -437,40 +442,6 @@ export function matchingVariations(
 
 export function matchesFilters(program: WorkoutProgram, filters: ProgramFilters): boolean {
   return matchingVariations(program, filters).length > 0;
-}
-
-/** The days-a-week a filter can pick: every variation's in the catalogue, fewest first. */
-export function frequencyChoices(programs: readonly WorkoutProgram[]): number[] {
-  return [...new Set(programs.flatMap((p) => p.variations.map((v) => v.daysPerWeek)))].sort(
-    (a, b) => a - b,
-  );
-}
-
-/** A program as a list shows it: on the variation that fits best there. */
-export interface ProgramEntry {
-  program: WorkoutProgram;
-  variation: ProgramVariation;
-}
-
-/**
- * The library by days a week ("3 Days Per Week"): each section every program with a variation
- * that fits the filters at that many days, on that variation -- so a program with 3- and 6-day
- * versions is in both. With days a week set, only its section.
- */
-export function frequencySections(
-  programs: readonly WorkoutProgram[],
-  filters: ProgramFilters,
-): { daysPerWeek: number; entries: ProgramEntry[] }[] {
-  const days = filters.daysPerWeek !== null ? [filters.daysPerWeek] : frequencyChoices(programs);
-  return days
-    .map((daysPerWeek) => ({
-      daysPerWeek,
-      entries: programs.flatMap((program) => {
-        const variation = matchingVariations(program, { ...filters, daysPerWeek })[0];
-        return variation ? [{ program, variation }] : [];
-      }),
-    }))
-    .filter((section) => section.entries.length > 0);
 }
 
 /** The goals a filter can pick, in onboarding's order, with their names. */
@@ -587,14 +558,13 @@ export function catalogProblems(
       if (!ID_PATTERN.test(variation.id)) where(`${at}: id must be lowercase words joined by -`);
       if (variationIds.has(variation.id)) where(`${at} is listed twice`);
       variationIds.add(variation.id);
-      const kind = `${variation.daysPerWeek ?? '?'}|${variation.focus ?? ''}`;
+      const kind = `${variation.daysPerWeek}|${variation.focus ?? ''}`;
       if (kinds.has(kind)) where(`${at} repeats another variation's days and focus`);
       kinds.add(kind);
       if (
-        variation.daysPerWeek !== undefined &&
-        (!Number.isInteger(variation.daysPerWeek) ||
-          variation.daysPerWeek < 1 ||
-          variation.daysPerWeek > 7)
+        !Number.isInteger(variation.daysPerWeek) ||
+        variation.daysPerWeek < 1 ||
+        variation.daysPerWeek > 7
       ) {
         where(`${at}: days a week must be 1 to 7`);
       }
@@ -603,11 +573,7 @@ export function catalogProblems(
       if (made.days.length > 0 && !isReadyContent(made)) {
         where(`${at} has a day with no exercises, so it isn't shown`);
       }
-      if (
-        isReadyContent(made) &&
-        variation.daysPerWeek !== undefined &&
-        made.days.length !== variation.daysPerWeek
-      ) {
+      if (isReadyContent(made) && made.days.length !== variation.daysPerWeek) {
         where(
           `${at} is ${variation.daysPerWeek} days a week, but its content has ${made.days.length} days`,
         );
