@@ -244,6 +244,21 @@ export interface FriendWorkout {
   cardio?: (CardioValues & { id: string; afterStrength: boolean })[];
   /** When its strength part ended, for cardio after it. */
   strengthEndedAt?: string | null;
+  /** The group workout it was part of (absent from an API from before, null when it wasn't
+   * one): everyone who trained in it, each with their workout's id only where you may open it. */
+  group?: FriendWorkoutGroup | null;
+}
+
+export interface FriendWorkoutGroup {
+  id: string;
+  name: string;
+  participants: {
+    user: FollowUser;
+    /** The workout this is. */
+    isAuthor: boolean;
+    canSeeWorkout: boolean;
+    workoutId: string | null;
+  }[];
 }
 
 export function getFriendWorkout(accessToken: string, workoutId: string): Promise<FriendWorkout> {

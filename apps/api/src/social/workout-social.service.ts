@@ -8,7 +8,7 @@ import { FollowsService, type FollowUserSummary } from '../follows/follows.servi
 import { SocialPushService } from '../notifications/social-push.service';
 import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
-import { canSeeActivity, relationshipWith } from './relationship';
+import { canSeeActivity, relationshipsWith, relationshipWith } from './relationship';
 import {
   CARDIO_COLUMNS,
   toWorkoutCardio,
@@ -29,6 +29,7 @@ interface WorkoutRow {
   deleted_at: string | null;
   logged_by: string | null;
   strength_ended_at?: string | null;
+  group_id?: string | null;
 }
 
 export interface WorkoutSet {
@@ -43,6 +44,30 @@ export interface WorkoutSet {
   isWarmup: boolean;
   /** A drop set: part of the working set before it, shown under it. */
   isDrop: boolean;
+}
+
+/**
+ * One person who trained in a group workout, as someone else sees them: always who they are --
+ * the group's record is never changed by who's looking -- and their workout's id only when the
+ * viewer may open it (GET /workouts/:id checks again): it's their own, they follow them
+ * (accepted), the profile is public, or the viewer trained in the group too. Otherwise null, and
+ * nothing of what they did is in the answer.
+ */
+export interface GroupParticipant {
+  user: FollowUserSummary;
+  /** The workout this answer is. */
+  isAuthor: boolean;
+  /** Whether the viewer may see what they did. */
+  canSeeWorkout: boolean;
+  workoutId: string | null;
+}
+
+export interface WorkoutGroupForViewer {
+  id: string;
+  name: string;
+  /** Everyone who trained in it -- the workout's author first -- leaving out anyone blocked
+   * either way, and anyone with nothing logged. */
+  participants: GroupParticipant[];
 }
 
 /** Someone else's workout, as the app shows it read-only: what they logged, and on what. */
@@ -70,6 +95,8 @@ export interface WorkoutForViewer {
   cardio: WorkoutCardio[];
   /** When its strength part ended, for cardio after it. */
   strengthEndedAt: string | null;
+  /** The group workout it was part of, or null when it wasn't one. */
+  group: WorkoutGroupForViewer | null;
 }
 
 export interface WorkoutComment {
@@ -118,7 +145,8 @@ export class WorkoutSocialService {
   ) {}
 
   async getWorkout(viewerId: string, workoutId: string): Promise<WorkoutForViewer> {
-    const workout = await this.visibleWorkout(viewerId, workoutId);
+    // Reading a workout, someone who trained in the same group may open it too.
+    const workout = await this.visibleWorkout(viewerId, workoutId, { groupmates: true });
     const client = this.supabaseService.getClient();
     const { data: cardioRows, error: cardioError } = await client
       .from('workout_cardio')
@@ -215,7 +243,83 @@ export class WorkoutSocialService {
       })),
       cardio: ((cardioRows ?? []) as CardioRow[]).map(toWorkoutCardio),
       strengthEndedAt: workout.strength_ended_at ?? null,
+      group: workout.group_id ? await this.groupFor(viewerId, workout) : null,
     };
+  }
+
+  /**
+   * The group a workout was part of, as this viewer may see it: everyone who trained in it, by
+   * name and photo, each with their workout's id only where canSeeActivity allows it -- or the
+   * viewer trained in it too (the people in a group see its workouts). Nobody is dropped or
+   * changed for not being followed; only someone blocked either way is left out.
+   */
+  private async groupFor(
+    viewerId: string,
+    workout: WorkoutRow,
+  ): Promise<WorkoutGroupForViewer | null> {
+    const client = this.supabaseService.getClient();
+    const groupId = workout.group_id as string;
+    const [group, workouts] = await Promise.all([
+      client.from('workout_groups').select('id, name').eq('id', groupId).maybeSingle(),
+      client
+        .from('workouts')
+        .select('id, user_id, created_at')
+        .eq('group_id', groupId)
+        .is('deleted_at', null)
+        .not('completed_at', 'is', null)
+        .order('created_at', { ascending: true }),
+    ]);
+    if (group.error || workouts.error) {
+      throw new InternalServerErrorException('Failed to load the group workout');
+    }
+    if (!group.data) return null;
+    const rows = (workouts.data ?? []) as { id: string; user_id: string }[];
+    const ids = rows.map((row) => row.id);
+    // Only someone who did something: a finished set, or cardio (a trainer who only coached has
+    // neither).
+    const [sets, cardio] = await Promise.all([
+      client
+        .from('sets')
+        .select('id, workout_exercises!inner(workout_id)')
+        .in('workout_exercises.workout_id', ids)
+        .is('deleted_at', null)
+        .not('completed_at', 'is', null),
+      client.from('workout_cardio').select('workout_id').in('workout_id', ids),
+    ]);
+    if (sets.error || cardio.error) {
+      throw new InternalServerErrorException('Failed to load the group workout');
+    }
+    const active = new Set<string>([
+      ...((sets.data ?? []) as unknown as { workout_exercises: { workout_id: string } | null }[])
+        .map((row) => row.workout_exercises?.workout_id)
+        .filter((id): id is string => typeof id === 'string'),
+      ...((cardio.data ?? []) as { workout_id: string }[]).map((row) => row.workout_id),
+    ]);
+    const trained = rows.filter((row) => row.id === workout.id || active.has(row.id));
+    const viewerTrainedHere = trained.some((row) => row.user_id === viewerId);
+    const relationships = await relationshipsWith(
+      client,
+      viewerId,
+      trained.map((row) => row.user_id),
+    );
+    const summaries = await this.followsService.getUserSummaries(trained.map((row) => row.user_id));
+    const participants = trained
+      .filter((row) => relationships.has(row.user_id))
+      .map((row): GroupParticipant => {
+        const canSee =
+          row.id === workout.id ||
+          viewerTrainedHere ||
+          canSeeActivity(relationships.get(row.user_id)!);
+        return {
+          user: summaries.get(row.user_id) ?? unknownUser(row.user_id),
+          isAuthor: row.id === workout.id,
+          canSeeWorkout: canSee,
+          workoutId: canSee ? row.id : null,
+        };
+      })
+      .sort((a, b) => Number(b.isAuthor) - Number(a.isAuthor));
+    const name = (group.data as { name: string }).name;
+    return { id: groupId, name, participants };
   }
 
   async getSocial(viewerId: string, workoutId: string): Promise<WorkoutSocial> {
@@ -399,13 +503,21 @@ export class WorkoutSocialService {
     if (deleteError) throw new InternalServerErrorException('Failed to delete the comment');
   }
 
-  /** The workout, when the viewer can see it; otherwise not found. */
-  private async visibleWorkout(viewerId: string, workoutId: string): Promise<WorkoutRow> {
+  /**
+   * The workout, when the viewer can see it; otherwise not found. To read it (`groupmates`),
+   * someone who trained in the same group workout may too -- liking and commenting stay with the
+   * owner's followers.
+   */
+  private async visibleWorkout(
+    viewerId: string,
+    workoutId: string,
+    { groupmates = false }: { groupmates?: boolean } = {},
+  ): Promise<WorkoutRow> {
     const client = this.supabaseService.getClient();
     const { data, error } = await client
       .from('workouts')
       .select(
-        'id, user_id, name, performed_at, completed_at, deleted_at, logged_by, strength_ended_at',
+        'id, user_id, name, performed_at, completed_at, deleted_at, logged_by, strength_ended_at, group_id',
       )
       .eq('id', workoutId)
       .maybeSingle();
@@ -416,9 +528,25 @@ export class WorkoutSocialService {
     }
     if (workout.user_id === viewerId) return workout;
     const relationship = await relationshipWith(client, viewerId, workout.user_id);
-    if (!canSeeActivity(relationship) || workout.logged_by !== null) {
-      throw new NotFoundException('Workout not found');
+    if (workout.logged_by !== null) throw new NotFoundException('Workout not found');
+    if (canSeeActivity(relationship)) return workout;
+    if (groupmates && workout.group_id && (await this.trainedIn(viewerId, workout.group_id))) {
+      return workout;
     }
-    return workout;
+    throw new NotFoundException('Workout not found');
+  }
+
+  /** Whether the viewer trained in this group: a workout of their own in it, not deleted. */
+  private async trainedIn(viewerId: string, groupId: string): Promise<boolean> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('workouts')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('user_id', viewerId)
+      .is('deleted_at', null)
+      .limit(1);
+    if (error) throw new InternalServerErrorException('Failed to look up the workout');
+    return ((data ?? []) as unknown[]).length > 0;
   }
 }

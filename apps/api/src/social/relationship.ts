@@ -77,6 +77,74 @@ export async function relationshipWith(
 }
 
 /**
+ * How the viewer stands with several people at once (a group workout's participants), in three
+ * reads whatever their number -- the same Relationship as relationshipWith gives one at a time.
+ * Someone blocked either way is left out of the map: no one at all, never revealed.
+ */
+export async function relationshipsWith(
+  client: Client,
+  viewerId: string,
+  personIds: string[],
+): Promise<Map<string, Relationship>> {
+  const ids = [...new Set(personIds)];
+  const result = new Map<string, Relationship>();
+  const others = ids.filter((id) => id !== viewerId);
+  if (ids.includes(viewerId)) {
+    result.set(viewerId, {
+      isSelf: true,
+      followStatus: 'none',
+      followsYou: false,
+      requestId: null,
+      isPublic: false,
+    });
+  }
+  if (others.length === 0) return result;
+  const [blocks, mine, theirs, people] = await Promise.all([
+    loadBlocks(client, viewerId),
+    client
+      .from('follows')
+      .select('id, follower_id, followee_id, status')
+      .eq('follower_id', viewerId)
+      .in('followee_id', others),
+    client
+      .from('follows')
+      .select('id, follower_id, followee_id, status')
+      .eq('followee_id', viewerId)
+      .in('follower_id', others),
+    client.from('users').select('id, profile_visibility').in('id', others),
+  ]);
+  if (mine.error || theirs.error) {
+    throw new InternalServerErrorException('Failed to load follow state');
+  }
+  if (people.error) throw new InternalServerErrorException('Failed to load their profiles');
+  type Row = {
+    id: string;
+    follower_id: string;
+    followee_id: string;
+    status: 'pending' | 'accepted';
+  };
+  const myFollows = new Map(((mine.data ?? []) as Row[]).map((row) => [row.followee_id, row]));
+  const theirFollows = new Map(((theirs.data ?? []) as Row[]).map((row) => [row.follower_id, row]));
+  const publicIds = new Set(
+    ((people.data ?? []) as { id: string; profile_visibility: string | null }[])
+      .filter((row) => row.profile_visibility === 'public')
+      .map((row) => row.id),
+  );
+  for (const id of others) {
+    if (isBlockedEitherWay(blocks, id)) continue;
+    const their = theirFollows.get(id);
+    result.set(id, {
+      isSelf: false,
+      followStatus: myFollows.get(id)?.status ?? 'none',
+      followsYou: their?.status === 'accepted',
+      requestId: their?.status === 'pending' ? their.id : null,
+      isPublic: publicIds.has(id),
+    });
+  }
+  return result;
+}
+
+/**
  * Whether the viewer can see this person's activity -- their workouts, stats, lifts, achievements,
  * montage, bio, likes and comments, and who follows them: it's the viewer's own, the viewer follows
  * them and they accepted, or their profile is public. The one place this is decided: every route

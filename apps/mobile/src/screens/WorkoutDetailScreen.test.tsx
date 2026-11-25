@@ -1065,6 +1065,116 @@ describe("WorkoutDetailScreen -- a friend's workout", () => {
     expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'sam' });
   });
 
+  it("shows a friend's group workout person by person: theirs, a public profile's, and only the name of a private one", async () => {
+    const { getFriendWorkout } = jest.requireMock('../lib/api') as { getFriendWorkout: jest.Mock };
+    const pat = { id: 'pat', username: 'pat', displayName: 'Pat Doe', avatarUrl: null };
+    const jo = {
+      id: 'jo',
+      username: 'jo',
+      displayName: 'Jo Lee',
+      avatarUrl: 'https://cdn.example.com/jo.jpg',
+    };
+    const patsWorkout = {
+      ...theirs,
+      id: 'pw1',
+      name: 'Pull Day',
+      author: pat,
+      exercises: [
+        {
+          ...theirs.exercises[0]!,
+          id: 'we-p1',
+          sets: [{ ...theirs.exercises[0]!.sets[0]!, id: 'ps1', weightKg: 60, reps: 12 }],
+        },
+      ],
+    };
+    getFriendWorkout.mockClear();
+    getFriendWorkout.mockImplementation(async (_token: string, id: string) =>
+      id === 'pw1'
+        ? patsWorkout
+        : {
+            ...theirs,
+            group: {
+              id: 'g1',
+              name: 'Pull Crew',
+              participants: [
+                { user: theirs.author, isAuthor: true, canSeeWorkout: true, workoutId: 'fw1' },
+                { user: pat, isAuthor: false, canSeeWorkout: true, workoutId: 'pw1' },
+                { user: jo, isAuthor: false, canSeeWorkout: false, workoutId: null },
+              ],
+            },
+          },
+    );
+    render(
+      <WorkoutDetailScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'fw1', authorId: 'sam' } } as never}
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    // A tab a person, in the group's order: Jo's says it's locked.
+    expect(await screen.findByTestId('workout-detail-people-fw1')).toHaveTextContent(/Sam/);
+    expect(await screen.findByTestId('workout-detail-people-pw1')).toHaveTextContent(/Pat/);
+    expect(screen.getByTestId('workout-detail-people-hidden:jo')).toHaveTextContent(/Jo/);
+    expect(screen.getByText(/80kg × 10/)).toBeTruthy();
+
+    // Pat's public profile: their workout, named as theirs -- no likes or comments of Sam's on it.
+    fireEvent.press(screen.getByTestId('workout-detail-people-pw1'));
+    expect(screen.getByTestId('workout-detail-author')).toHaveTextContent("Pat Doe's workout");
+    expect(screen.getByText(/60kg × 12/)).toBeTruthy();
+    expect(screen.queryByText(/80kg × 10/)).toBeNull();
+    expect(screen.queryByTestId('workout-comments')).toBeNull();
+    expect(getFriendWorkout).toHaveBeenCalledWith('token-123', 'pw1');
+
+    // Jo's private profile: who they are, and nothing of what they did.
+    fireEvent.press(screen.getByTestId('workout-detail-people-hidden:jo'));
+    expect(screen.getByTestId('workout-detail-hidden')).toHaveTextContent(
+      /Jo Lee.*Private Profile/,
+    );
+    expect(screen.getByTestId('workout-detail-hidden-line')).toHaveTextContent(
+      'Jo trained in this group workout. Their sets, weights, reps and figures are private: follow them to see their workouts.',
+    );
+    expect(screen.queryByTestId('workout-detail-summary')).toBeNull();
+    expect(screen.queryByText(/kg ×/)).toBeNull();
+    // Never asked for: the API gave no workout of theirs to read.
+    expect(getFriendWorkout).toHaveBeenCalledTimes(2);
+    fireEvent.press(screen.getByTestId('workout-detail-hidden-profile'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'jo' });
+
+    // Back on Sam's: their likes and comments again.
+    fireEvent.press(screen.getByTestId('workout-detail-people-fw1'));
+    expect(await screen.findByTestId('workout-comments')).toBeTruthy();
+  });
+
+  it("hides someone in a friend's group whose workout can't be read after all", async () => {
+    const { getFriendWorkout } = jest.requireMock('../lib/api') as { getFriendWorkout: jest.Mock };
+    const pat = { id: 'pat', username: 'pat', displayName: 'Pat Doe', avatarUrl: null };
+    getFriendWorkout.mockImplementation(async (_token: string, id: string) => {
+      if (id === 'pw1') throw new Error('Workout not found');
+      return {
+        ...theirs,
+        group: {
+          id: 'g1',
+          name: 'Pull Crew',
+          participants: [
+            { user: theirs.author, isAuthor: true, canSeeWorkout: true, workoutId: 'fw1' },
+            { user: pat, isAuthor: false, canSeeWorkout: true, workoutId: 'pw1' },
+          ],
+        },
+      };
+    });
+    render(
+      <WorkoutDetailScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'fw1', authorId: 'sam' } } as never}
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    fireEvent.press(await screen.findByTestId('workout-detail-people-hidden:pat'));
+    expect(screen.getByTestId('workout-detail-hidden')).toHaveTextContent(/Pat Doe/);
+  });
+
   it('has likes and comments on your own finished workout too', async () => {
     render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,

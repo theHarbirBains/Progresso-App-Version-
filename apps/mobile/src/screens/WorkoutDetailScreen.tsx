@@ -18,6 +18,7 @@ import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { getFriendWorkout, type FollowUser } from '../lib/api';
 import { listTrainerClients } from '../lib/trainerApi';
 import { friendWorkoutDetail } from '../social/friendWorkout';
+import { HiddenWorkoutCard } from '../social/HiddenWorkoutCard';
 import { personLabel } from '../social/PeopleList';
 import { WorkoutComments } from '../social/WorkoutComments';
 import { formatWeightKg } from '../lib/units';
@@ -58,8 +59,10 @@ import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 import { SkeletonCards } from '../design/Skeleton';
 import {
+  fetchFriendGroupWorkouts,
   fetchGroupWorkouts,
   firstName,
+  type FriendGroupEntry,
   type GroupWorkoutPerson,
 } from '../workouts/groupWorkoutHistory';
 
@@ -147,6 +150,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   // Everyone's workout in the group this one was part of; null when it wasn't one.
   const [people, setPeople] = useState<GroupWorkoutPerson[] | null>(null);
+  // A friend's group workout: everyone in it in the group's order, each theirs to read or, where
+  // you may not see it (a private profile you don't follow), only who they are.
+  const [friendGroup, setFriendGroup] = useState<FriendGroupEntry[] | null>(null);
   const [selectedId, setSelectedId] = useState(workoutId);
   // Which muscle group's exercises show, as in the live workout -- or its cardio alone; All to
   // start.
@@ -167,8 +173,15 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         if (friend) {
           const theirs = await getFriendWorkout(accessToken, workoutId);
           if (cancelled) return;
-          setWorkout(friendWorkoutDetail(theirs));
+          const detail = friendWorkoutDetail(theirs);
+          setWorkout(detail);
           setAuthor(theirs.author);
+          // The rest of the group follows, each as the API lets you see them.
+          void fetchFriendGroupWorkouts(accessToken, theirs, detail, userId).then((entries) => {
+            if (cancelled || !entries) return;
+            setFriendGroup(entries);
+            setPeople(entries.flatMap((entry) => (entry.kind === 'shown' ? [entry.person] : [])));
+          });
           return;
         }
         const detail = await fetchWorkoutDetail(workoutId);
@@ -260,14 +273,23 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  // The person whose workout is showing: this one, or someone else's in the group.
+  // The person whose workout is showing: this one, or someone else's in the group -- or, in a
+  // friend's, someone whose workout is private to you.
   const shownPerson = people?.find((person) => person.workout.id === selectedId);
+  const hiddenPerson = friendGroup?.flatMap((entry) =>
+    entry.kind === 'hidden' && `hidden:${entry.person.userId}` === selectedId ? [entry.person] : [],
+  )[0];
   const shown = shownPerson?.workout ?? workout;
   const isOwn = !friend && shown.id === workout.id;
   // Likes and comments: on your own finished workout, or a friend's -- not a client's (a
   // trainer's view) or another group member's tab.
+  // In a friend's group workout, only on the one opened: the others are their own people's.
   const showsSocial =
-    workout.completedAt !== null && !clientId && (friend || (isOwn && shown.id === workoutId));
+    workout.completedAt !== null &&
+    !clientId &&
+    shown.id === workoutId &&
+    hiddenPerson === undefined &&
+    (friend || isOwn);
   const comments = showsSocial ? (
     <WorkoutComments
       workoutId={shown.id}
@@ -280,14 +302,34 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // wrong -- under the trainer's link, recorded for the client like any trainer edit.
   const editsAsTrainer = !isOwn && shownPerson !== undefined && clientIds.has(shownPerson.userId);
   const canEdit = isOwn || editsAsTrainer;
-  const tabs =
-    people && people.length > 1
+  const tabs = friendGroup
+    ? friendGroup.map((entry) =>
+        entry.kind === 'shown'
+          ? {
+              key: entry.person.workout.id,
+              label: firstName(entry.person.displayName),
+              icon: 'user' as const,
+            }
+          : {
+              key: `hidden:${entry.person.userId}`,
+              label: entry.person.displayName
+                ? firstName(entry.person.displayName)
+                : entry.person.username
+                  ? `@${entry.person.username}`
+                  : 'Member',
+              icon: 'lock' as const,
+            },
+      )
+    : people && people.length > 1
       ? people.map((person) => ({
           key: person.workout.id,
           label: person.userId === userId ? 'You' : firstName(person.displayName),
           icon: 'user' as const,
         }))
       : null;
+  // Whose workout the summary names, in a friend's group: the person whose tab is showing.
+  const shownOwner =
+    friend && shownPerson && author && shownPerson.userId !== author.id ? shownPerson : null;
 
   // The workout as a whole, from the sets that were actually logged -- each holding what its
   // exercise records (weight and reps; reps; a time). Its warm-ups show, marked, but never count.
@@ -425,234 +467,267 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         <UnderlineTabs
           testID="workout-detail-people"
           categories={tabs}
-          active={shown.id}
+          active={hiddenPerson ? selectedId : shown.id}
           onSelect={setSelectedId}
           accentColor={theme.accent}
         />
       ) : null}
 
-      <AppCard hero topAccent={theme.accent} testID="workout-detail-summary">
-        {!isOwn ? (
-          <Text testID="workout-detail-person-workout" style={styles.exerciseTitle}>
-            {shown.name}
-          </Text>
-        ) : null}
-        {friend && author ? (
-          <TouchableOpacity
-            testID="workout-detail-author"
-            onPress={() => navigation.navigate('PersonProfile', { userId: author.id })}
-            accessibilityRole="button"
-            accessibilityLabel={`${personLabel(author).title}, open profile`}
-          >
-            <Text style={styles.eyebrow}>{personLabel(author).title}&apos;s workout</Text>
-          </TouchableOpacity>
-        ) : null}
-        {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
-        {/* A workout logged with no duration (Log Past Workout's is optional) shows none: the
+      {hiddenPerson ? (
+        <HiddenWorkoutCard
+          person={hiddenPerson}
+          onOpenProfile={() =>
+            navigation.navigate('PersonProfile', { userId: hiddenPerson.userId })
+          }
+        />
+      ) : (
+        <>
+          <AppCard hero topAccent={theme.accent} testID="workout-detail-summary">
+            {!isOwn ? (
+              <Text testID="workout-detail-person-workout" style={styles.exerciseTitle}>
+                {shown.name}
+              </Text>
+            ) : null}
+            {friend && author && shownOwner ? (
+              shownOwner.displayName === 'You' ? (
+                <Text style={styles.eyebrow}>Your workout</Text>
+              ) : (
+                <TouchableOpacity
+                  testID="workout-detail-author"
+                  onPress={() =>
+                    navigation.navigate('PersonProfile', { userId: shownOwner.userId })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`${shownOwner.displayName ?? 'Member'}, open profile`}
+                >
+                  <Text style={styles.eyebrow}>
+                    {shownOwner.displayName ?? 'Member'}&apos;s workout
+                  </Text>
+                </TouchableOpacity>
+              )
+            ) : friend && author ? (
+              <TouchableOpacity
+                testID="workout-detail-author"
+                onPress={() => navigation.navigate('PersonProfile', { userId: author.id })}
+                accessibilityRole="button"
+                accessibilityLabel={`${personLabel(author).title}, open profile`}
+              >
+                <Text style={styles.eyebrow}>{personLabel(author).title}&apos;s workout</Text>
+              </TouchableOpacity>
+            ) : null}
+            {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
+            {/* A workout logged with no duration (Log Past Workout's is optional) shows none: the
             other three figures share one row instead. With cardio, its Duration is its total time
             -- the strength training and the cardio together, told apart in its Time card; cardio
             alone shows its time and how many activities. */}
-        {cardioOnly ? (
-          <View style={styles.statRow}>
-            <StatBlock
-              testID="workout-detail-stat-active"
-              value={formatMinutes(times.cardioSeconds)}
-              label="Cardio"
-            />
-            <StatBlock
-              testID="workout-detail-stat-activities"
-              value={String(cardio.length)}
-              label={cardio.length === 1 ? 'Activity' : 'Activities'}
-            />
-          </View>
-        ) : cardio.length > 0 && times.totalSeconds !== null ? (
-          <View style={styles.statGrid}>
-            <View style={styles.statRow}>
-              <StatBlock
-                testID="workout-detail-stat-duration"
-                value={formatMinutes(times.totalSeconds)}
-                label="Duration"
-              />
-              {setsStat}
-            </View>
-            <View style={styles.statRow}>
-              {volumeStat}
-              {lastStat}
-            </View>
-          </View>
-        ) : durationMinutes !== null ? (
-          <View style={styles.statGrid}>
-            <View style={styles.statRow}>
-              <StatBlock
-                testID="workout-detail-stat-duration"
-                value={formatCardDuration(durationMinutes)}
-                label="Duration"
-              />
-              {setsStat}
-            </View>
-            <View style={styles.statRow}>
-              {volumeStat}
-              {lastStat}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.statRow}>
-            {setsStat}
-            {volumeStat}
-            {lastStat}
-          </View>
-        )}
-      </AppCard>
+            {cardioOnly ? (
+              <View style={styles.statRow}>
+                <StatBlock
+                  testID="workout-detail-stat-active"
+                  value={formatMinutes(times.cardioSeconds)}
+                  label="Cardio"
+                />
+                <StatBlock
+                  testID="workout-detail-stat-activities"
+                  value={String(cardio.length)}
+                  label={cardio.length === 1 ? 'Activity' : 'Activities'}
+                />
+              </View>
+            ) : cardio.length > 0 && times.totalSeconds !== null ? (
+              <View style={styles.statGrid}>
+                <View style={styles.statRow}>
+                  <StatBlock
+                    testID="workout-detail-stat-duration"
+                    value={formatMinutes(times.totalSeconds)}
+                    label="Duration"
+                  />
+                  {setsStat}
+                </View>
+                <View style={styles.statRow}>
+                  {volumeStat}
+                  {lastStat}
+                </View>
+              </View>
+            ) : durationMinutes !== null ? (
+              <View style={styles.statGrid}>
+                <View style={styles.statRow}>
+                  <StatBlock
+                    testID="workout-detail-stat-duration"
+                    value={formatCardDuration(durationMinutes)}
+                    label="Duration"
+                  />
+                  {setsStat}
+                </View>
+                <View style={styles.statRow}>
+                  {volumeStat}
+                  {lastStat}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.statRow}>
+                {setsStat}
+                {volumeStat}
+                {lastStat}
+              </View>
+            )}
+          </AppCard>
 
-      {/* Opened at its comments (a feed card's bubble, a like or comment in the bell): they
+          {/* Opened at its comments (a feed card's bubble, a like or comment in the bell): they
           come first. */}
-      {focusComments ? comments : null}
+          {focusComments ? comments : null}
 
-      {muscleTabs.length > 0 ? (
-        <FilterChips<DetailTab>
-          testID="workout-detail-muscle-tabs"
-          options={[
-            { value: 'all', label: 'All' },
-            ...muscleTabs.map((muscle) => ({ value: muscle, label: MUSCLE_GROUP_LABELS[muscle] })),
-            ...(cardio.length > 0 ? [{ value: 'cardio' as const, label: 'Cardio' }] : []),
-          ]}
-          value={activeTab}
-          onChange={setMuscleTab}
-          accentColor={theme.accent}
-          onAccentColor={theme.onAccent}
-        />
-      ) : null}
+          {muscleTabs.length > 0 ? (
+            <FilterChips<DetailTab>
+              testID="workout-detail-muscle-tabs"
+              options={[
+                { value: 'all', label: 'All' },
+                ...muscleTabs.map((muscle) => ({
+                  value: muscle,
+                  label: MUSCLE_GROUP_LABELS[muscle],
+                })),
+                ...(cardio.length > 0 ? [{ value: 'cardio' as const, label: 'Cardio' }] : []),
+              ]}
+              value={activeTab}
+              onChange={setMuscleTab}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+          ) : null}
 
-      {shownExercises.map(({ exercise, type, withWarmups: exerciseSets }) => {
-        // A workout's history view only ever shows sets that were actually
-        // logged -- a blank/incomplete set left over from a live session
-        // that was completed anyway is not real performance data.
-        const topSet = bestLoggedSet(exerciseSets, type);
-        // Each set's label, by its place: a unilateral set's two sides share one, and a drop set
-        // sits under the set it drops from with none of its own.
-        const logical = [...new Map(exerciseSets.map((set) => [set.setIndex, set])).values()];
-        const labels = setLabels(logical);
-        const labelOf = new Map(logical.map((set, position) => [set.setIndex, labels[position]]));
-        return (
-          <AppCard key={exercise.id} testID={`exercise-card-${exercise.id}`}>
-            {/* PR history is weighted rep PRs and 1RMs: a bodyweight or timed exercise's
+          {shownExercises.map(({ exercise, type, withWarmups: exerciseSets }) => {
+            // A workout's history view only ever shows sets that were actually
+            // logged -- a blank/incomplete set left over from a live session
+            // that was completed anyway is not real performance data.
+            const topSet = bestLoggedSet(exerciseSets, type);
+            // Each set's label, by its place: a unilateral set's two sides share one, and a drop set
+            // sits under the set it drops from with none of its own.
+            const logical = [...new Map(exerciseSets.map((set) => [set.setIndex, set])).values()];
+            const labels = setLabels(logical);
+            const labelOf = new Map(
+              logical.map((set, position) => [set.setIndex, labels[position]]),
+            );
+            return (
+              <AppCard key={exercise.id} testID={`exercise-card-${exercise.id}`}>
+                {/* PR history is weighted rep PRs and 1RMs: a bodyweight or timed exercise's
                 title opens nothing, and its record shows on its set instead. */}
-            <TouchableOpacity
-              testID={`exercise-title-${exercise.id}`}
-              style={styles.exerciseTitleRow}
-              onPress={() =>
-                navigation.navigate('PRHistory', {
-                  exerciseId: exercise.exerciseId,
-                  exerciseName: exercise.exerciseName,
-                })
-              }
-              disabled={type !== 'weight_reps' || !isOwn}
-              accessibilityRole={type === 'weight_reps' && isOwn ? 'button' : undefined}
-              accessibilityLabel={
-                type === 'weight_reps' && isOwn
-                  ? `${exercise.exerciseName}, view PR history`
-                  : undefined
-              }
-            >
-              {/* Which machine it was, as the Exercise Library shows it: its photo (full size
+                <TouchableOpacity
+                  testID={`exercise-title-${exercise.id}`}
+                  style={styles.exerciseTitleRow}
+                  onPress={() =>
+                    navigation.navigate('PRHistory', {
+                      exerciseId: exercise.exerciseId,
+                      exerciseName: exercise.exerciseName,
+                    })
+                  }
+                  disabled={type !== 'weight_reps' || !isOwn}
+                  accessibilityRole={type === 'weight_reps' && isOwn ? 'button' : undefined}
+                  accessibilityLabel={
+                    type === 'weight_reps' && isOwn
+                      ? `${exercise.exerciseName}, view PR history`
+                      : undefined
+                  }
+                >
+                  {/* Which machine it was, as the Exercise Library shows it: its photo (full size
                   on a tap -- the row's own tap still opens PR History), then its muscle, gym
                   and handle. */}
-              <ExercisePhoto
-                testID={`exercise-photo-${exercise.id}`}
-                uri={exercise.photoUrl}
-                name={exercise.exerciseName}
-              />
-              <View style={styles.exerciseTitleBody}>
-                <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
-                <Text testID={`exercise-muscle-${exercise.id}`} style={styles.exerciseMuscle}>
-                  {machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup])}
-                </Text>
-              </View>
-              {type === 'weight_reps' && isOwn ? (
-                <Feather name="chevron-right" size={18} color={colors.textMuted} />
-              ) : null}
-            </TouchableOpacity>
-            {topSet ? (
-              <View style={styles.topSetBlock}>
-                <Text
-                  testID={`top-set-${exercise.id}`}
-                  style={[styles.topSet, { color: theme.accent }]}
-                >
-                  {type === 'weight_reps' ? (
-                    <>
-                      Top set: {formatWeightKg(topSet.weightKg ?? 0, weightUnit)}
-                      {weightUnit}
-                      {'×'}
-                      {topSet.reps}
-                    </>
-                  ) : (
-                    `${type === 'timed' ? 'Longest' : 'Best set'}: ${formatSetValues(
-                      setValuesOf(topSet, type),
-                      weightUnit,
-                    )}`
-                  )}
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.sets}>
-              {exerciseSets.map((set) => {
-                const oneRepMax =
-                  type === 'weight_reps' && oneRepMaxes[exercise.id]?.sourceSetId === set.id;
-                const record = isRecord(exercise.id, type, set);
-                const label = labelOf.get(set.setIndex);
-                return (
-                  <View
-                    key={set.id}
-                    style={[
-                      styles.setRow,
-                      set.isWarmup && styles.warmupRow,
-                      label?.drop && styles.dropRow,
-                    ]}
-                  >
-                    <Text testID={`set-label-${set.id}`} style={styles.setLabel}>
-                      {set.isWarmup ? 'Warm-up' : label?.drop ? 'Drop' : `Set ${label?.number}`}
+                  <ExercisePhoto
+                    testID={`exercise-photo-${exercise.id}`}
+                    uri={exercise.photoUrl}
+                    name={exercise.exerciseName}
+                  />
+                  <View style={styles.exerciseTitleBody}>
+                    <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
+                    <Text testID={`exercise-muscle-${exercise.id}`} style={styles.exerciseMuscle}>
+                      {machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup])}
                     </Text>
-                    <Text style={styles.setValue}>
-                      {type === 'weight_reps'
-                        ? `${formatWeightKg(set.weightKg ?? 0, weightUnit)}${weightUnit} × ${set.reps}`
-                        : formatSetValues(setValuesOf(set, type), weightUnit)}
-                    </Text>
-                    {record ? (
-                      <Badge
-                        testID={`pr-tag-${set.id}`}
-                        label={oneRepMax ? '1RM' : 'PR'}
-                        color={theme.accent}
-                        backgroundColor={theme.accentBg}
-                      />
-                    ) : null}
                   </View>
-                );
-              })}
-            </View>
-          </AppCard>
-        );
-      })}
+                  {type === 'weight_reps' && isOwn ? (
+                    <Feather name="chevron-right" size={18} color={colors.textMuted} />
+                  ) : null}
+                </TouchableOpacity>
+                {topSet ? (
+                  <View style={styles.topSetBlock}>
+                    <Text
+                      testID={`top-set-${exercise.id}`}
+                      style={[styles.topSet, { color: theme.accent }]}
+                    >
+                      {type === 'weight_reps' ? (
+                        <>
+                          Top set: {formatWeightKg(topSet.weightKg ?? 0, weightUnit)}
+                          {weightUnit}
+                          {'×'}
+                          {topSet.reps}
+                        </>
+                      ) : (
+                        `${type === 'timed' ? 'Longest' : 'Best set'}: ${formatSetValues(
+                          setValuesOf(topSet, type),
+                          weightUnit,
+                        )}`
+                      )}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.sets}>
+                  {exerciseSets.map((set) => {
+                    const oneRepMax =
+                      type === 'weight_reps' && oneRepMaxes[exercise.id]?.sourceSetId === set.id;
+                    const record = isRecord(exercise.id, type, set);
+                    const label = labelOf.get(set.setIndex);
+                    return (
+                      <View
+                        key={set.id}
+                        style={[
+                          styles.setRow,
+                          set.isWarmup && styles.warmupRow,
+                          label?.drop && styles.dropRow,
+                        ]}
+                      >
+                        <Text testID={`set-label-${set.id}`} style={styles.setLabel}>
+                          {set.isWarmup ? 'Warm-up' : label?.drop ? 'Drop' : `Set ${label?.number}`}
+                        </Text>
+                        <Text style={styles.setValue}>
+                          {type === 'weight_reps'
+                            ? `${formatWeightKg(set.weightKg ?? 0, weightUnit)}${weightUnit} × ${set.reps}`
+                            : formatSetValues(setValuesOf(set, type), weightUnit)}
+                        </Text>
+                        {record ? (
+                          <Badge
+                            testID={`pr-tag-${set.id}`}
+                            label={oneRepMax ? '1RM' : 'PR'}
+                            color={theme.accent}
+                            backgroundColor={theme.accentBg}
+                          />
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              </AppCard>
+            );
+          })}
 
-      {cardio.length > 0 && (activeTab === 'all' || activeTab === 'cardio') ? (
-        <WorkoutCardio
-          testID="workout-detail-cardio"
-          entries={cardio}
-          times={times}
-          keyOf={(entry) => entry.id}
-          accentColor={theme.accent}
-        />
-      ) : null}
+          {cardio.length > 0 && (activeTab === 'all' || activeTab === 'cardio') ? (
+            <WorkoutCardio
+              testID="workout-detail-cardio"
+              entries={cardio}
+              times={times}
+              keyOf={(entry) => entry.id}
+              accentColor={theme.accent}
+            />
+          ) : null}
 
-      {focusComments ? null : comments}
+          {focusComments ? null : comments}
 
-      {isOwn ? (
-        <TextButton
-          testID="workout-detail-delete"
-          label="Delete Workout"
-          destructive
-          onPress={confirmDeleteWorkout}
-        />
-      ) : null}
+          {isOwn ? (
+            <TextButton
+              testID="workout-detail-delete"
+              label="Delete Workout"
+              destructive
+              onPress={confirmDeleteWorkout}
+            />
+          ) : null}
+        </>
+      )}
     </Screen>
   );
 }

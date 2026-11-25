@@ -1,5 +1,6 @@
 import { measurementTypeOf } from '../exercises/movementTypes';
-import { getGroup } from '../lib/api';
+import { getFriendWorkout, getGroup, type FriendWorkout } from '../lib/api';
+import { friendWorkoutDetail } from '../social/friendWorkout';
 import { loggedSets } from './setValues';
 import { fetchWorkoutDetail, type WorkoutDetail } from './workoutQueries';
 
@@ -11,6 +12,61 @@ export interface GroupWorkoutPerson {
   userId: string;
   displayName: string | null;
   workout: WorkoutDetail;
+  avatarUrl?: string | null;
+}
+
+/** Someone in a friend's group workout whose workout you may not see: who they are, only. */
+export interface HiddenGroupPerson {
+  userId: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
+/** A friend's group workout, a tab a person in the group's order: theirs to read, or hidden. */
+export type FriendGroupEntry =
+  { kind: 'shown'; person: GroupWorkoutPerson } | { kind: 'hidden'; person: HiddenGroupPerson };
+
+/**
+ * Everyone in the group a friend's workout was part of, as the API says you may see them
+ * (`group.participants`): each one you may see read through GET /workouts/:id -- which checks
+ * again -- and the rest only by name and photo. Someone whose workout can't be read after all is
+ * hidden too, never guessed at. Null when it wasn't a group workout, or only they trained in it.
+ */
+export async function fetchFriendGroupWorkouts(
+  accessToken: string,
+  theirs: FriendWorkout,
+  shown: WorkoutDetail,
+  viewerId: string,
+): Promise<FriendGroupEntry[] | null> {
+  const participants = theirs.group?.participants ?? [];
+  if (participants.length < 2) return null;
+  return Promise.all(
+    participants.map(async (participant): Promise<FriendGroupEntry> => {
+      const who = {
+        userId: participant.user.id,
+        displayName: participant.user.id === viewerId ? 'You' : participant.user.displayName,
+        avatarUrl: participant.user.avatarUrl,
+      };
+      if (participant.isAuthor) {
+        return { kind: 'shown', person: { ...who, workout: shown } };
+      }
+      if (participant.canSeeWorkout && participant.workoutId) {
+        try {
+          const workout = friendWorkoutDetail(
+            await getFriendWorkout(accessToken, participant.workoutId),
+          );
+          return { kind: 'shown', person: { ...who, workout } };
+        } catch {
+          // Not to be read after all: who they are, only.
+        }
+      }
+      return {
+        kind: 'hidden',
+        person: { ...who, username: participant.user.username },
+      };
+    }),
+  );
 }
 
 /** "Jashan" from "Jashan Singh"; "Member" without a name. */

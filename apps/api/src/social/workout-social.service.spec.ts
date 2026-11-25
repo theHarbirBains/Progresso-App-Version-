@@ -9,7 +9,18 @@ interface QueuedResult {
   error: { code?: string; message: string } | null;
 }
 
-const CHAIN = ['select', 'eq', 'in', 'is', 'not', 'or', 'order', 'insert', 'delete'] as const;
+const CHAIN = [
+  'select',
+  'eq',
+  'in',
+  'is',
+  'not',
+  'or',
+  'order',
+  'insert',
+  'delete',
+  'limit',
+] as const;
 
 /** Per-table FIFO results, as in the other specs, with every call recorded. */
 function createMockClient() {
@@ -268,5 +279,208 @@ describe('WorkoutSocialService', () => {
 
       expect(summary).toEqual({ [W]: { likeCount: 2, commentCount: 1, likedByMe: true } });
     });
+  });
+});
+
+describe('WorkoutSocialService -- a group workout, as someone else sees it', () => {
+  // SAM's group workout, with JO (private), PAT (public), KIM (who blocked ME) and LEE (who
+  // logged nothing). ME follows SAM.
+  const G = '55555555-5555-5555-5555-555555555555';
+  const JO = '66666666-6666-6666-6666-666666666666';
+  const PAT = '77777777-7777-7777-7777-777777777777';
+  const KIM = '88888888-8888-8888-8888-888888888888';
+  const LEE = '99999999-9999-9999-9999-999999999999';
+  const [WJ, WP, WK, WL, WM] = ['wj', 'wp', 'wk', 'wl', 'wm'];
+  const person = (id: string, name: string) => ({
+    id,
+    username: name.toLowerCase(),
+    display_name: name,
+    avatar_url: null,
+    profile_visibility: id === PAT ? 'public' : 'private',
+  });
+  const everyone = [
+    person(SAM, 'Sam'),
+    person(JO, 'Jo'),
+    person(PAT, 'Pat'),
+    person(KIM, 'Kim'),
+    person(LEE, 'Lee'),
+    person(ME, 'Me'),
+  ];
+
+  /** Everything getWorkout reads for SAM's group workout, as ME. */
+  function queueGroupWorkout(
+    client: ReturnType<typeof createMockClient>,
+    { meFollows = [SAM], meTrained = false }: { meFollows?: string[]; meTrained?: boolean } = {},
+  ) {
+    // The workout, and ME's standing with SAM.
+    client.queue('workouts', { data: workout({ group_id: G }), error: null });
+    queueFollowing(client);
+    client.queue('workout_cardio', { data: [], error: null });
+    client.queue('workout_exercises', { data: [], error: null });
+    client.queue('users', { data: [person(SAM, 'Sam')], error: null });
+    // The group: everyone's workout in it, and who did something.
+    client.queue('workout_groups', { data: { id: G, name: 'Leg Day Crew' }, error: null });
+    client.queue('workouts', {
+      data: [
+        { id: W, user_id: SAM },
+        { id: WJ, user_id: JO },
+        { id: WP, user_id: PAT },
+        { id: WK, user_id: KIM },
+        { id: WL, user_id: LEE },
+        ...(meTrained ? [{ id: WM, user_id: ME }] : []),
+      ],
+      error: null,
+    });
+    client.queue('sets', {
+      data: [WJ, WP, WK, ...(meTrained ? [WM] : [])].map((id) => ({
+        id: `set-${id}`,
+        workout_exercises: { workout_id: id },
+      })),
+      error: null,
+    });
+    client.queue('workout_cardio', { data: [], error: null });
+    // ME's standing with each of them, at once.
+    client.queue('user_blocks', { data: [{ blocker_id: KIM, blocked_id: ME }], error: null });
+    client.queue('follows', {
+      data: meFollows.map((id) => ({
+        id: `f-${id}`,
+        follower_id: ME,
+        followee_id: id,
+        status: 'accepted',
+      })),
+      error: null,
+    });
+    client.queue('follows', { data: [], error: null });
+    client.queue('users', {
+      data: everyone.map(({ id, profile_visibility }) => ({ id, profile_visibility })),
+      error: null,
+    });
+    client.queue('users', { data: everyone, error: null });
+  }
+
+  const shape = (group: Awaited<ReturnType<WorkoutSocialService['getWorkout']>>['group']) =>
+    group?.participants.map((p) => [p.user.displayName, p.isAuthor, p.canSeeWorkout, p.workoutId]);
+
+  it("friends with one of them: everyone's name, only their workout -- and a public profile's", async () => {
+    const { client, service } = setup();
+    queueGroupWorkout(client);
+
+    const seen = await service.getWorkout(ME, W);
+
+    expect(seen.group).toMatchObject({ id: G, name: 'Leg Day Crew' });
+    expect(shape(seen.group)).toEqual([
+      ['Sam', true, true, W],
+      // Private, not followed: who they are, nothing of what they did.
+      ['Jo', false, false, null],
+      // Public: as a follower would see it.
+      ['Pat', false, true, WP],
+    ]);
+    // Someone blocked either way, and someone who logged nothing, aren't there at all.
+    expect(seen.group?.participants.map((p) => p.user.id)).not.toContain(KIM);
+    expect(seen.group?.participants.map((p) => p.user.id)).not.toContain(LEE);
+    expect(JSON.stringify(seen)).not.toContain(WJ);
+  });
+
+  it('friends with both: both workouts', async () => {
+    const { client, service } = setup();
+    queueGroupWorkout(client, { meFollows: [SAM, JO] });
+
+    const seen = await service.getWorkout(ME, W);
+
+    expect(shape(seen.group)).toEqual([
+      ['Sam', true, true, W],
+      ['Jo', false, true, WJ],
+      ['Pat', false, true, WP],
+    ]);
+  });
+
+  it('trained in it yourself: every workout in the group, followed or not', async () => {
+    const { client, service } = setup();
+    queueGroupWorkout(client, { meTrained: true });
+
+    const seen = await service.getWorkout(ME, W);
+
+    expect(shape(seen.group)).toEqual([
+      ['Sam', true, true, W],
+      ['Jo', false, true, WJ],
+      ['Pat', false, true, WP],
+      ['Me', false, true, WM],
+    ]);
+  });
+
+  it("never opens a private participant's workout directly for someone who wasn't there", async () => {
+    const { client, service } = setup();
+    client.queue('workouts', {
+      data: workout({ id: WJ, user_id: JO, group_id: G }),
+      error: null,
+    });
+    client.queue('user_blocks', { data: [], error: null });
+    client.queue('follows', { data: [], error: null });
+    client.queue('users', { data: { profile_visibility: 'private' }, error: null });
+    // ME trained in no workout of this group.
+    client.queue('workouts', { data: [], error: null });
+
+    await expect(service.getWorkout(ME, WJ)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('opens it for someone who trained in the group -- to read, never to like', async () => {
+    const { client, service } = setup();
+    client.queue('workouts', {
+      data: workout({ id: WJ, user_id: JO, group_id: G }),
+      error: null,
+    });
+    client.queue('user_blocks', { data: [], error: null });
+    client.queue('follows', { data: [], error: null });
+    client.queue('users', { data: { profile_visibility: 'private' }, error: null });
+    client.queue('workouts', { data: [{ id: WM }], error: null });
+    client.queue('workout_cardio', { data: [], error: null });
+    client.queue('workout_exercises', { data: [], error: null });
+    client.queue('users', { data: [person(JO, 'Jo')], error: null });
+    client.queue('workout_groups', { data: { id: G, name: 'Leg Day Crew' }, error: null });
+    client.queue('workouts', {
+      data: [
+        { id: WJ, user_id: JO },
+        { id: WM, user_id: ME },
+      ],
+      error: null,
+    });
+    client.queue('sets', {
+      data: [{ id: 's', workout_exercises: { workout_id: WM } }],
+      error: null,
+    });
+    client.queue('workout_cardio', { data: [], error: null });
+    client.queue('user_blocks', { data: [], error: null });
+    client.queue('follows', { data: [], error: null });
+    client.queue('follows', { data: [], error: null });
+    client.queue('users', { data: [{ id: JO, profile_visibility: 'private' }], error: null });
+    client.queue('users', { data: [person(JO, 'Jo'), person(ME, 'Me')], error: null });
+
+    const seen = await service.getWorkout(ME, WJ);
+    expect(seen.id).toBe(WJ);
+    expect(shape(seen.group)).toEqual([
+      ['Jo', true, true, WJ],
+      ['Me', false, true, WM],
+    ]);
+
+    // Liking it stays with Jo's followers.
+    client.queue('workouts', {
+      data: workout({ id: WJ, user_id: JO, group_id: G }),
+      error: null,
+    });
+    client.queue('user_blocks', { data: [], error: null });
+    client.queue('follows', { data: [], error: null });
+    client.queue('users', { data: { profile_visibility: 'private' }, error: null });
+    await expect(service.like(ME, WJ)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('has no group for a workout that was never one', async () => {
+    const { client, service } = setup();
+    client.queue('workouts', { data: workout(), error: null });
+    queueFollowing(client);
+    client.queue('workout_cardio', { data: [], error: null });
+    client.queue('workout_exercises', { data: [], error: null });
+    client.queue('users', { data: [person(SAM, 'Sam')], error: null });
+
+    expect((await service.getWorkout(ME, W)).group).toBeNull();
   });
 });
