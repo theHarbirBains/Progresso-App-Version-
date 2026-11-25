@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { CreateGroupDto, RespondGroupInviteDto, SetMyWorkoutDayDto } from './dto/groups.dto';
+import {
+  CreateGroupDto,
+  InviteToGroupDto,
+  RespondGroupInviteDto,
+  SetMyWorkoutDayDto,
+} from './dto/groups.dto';
 import { GroupsService } from './groups.service';
 
 // Group workouts (see apps/api/src/groups). Every write is checked here against
@@ -45,6 +50,29 @@ export class GroupsController {
     @Body() dto: RespondGroupInviteDto,
   ) {
     await this.groupsService.respondToInvite(user.id, id, dto.action);
+    return { ok: true };
+  }
+
+  // Invites more friends to a live group, from inside it.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post(':id/invites')
+  async invite(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: InviteToGroupDto,
+  ) {
+    return { results: await this.groupsService.inviteMany(user.id, id, dto.userIds) };
+  }
+
+  // Takes back an invite still waiting: its sender's, or anyone's for the host.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Delete(':id/invites/:userId')
+  async cancelInvite(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) invitee: string,
+  ) {
+    await this.groupsService.cancelInvite(user.id, id, invitee);
     return { ok: true };
   }
 

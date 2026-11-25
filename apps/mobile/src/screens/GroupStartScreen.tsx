@@ -40,7 +40,7 @@ const OWN = 'own';
  * create their own with a name, or choose a day from their own split. Friends and
  * clients join the group straight away; a guest needs no account.
  */
-export function GroupStartScreen({ navigation }: Props) {
+export function GroupStartScreen({ navigation, route }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const { theme, activeWorkoutSplitId } = useProgressTheme();
@@ -52,7 +52,10 @@ export function GroupStartScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [step, setStep] = useState<Step>('people');
-  const [pickedFriends, setPickedFriends] = useState<Set<string>>(new Set());
+  // A friend chosen already: Work Out Together on their profile opens here with them ticked.
+  const [pickedFriends, setPickedFriends] = useState<Set<string>>(
+    () => new Set(route?.params?.invite ? [route.params.invite] : []),
+  );
   const [pickedClients, setPickedClients] = useState<Set<string>>(new Set());
   const [guests, setGuests] = useState<string[]>([]);
   const [guestName, setGuestName] = useState('');

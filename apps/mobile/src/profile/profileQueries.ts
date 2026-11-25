@@ -12,7 +12,7 @@ const PROFILE_COLUMNS =
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
   'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
   'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions, ' +
-  'profile_visibility';
+  'profile_visibility, notify_group_invites';
 
 interface ProfileRow {
   weight_unit: ProfileResponse['weightUnit'];
@@ -59,6 +59,7 @@ interface ProfileRow {
   equipment_access: ProfileResponse['equipmentAccess'];
   training_exclusions: ProfileResponse['trainingExclusions'] | null;
   profile_visibility: string | null;
+  notify_group_invites: boolean | null;
 }
 
 function toProfile(userId: string, row: ProfileRow): ProfileResponse {
@@ -111,6 +112,7 @@ function toProfile(userId: string, row: ProfileRow): ProfileResponse {
     findableByPhone: row.findable_by_phone !== false,
     // Private unless they've made it public.
     profileVisibility: row.profile_visibility === 'public' ? 'public' : 'private',
+    notifyGroupInvites: row.notify_group_invites !== false,
   };
 }
 

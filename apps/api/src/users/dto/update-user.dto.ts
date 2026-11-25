@@ -317,6 +317,11 @@ export class UpdateUserDto {
   @IsBoolean()
   showRank?: boolean;
 
+  /** Settings > Notifications > Social: a workout invite, and the answer to one sent. */
+  @IsOptional()
+  @IsBoolean()
+  notifyGroupInvites?: boolean;
+
   /** Settings > Account & Security > Privacy: a private profile (the default) or a public one. */
   @IsOptional()
   @IsIn(['private', 'public'])

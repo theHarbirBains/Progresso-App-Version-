@@ -923,6 +923,17 @@ export function PersonProfilePage({
                     />
                   )}
                 </View>
+                {/* Someone you follow: invite them to start a live workout together. */}
+                {profile.followStatus === 'accepted' ? (
+                  <SecondaryButton
+                    testID="person-profile-work-out"
+                    label="Train"
+                    icon="users"
+                    size="sm"
+                    onPress={() => navigation.navigate('GroupStart', { invite: userId })}
+                    accessibilityLabel={`Invite ${title} to a live workout`}
+                  />
+                ) : null}
                 <SecondaryButton
                   testID="person-profile-share"
                   label="Share"

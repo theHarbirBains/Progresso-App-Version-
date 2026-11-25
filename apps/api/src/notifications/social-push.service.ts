@@ -3,12 +3,13 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { ExpoPushProvider } from './providers/expo-push.provider';
 
 /** Which of a person's Social Notifications switches a push falls under. */
-export type SocialPushKind = 'follows' | 'likes' | 'comments';
+export type SocialPushKind = 'follows' | 'likes' | 'comments' | 'groupInvites';
 
 const SWITCH_COLUMN: Record<SocialPushKind, string> = {
   follows: 'notify_follows',
   likes: 'notify_likes',
   comments: 'notify_comments',
+  groupInvites: 'notify_group_invites',
 };
 
 /** The app's own links (app.json's scheme): a tapped push opens this screen. */

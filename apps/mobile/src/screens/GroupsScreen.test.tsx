@@ -50,6 +50,24 @@ describe('GroupsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('GroupSession', { groupId: 'g1' });
   });
 
+  it('says who wants to start a live workout with you', async () => {
+    mockInvites.mockResolvedValue([
+      {
+        groupId: 'g4',
+        name: 'Pull Crew',
+        hostDisplayName: 'Jo',
+        invitedById: 'sam',
+        invitedByDisplayName: 'Sam',
+        invitedAt: '2026-10-05T00:00:00.000Z',
+      },
+    ]);
+    render(<GroupsScreen navigation={navigation} route={{} as never} />);
+
+    expect(await screen.findByTestId('group-invite-g4')).toHaveTextContent(
+      /Pull Crew.*Sam wants to start a live workout with you/,
+    );
+  });
+
   it('accepting an invite joins the group and opens it', async () => {
     mockInvites.mockResolvedValue([
       {

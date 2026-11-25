@@ -93,6 +93,23 @@ describe('GroupStartScreen', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it('opens with a friend chosen already, from Train on their profile', async () => {
+    render(
+      <GroupStartScreen navigation={navigation} route={{ params: { invite: 'f1' } } as never} />,
+    );
+
+    await continueToWorkout();
+    fireEvent.press(screen.getByTestId('group-start-day-day-2'));
+    fireEvent.press(screen.getByTestId('group-start-submit'));
+
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        'token-1',
+        expect.objectContaining({ friendUsernames: ['sam_lifts'] }),
+      ),
+    );
+  });
+
   it('starts a split day, with a friend and a client in the group', async () => {
     render(<GroupStartScreen navigation={navigation} route={{} as never} />);
 

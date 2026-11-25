@@ -97,6 +97,8 @@ export interface ProfileResponse {
   /** Who sees their profile's training: accepted followers (private, the default) or everyone
    * signed in (public) -- Settings > Account & Security > Privacy. */
   profileVisibility: 'private' | 'public';
+  /** Whether a workout invite, and the answer to one they sent, is pushed to them. */
+  notifyGroupInvites: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -148,6 +150,7 @@ export interface UpdateProfileInput {
   findableByPhone?: boolean;
   showRank?: boolean;
   profileVisibility?: 'private' | 'public';
+  notifyGroupInvites?: boolean;
 }
 
 export function updateMyProfile(

@@ -67,6 +67,8 @@ export interface UserProfile {
   /** Who sees their profile's training: accepted followers (private, the default) or every
    * signed-in user (public). */
   profileVisibility: 'private' | 'public';
+  /** Whether a workout invite, and the answer to one they sent, is pushed to them. */
+  notifyGroupInvites: boolean;
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
@@ -82,7 +84,7 @@ const PROFILE_COLUMNS =
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
   'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
   'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions, ' +
-  'profile_visibility';
+  'profile_visibility, notify_group_invites';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -131,6 +133,7 @@ function toProfile(data: any): UserProfile {
     findableByPhone: data.findable_by_phone,
     showRank: data.show_rank,
     profileVisibility: data.profile_visibility,
+    notifyGroupInvites: data.notify_group_invites,
   };
 }
 
@@ -240,6 +243,9 @@ export class UsersService {
     if (dto.notifyFollows !== undefined) updatePayload.notify_follows = dto.notifyFollows;
     if (dto.notifyLikes !== undefined) updatePayload.notify_likes = dto.notifyLikes;
     if (dto.notifyComments !== undefined) updatePayload.notify_comments = dto.notifyComments;
+    if (dto.notifyGroupInvites !== undefined) {
+      updatePayload.notify_group_invites = dto.notifyGroupInvites;
+    }
     if (dto.findableByEmail !== undefined) updatePayload.findable_by_email = dto.findableByEmail;
     if (dto.phoneNumber !== undefined) updatePayload.phone_e164 = dto.phoneNumber;
     if (dto.findableByPhone !== undefined) updatePayload.findable_by_phone = dto.findableByPhone;

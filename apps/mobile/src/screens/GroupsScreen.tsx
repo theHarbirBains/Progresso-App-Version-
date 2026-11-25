@@ -57,6 +57,7 @@ export function GroupsScreen({ navigation }: Props) {
     if (!accessToken) return;
     try {
       await respondToGroupInvite(accessToken, groupId, action);
+      // Accepted: straight into the same live workout, with no code to type.
       if (action === 'accept') navigation.navigate('GroupSession', { groupId });
       await load();
     } catch (err) {
@@ -92,7 +93,9 @@ export function GroupsScreen({ navigation }: Props) {
                   <ListRow
                     testID={`group-invite-${invite.groupId}`}
                     title={invite.name}
-                    subtitle={`From ${invite.hostDisplayName ?? 'a friend'}`}
+                    subtitle={`${
+                      invite.invitedByDisplayName ?? invite.hostDisplayName ?? 'A friend'
+                    } wants to start a live workout with you`}
                     detail={formatCardDate(invite.invitedAt)}
                     divider={index > 0}
                   />

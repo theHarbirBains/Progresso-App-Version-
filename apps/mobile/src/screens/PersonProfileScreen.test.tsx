@@ -240,6 +240,25 @@ describe('PersonProfileScreen', () => {
     expect(screen.queryByTestId('person-profile-subline')).toBeNull();
   });
 
+  it('offers someone you follow a live workout together, and nobody else', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(profile({ followStatus: 'accepted' }));
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-work-out'));
+    expect(mockNavigate).toHaveBeenCalledWith('GroupStart', { invite: 'sam' });
+  });
+
+  it("doesn't offer it to someone you don't follow", async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ followStatus: 'none', canSeeActivity: false, stats: null, exercises: null }),
+    );
+    (getPersonWorkouts as jest.Mock).mockRejectedValue(new Error('Follow them to see'));
+    renderScreen();
+
+    await screen.findByTestId('person-profile-follow');
+    expect(screen.queryByTestId('person-profile-work-out')).toBeNull();
+  });
+
   it('puts your follow requests between the counts on your own, opening them', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       user: { id: 'sam' },

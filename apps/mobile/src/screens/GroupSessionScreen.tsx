@@ -8,7 +8,6 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { cancelGroupWorkout, finishGroup, getGroup, type GroupDetail } from '../lib/api';
@@ -17,6 +16,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { hasLoggedSets } from '../workouts/groupWorkoutHistory';
+import { GroupInvitations } from '../workouts/GroupInvitations';
 import { GroupWorkoutEditor, type LiveWorkoutFinish } from '../workouts/GroupWorkoutEditor';
 import { usePreviousExercises } from '../workouts/usePreviousExercises';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
@@ -33,7 +33,8 @@ type Props = RootStackScreenProps<'GroupSession'>;
  * One group session, laid out like the regular live workout: the header, then the
  * workout's exercises and sets, then Finish. The only addition is a row of tabs across
  * the top of the workout, one per person in the group. Who is training is chosen when
- * the group starts (see GroupStartScreen); nobody can be added once it has started.
+ * the group starts (see GroupStartScreen); more friends can be invited while it's going, and
+ * every invite and its answer shows under the workout (GroupInvitations).
  */
 export function GroupSessionScreen({ navigation, route }: Props) {
   const { groupId } = route.params;
@@ -184,7 +185,6 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const isHost = group?.hostId === userId;
   const isLive = group?.status === 'live';
   const joined = group?.members.filter((member) => member.status === 'joined') ?? [];
-  const invited = group?.members.filter((member) => member.status === 'invited') ?? [];
   const editorMembers = joined.flatMap((member) =>
     member.workoutId
       ? [{ userId: member.userId, displayName: member.displayName, workoutId: member.workoutId }]
@@ -258,19 +258,15 @@ export function GroupSessionScreen({ navigation, route }: Props) {
           />
         ) : null}
 
-        {invited.length > 0 ? (
+        {accessToken ? (
           <RiseIn>
-            <AppCard testID="group-session-invited">
-              <SectionHeader label="Invited" />
-              {invited.map((member, index) => (
-                <ListRow
-                  key={member.userId}
-                  title={member.displayName ?? 'Invited'}
-                  subtitle="Waiting for them to accept"
-                  divider={index > 0}
-                />
-              ))}
-            </AppCard>
+            <GroupInvitations
+              group={group}
+              accessToken={accessToken}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+              onChanged={load}
+            />
           </RiseIn>
         ) : null}
       </ScrollView>

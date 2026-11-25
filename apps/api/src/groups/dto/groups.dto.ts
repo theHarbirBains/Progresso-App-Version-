@@ -1,5 +1,7 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsIn,
   IsOptional,
@@ -73,4 +75,14 @@ export class AddGuestDto {
 export class RespondGroupInviteDto {
   @IsIn(['accept', 'decline'])
   action!: 'accept' | 'decline';
+}
+
+// Friends (or clients with an account) to invite to a live group, by id.
+export class InviteToGroupDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  userIds!: string[];
 }

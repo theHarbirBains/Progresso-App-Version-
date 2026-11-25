@@ -136,6 +136,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
     notifyFollows: profile?.notifyFollows ?? true,
     notifyLikes: profile?.notifyLikes ?? true,
     notifyComments: profile?.notifyComments ?? true,
+    notifyGroupInvites: profile?.notifyGroupInvites ?? true,
   });
   useEffect(() => {
     if (!profile) return;
@@ -143,6 +144,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
       notifyFollows: profile.notifyFollows ?? true,
       notifyLikes: profile.notifyLikes ?? true,
       notifyComments: profile.notifyComments ?? true,
+      notifyGroupInvites: profile.notifyGroupInvites ?? true,
     });
   }, [profile]);
 
@@ -344,6 +346,23 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
               disabled={saving}
               accentColor={theme.accent}
               accessibilityLabel="Comments"
+            />
+          }
+        />
+        <ListRow
+          testID="notif-social-group-invites"
+          icon="users"
+          title="Live Workout Invites"
+          subtitle="When a friend invites you to work out together, and the answer to one you sent."
+          divider
+          trailing={
+            <Toggle
+              testID="notif-social-group-invites-toggle"
+              value={social.notifyGroupInvites}
+              onValueChange={(value) => void handleToggleSocial('notifyGroupInvites', value)}
+              disabled={saving}
+              accentColor={theme.accent}
+              accessibilityLabel="Live Workout Invites"
             />
           }
         />

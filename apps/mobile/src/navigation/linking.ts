@@ -19,6 +19,7 @@ export const LINK_CONFIG: NonNullable<LinkingOptions<RootStackParamList>['config
     NewWorkout: 'workouts/new',
     WorkoutDetail: 'workouts/:workoutId',
     ActiveWorkout: 'workouts/:workoutId/live',
+    Groups: 'groups',
     GroupSession: 'groups/:groupId',
     PersonProfile: 'people/:userId',
     Notifications: 'notifications',

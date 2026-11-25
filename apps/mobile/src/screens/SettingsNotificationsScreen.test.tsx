@@ -186,6 +186,15 @@ describe('SettingsNotificationsScreen', () => {
       expect(mockUpdateMyProfile).toHaveBeenCalledWith(expect.any(String), { notifyLikes: false }),
     );
     expect(screen.getByTestId('notif-social-likes-toggle').props.value).toBe(false);
+
+    // Live workout invites, the same way.
+    expect(screen.getByTestId('notif-social-group-invites-toggle').props.value).toBe(true);
+    fireEvent(screen.getByTestId('notif-social-group-invites-toggle'), 'valueChange', false);
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith(expect.any(String), {
+        notifyGroupInvites: false,
+      }),
+    );
   });
 
   it('asks the phone again once push is turned on, so the reminders can start', async () => {

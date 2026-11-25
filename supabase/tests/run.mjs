@@ -7763,6 +7763,69 @@ async function main() {
     );
   }
 
+  console.log('\nRunning workout invitation tests...\n');
+  {
+    const [host, declined, cancelled, waiting] = [
+      randomUUID(),
+      randomUUID(),
+      randomUUID(),
+      randomUUID(),
+    ];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8)', [
+      host,
+      'inv-host@test.local',
+      declined,
+      'inv-declined@test.local',
+      cancelled,
+      'inv-cancelled@test.local',
+      waiting,
+      'inv-waiting@test.local',
+    ]);
+    const group = (
+      await admin.query(
+        "insert into public.workout_groups (host_id, name) values ($1, 'Invite group') returning id",
+        [host],
+      )
+    ).rows[0].id;
+    await admin.query(
+      `insert into public.workout_group_members (group_id, user_id, role, status, added_by, invited_at, responded_at)
+       values ($1, $2, 'host', 'joined', $2, null, null),
+              ($1, $3, 'member', 'declined', $2, now(), now()),
+              ($1, $4, 'member', 'cancelled', $2, now(), now()),
+              ($1, $5, 'member', 'invited', $2, now(), null)`,
+      [group, host, declined, cancelled, waiting],
+    );
+    const hostsWorkout = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Invite group', now(), $2) returning id",
+        [host, group],
+      )
+    ).rows[0].id;
+    const sees = async (userId) =>
+      (
+        await asUser(userId, (c) =>
+          c.query('select id from public.workouts where id = $1', [hostsWorkout]),
+        )
+      ).rows.length;
+    record(
+      'A declined or cancelled invite never counts as being in the group',
+      (await sees(declined)) === 0 && (await sees(cancelled)) === 0 && (await sees(waiting)) === 0,
+    );
+    record('The host still reads their own group workout', (await sees(host)) === 1);
+    await expectThrows(
+      admin.query("update public.workout_group_members set status = 'maybe' where user_id = $1", [
+        waiting,
+      ]),
+      'An invite is only ever invited, joined, left, declined or cancelled',
+      /workout_group_members_status_check/,
+    );
+    record(
+      'Workout invites are pushed unless turned off',
+      (await admin.query('select notify_group_invites from public.users where id = $1', [waiting]))
+        .rows[0].notify_group_invites === true,
+    );
+  }
+
   await admin.end();
 }
 

@@ -91,7 +91,8 @@ export type RootStackParamList = {
   GroupSession: { groupId: string };
   /** A trainer picks several of their clients to add to the group. */
   /** Working out as a group: pick who is training, the workout, then start. */
-  GroupStart: undefined;
+  /** Working out as a group; `invite`, a friend to have chosen already (from their profile). */
+  GroupStart: { invite?: string } | undefined;
   /** A live session a trainer runs for a client, finished by the trainer. */
   /** startedAt is when the session began, so its stats count from then. */
   TrainerLiveWorkout: {

@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  GoneException,
+  NotFoundException,
+} from '@nestjs/common';
+import type { SocialPushService } from '../notifications/social-push.service';
 import type { SupabaseService } from '../supabase/supabase.service';
 import { GroupsService } from './groups.service';
 
@@ -10,6 +16,7 @@ interface Result {
 const CHAIN = [
   'select',
   'eq',
+  'not',
   'in',
   'gt',
   'or',
@@ -86,8 +93,19 @@ const GROUP = '55555555-5555-4555-8555-555555555555';
 function setup() {
   const mock = createMockClient();
   const supabase = { getClient: () => mock.client } as unknown as SupabaseService;
-  return { mock, service: new GroupsService(supabase) };
+  const push = {
+    nameOf: jest.fn().mockResolvedValue('Sam'),
+    notify: jest.fn().mockResolvedValue(undefined),
+  };
+  return {
+    mock,
+    push,
+    service: new GroupsService(supabase, push as unknown as SocialPushService),
+  };
 }
+
+/** Lets the pushes sent after an answer (never awaited by it) go out. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 const joined = (userId: string, role: 'host' | 'member' = 'member') =>
   ok({
@@ -159,7 +177,7 @@ describe('GroupsService', () => {
       const { mock, service } = setup();
       mock.queue('workout_groups', ok({ status: 'live' }));
       mock.queue('workout_group_members', joined(HOST, 'host'));
-      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('users', ok({ id: TARGET }), ok({ id: TARGET }));
       mock.queue('follows', ok(null), ok(null));
       mock.queue('trainer_clients', ok(null), ok(null));
 
@@ -172,7 +190,7 @@ describe('GroupsService', () => {
       const { mock, service } = setup();
       mock.queue('workout_groups', ok({ status: 'live' }));
       mock.queue('workout_group_members', joined(HOST, 'host'));
-      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('users', ok({ id: TARGET }), ok({ id: TARGET }));
       mock.queue('user_blocks', ok([{ blocker_id: TARGET, blocked_id: HOST }]));
 
       await expect(service.inviteMember(HOST, GROUP, 'friend_one')).rejects.toThrow(
@@ -181,11 +199,11 @@ describe('GroupsService', () => {
       expect(mock.calls.some((c) => c.method === 'insert')).toBe(false);
     });
 
-    it('invites a friend, who then has to accept', async () => {
-      const { mock, service } = setup();
-      mock.queue('workout_groups', ok({ status: 'live' }));
+    it('invites a friend, who then has to accept -- and tells them', async () => {
+      const { mock, push, service } = setup();
+      mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
       mock.queue('workout_group_members', joined(HOST, 'host'), ok(null), ok());
-      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('users', ok({ id: TARGET }), ok({ id: TARGET }));
       mock.queue('follows', ok({ id: 'f1' }), ok(null));
       mock.queue('trainer_clients', ok(null), ok(null));
 
@@ -196,11 +214,24 @@ describe('GroupsService', () => {
       const invite = mock.calls.find(
         (c) => c.target === 'workout_group_members' && c.method === 'insert',
       );
-      expect(invite?.args[0]).toMatchObject({ user_id: TARGET, status: 'invited', role: 'member' });
+      expect(invite?.args[0]).toMatchObject({
+        user_id: TARGET,
+        status: 'invited',
+        role: 'member',
+        added_by: HOST,
+        invited_at: expect.any(String),
+      });
+      await settle();
+      expect(push.notify).toHaveBeenCalledWith(TARGET, 'groupInvites', {
+        title: 'Live workout invite',
+        body: 'Sam wants to start a live workout with you: Thursday legs.',
+        path: 'groups',
+      });
     });
 
     it('refuses anyone who is not in the group', async () => {
       const { mock, service } = setup();
+      mock.queue('users', ok({ id: TARGET }));
       mock.queue('workout_groups', ok({ status: 'live' }));
       mock.queue('workout_group_members', ok(null));
       await expect(service.inviteMember(HOST, GROUP, 'friend_one')).rejects.toThrow(
@@ -242,14 +273,14 @@ describe('GroupsService', () => {
         ok(),
       );
       mock.queue('workouts', ok(null), ok());
-      mock.queue('workout_groups', ok({ name: 'Thursday legs' }));
+      mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
 
       await service.respondToInvite(MEMBER, GROUP, 'accept');
 
       const update = mock.calls.find(
         (c) => c.target === 'workout_group_members' && c.method === 'update',
       );
-      expect(update?.args[0]).toEqual({ status: 'joined' });
+      expect(update?.args[0]).toEqual({ status: 'joined', responded_at: expect.any(String) });
       const workout = mock.calls.find((c) => c.target === 'workouts' && c.method === 'insert');
       expect(workout?.args[0]).toMatchObject({ user_id: MEMBER, group_id: GROUP });
     });
@@ -260,6 +291,260 @@ describe('GroupsService', () => {
       await expect(service.respondToInvite(MEMBER, GROUP, 'accept')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('invitations', () => {
+    const invitedRow = (extra: Record<string, unknown> = {}) =>
+      ok({
+        id: 'm-target',
+        user_id: TARGET,
+        role: 'member',
+        status: 'invited',
+        is_guest: false,
+        added_by: HOST,
+        invited_at: '2026-11-25T10:00:00Z',
+        ...extra,
+      });
+
+    it('never invites anyone twice, and invites someone again after they declined', async () => {
+      const { mock, service } = setup();
+      // Waiting already: as it is, nothing written.
+      mock.queue('workout_groups', ok({ status: 'live' }), ok({ status: 'live' }));
+      mock.queue('workout_group_members', joined(HOST, 'host'), joined(HOST, 'host'), invitedRow());
+      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('follows', ok({ id: 'f1' }), ok(null));
+      mock.queue('trainer_clients', ok(null), ok(null));
+      await expect(service.inviteMany(HOST, GROUP, [TARGET])).resolves.toEqual([
+        { userId: TARGET, status: 'invited' },
+      ]);
+      expect(mock.calls.some((c) => c.method === 'insert' || c.method === 'update')).toBe(false);
+
+      // Declined before: a new invite, on the same row.
+      mock.queue(
+        'workout_groups',
+        ok({ status: 'live' }),
+        ok({ status: 'live' }),
+        ok({ name: 'Legs' }),
+      );
+      mock.queue(
+        'workout_group_members',
+        joined(HOST, 'host'),
+        joined(HOST, 'host'),
+        invitedRow({ status: 'declined', responded_at: '2026-11-25T10:05:00Z' }),
+        ok(),
+      );
+      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('follows', ok({ id: 'f1' }), ok(null));
+      mock.queue('trainer_clients', ok(null), ok(null));
+      await expect(service.inviteMany(HOST, GROUP, [TARGET])).resolves.toEqual([
+        { userId: TARGET, status: 'invited' },
+      ]);
+      const again = mock.calls.find(
+        (c) => c.target === 'workout_group_members' && c.method === 'update',
+      );
+      expect(again?.args[0]).toMatchObject({
+        status: 'invited',
+        added_by: HOST,
+        invited_at: expect.any(String),
+        responded_at: null,
+      });
+    });
+
+    it('invites several at once, skipping anyone who can’t be invited', async () => {
+      const { mock, service } = setup();
+      const OTHER = '99999999-9999-9999-9999-999999999999';
+      mock.queue(
+        'workout_groups',
+        ok({ status: 'live' }),
+        ok({ status: 'live' }),
+        ok({ status: 'live' }),
+        ok({ name: 'Legs' }),
+      );
+      mock.queue(
+        'workout_group_members',
+        joined(HOST, 'host'),
+        joined(HOST, 'host'),
+        ok(null),
+        ok(),
+        joined(HOST, 'host'),
+      );
+      // A friend, then someone with no account.
+      mock.queue('users', ok({ id: TARGET }), ok(null));
+      mock.queue('follows', ok({ id: 'f1' }), ok(null));
+      mock.queue('trainer_clients', ok(null), ok(null));
+
+      await expect(service.inviteMany(HOST, GROUP, [TARGET, OTHER])).resolves.toEqual([
+        { userId: TARGET, status: 'invited' },
+        { userId: OTHER, status: 'skipped' },
+      ]);
+    });
+
+    it('lets whoever sent an invite, or the host, cancel it while it waits', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', joined(HOST, 'host'), invitedRow(), ok());
+      mock.queue('workout_groups', ok({ host_id: HOST }));
+      await service.cancelInvite(HOST, GROUP, TARGET);
+      const cancelled = mock.calls.find(
+        (c) => c.target === 'workout_group_members' && c.method === 'update',
+      );
+      expect(cancelled?.args[0]).toEqual({ status: 'cancelled', responded_at: expect.any(String) });
+
+      // Someone else in the group, who didn't send it: no.
+      mock.queue('workout_group_members', joined(MEMBER), invitedRow());
+      mock.queue('workout_groups', ok({ host_id: HOST }));
+      await expect(service.cancelInvite(MEMBER, GROUP, TARGET)).rejects.toThrow(ForbiddenException);
+
+      // Answered already: nothing to cancel.
+      mock.queue('workout_group_members', joined(HOST, 'host'), invitedRow({ status: 'joined' }));
+      await expect(service.cancelInvite(HOST, GROUP, TARGET)).rejects.toThrow(NotFoundException);
+    });
+
+    it('declining says so -- not as if they joined and left -- and tells whoever sent it', async () => {
+      const { mock, push, service } = setup();
+      mock.queue('workout_group_members', invitedRow({ user_id: MEMBER }), ok());
+      mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
+
+      await service.respondToInvite(MEMBER, GROUP, 'decline');
+      await settle();
+
+      const update = mock.calls.find(
+        (c) => c.target === 'workout_group_members' && c.method === 'update',
+      );
+      expect(update?.args[0]).toEqual({ status: 'declined', responded_at: expect.any(String) });
+      expect(push.notify).toHaveBeenCalledWith(HOST, 'groupInvites', {
+        title: 'Invite declined',
+        body: "Sam can't join your live workout: Thursday legs.",
+        path: `groups/${GROUP}`,
+      });
+    });
+
+    it('tells whoever sent it when it’s accepted', async () => {
+      const { mock, push, service } = setup();
+      mock.queue('workout_group_members', invitedRow({ user_id: MEMBER }), ok());
+      mock.queue('workouts', ok({ id: 'w-member' }));
+      mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
+
+      await service.respondToInvite(MEMBER, GROUP, 'accept');
+      await settle();
+
+      expect(push.notify).toHaveBeenCalledWith(HOST, 'groupInvites', {
+        title: 'Invite accepted',
+        body: 'Sam is joining your live workout: Thursday legs.',
+        path: `groups/${GROUP}`,
+      });
+      // Already had a workout in the group: none made, nobody else touched.
+      expect(mock.calls.filter((c) => c.method === 'insert')).toEqual([]);
+      expect(mock.calls.filter((c) => c.method === 'update')).toHaveLength(1);
+    });
+
+    it("takes no answer once the workout has finished: it's expired", async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', invitedRow({ user_id: MEMBER }));
+      mock.queue('workout_groups', ok({ status: 'finished' }));
+
+      await expect(service.respondToInvite(MEMBER, GROUP, 'accept')).rejects.toThrow(GoneException);
+      expect(mock.calls.some((c) => c.method === 'update')).toBe(false);
+    });
+
+    it('shows everyone in the group what became of each invite', async () => {
+      const { mock, service } = setup();
+      const [A, B, C, D] = ['aaaa', 'bbbb', 'cccc', 'dddd'];
+      mock.queue(
+        'workout_group_members',
+        joined(MEMBER),
+        ok([
+          {
+            id: 'm1',
+            user_id: HOST,
+            role: 'host',
+            status: 'joined',
+            is_guest: false,
+            added_by: HOST,
+            invited_at: null,
+          },
+          {
+            id: 'm2',
+            user_id: MEMBER,
+            role: 'member',
+            status: 'joined',
+            is_guest: false,
+            added_by: HOST,
+            invited_at: '2026-11-25T10:00:00Z',
+            responded_at: '2026-11-25T10:01:00Z',
+          },
+          {
+            id: 'm3',
+            user_id: A,
+            role: 'member',
+            status: 'invited',
+            is_guest: false,
+            added_by: MEMBER,
+            invited_at: '2026-11-25T10:04:00Z',
+          },
+          {
+            id: 'm4',
+            user_id: B,
+            role: 'member',
+            status: 'invited',
+            is_guest: false,
+            added_by: HOST,
+            invited_at: '2026-11-25T10:03:00Z',
+          },
+          {
+            id: 'm5',
+            user_id: C,
+            role: 'member',
+            status: 'declined',
+            is_guest: false,
+            added_by: HOST,
+            invited_at: '2026-11-25T10:02:00Z',
+            responded_at: '2026-11-25T10:06:00Z',
+          },
+          {
+            id: 'm6',
+            user_id: D,
+            role: 'member',
+            status: 'cancelled',
+            is_guest: false,
+            added_by: HOST,
+            invited_at: '2026-11-25T10:00:30Z',
+            responded_at: '2026-11-25T10:07:00Z',
+          },
+        ]),
+      );
+      mock.queue(
+        'workout_groups',
+        ok({
+          id: GROUP,
+          name: 'Thursday legs',
+          status: 'live',
+          host_id: HOST,
+          started_at: '2026-11-25T09:55:00Z',
+          finished_at: null,
+        }),
+      );
+      mock.queue('workouts', ok([]));
+      mock.queue('users', ok([]));
+
+      const detail = await service.getDetail(MEMBER, GROUP);
+
+      expect(detail.members.map((m) => [m.userId, m.status])).toEqual([
+        [HOST, 'joined'],
+        [MEMBER, 'joined'],
+        [A, 'invited'],
+        [B, 'invited'],
+      ]);
+      expect(
+        detail.invitations.map((i) => [i.userId, i.status, i.invitedById, i.canCancel]),
+      ).toEqual([
+        // MEMBER sent A's: theirs to take back. B's is the host's.
+        [A, 'pending', MEMBER, true],
+        [B, 'pending', HOST, false],
+        [C, 'declined', HOST, false],
+        [D, 'cancelled', HOST, false],
+        [MEMBER, 'accepted', HOST, false],
+      ]);
     });
   });
 

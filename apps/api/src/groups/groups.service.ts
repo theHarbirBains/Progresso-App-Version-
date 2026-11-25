@@ -2,11 +2,15 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  GoneException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { SocialPushService } from '../notifications/social-push.service';
 import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { AddGuestDto, CreateGroupDto } from './dto/groups.dto';
@@ -32,6 +36,22 @@ export interface GroupMemberView {
   workoutName: string | null;
 }
 
+/**
+ * One invite to a group, as everyone in it sees it: who it's for, who sent it and what became of
+ * it -- waiting, accepted, declined, cancelled, or expired with the group finished.
+ */
+export interface GroupInvitation {
+  userId: string;
+  displayName: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired';
+  invitedById: string | null;
+  invitedByDisplayName: string | null;
+  invitedAt: string;
+  respondedAt: string | null;
+  /** The viewer may take it back: it's waiting, and they sent it or they're the host. */
+  canCancel: boolean;
+}
+
 export interface GroupDetail {
   id: string;
   name: string;
@@ -40,22 +60,41 @@ export interface GroupDetail {
   startedAt: string;
   finishedAt: string | null;
   members: GroupMemberView[];
+  /** Every invite sent to it, newest first. */
+  invitations: GroupInvitation[];
 }
 
 export interface GroupInvite {
   groupId: string;
   name: string;
   hostDisplayName: string | null;
+  /** Who sent it (anyone in the group can): "Sam wants to start a live workout with you." */
+  invitedById: string | null;
+  invitedByDisplayName: string | null;
   invitedAt: string;
 }
+
+/** What became of an invite asked for (POST /groups/:id/invites), one a person. */
+export interface InviteResult {
+  userId: string;
+  /** invited: sent now, or waiting already (never twice); joined: in the group already. */
+  status: 'invited' | 'joined' | 'skipped';
+}
+
+type MemberStatus = 'invited' | 'joined' | 'left' | 'declined' | 'cancelled';
 
 interface MemberRow {
   id: string;
   user_id: string;
   role: 'host' | 'member';
-  status: 'invited' | 'joined' | 'left';
+  status: MemberStatus;
   is_guest: boolean;
+  added_by?: string | null;
+  invited_at?: string | null;
+  responded_at?: string | null;
 }
+
+const MEMBER_COLUMNS = 'id, user_id, role, status, is_guest, added_by, invited_at, responded_at';
 
 interface ExerciseSetsRow {
   id: string;
@@ -71,7 +110,13 @@ interface ExerciseSetsRow {
  */
 @Injectable()
 export class GroupsService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  private readonly logger = new Logger(GroupsService.name);
+
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    // Pushes an invite to its invitee, and the answer to its sender (when they want it).
+    @Optional() private readonly socialPush?: SocialPushService,
+  ) {}
 
   /**
    * Starts a group and adds the people working out today. This is the only place people
@@ -194,12 +239,19 @@ export class GroupsService {
     const client = this.supabaseService.getClient();
     const { data: rows, error } = await client
       .from('workout_group_members')
-      .select('group_id, created_at')
+      .select('group_id, created_at, invited_at, added_by')
       .eq('user_id', userId)
       .eq('status', 'invited');
     if (error) throw new InternalServerErrorException('Failed to load invites');
 
-    const invites = (rows ?? []) as { group_id: string; created_at: string }[];
+    const invites = (
+      (rows ?? []) as {
+        group_id: string;
+        created_at: string;
+        invited_at: string | null;
+        added_by: string | null;
+      }[]
+    ).sort((a, b) => (b.invited_at ?? b.created_at).localeCompare(a.invited_at ?? a.created_at));
     if (invites.length === 0) return [];
 
     const { data: groups, error: groupsError } = await client
@@ -213,23 +265,25 @@ export class GroupsService {
     if (groupsError) throw new InternalServerErrorException('Failed to load invites');
 
     const groupRows = (groups ?? []) as { id: string; name: string; host_id: string }[];
-    const hosts = await this.loadDisplayNames(groupRows.map((g) => g.host_id));
-    return invites
-      .map((invite) => ({ invite, group: groupRows.find((g) => g.id === invite.group_id) }))
-      .filter(
-        (
-          row,
-        ): row is {
-          invite: { group_id: string; created_at: string };
-          group: { id: string; name: string; host_id: string };
-        } => row.group !== undefined,
-      )
-      .map(({ invite, group }) => ({
-        groupId: group.id,
-        name: group.name,
-        hostDisplayName: hosts.get(group.host_id) ?? null,
-        invitedAt: invite.created_at,
-      }));
+    const names = await this.loadDisplayNames([
+      ...groupRows.map((g) => g.host_id),
+      ...invites.flatMap((invite) => (invite.added_by ? [invite.added_by] : [])),
+    ]);
+    // Only a live group's: one that's finished has expired.
+    return invites.flatMap((invite) => {
+      const group = groupRows.find((g) => g.id === invite.group_id);
+      if (!group) return [];
+      return [
+        {
+          groupId: group.id,
+          name: group.name,
+          hostDisplayName: names.get(group.host_id) ?? null,
+          invitedById: invite.added_by,
+          invitedByDisplayName: invite.added_by ? (names.get(invite.added_by) ?? null) : null,
+          invitedAt: invite.invited_at ?? invite.created_at,
+        },
+      ];
+    });
   }
 
   /** The group, its members and each member's workout. Only joined members see it. */
@@ -255,11 +309,13 @@ export class GroupsService {
 
     const { data: memberRows, error: membersError } = await client
       .from('workout_group_members')
-      .select('id, user_id, role, status, is_guest')
-      .eq('group_id', groupId)
-      .in('status', ['invited', 'joined']);
+      .select(MEMBER_COLUMNS)
+      .eq('group_id', groupId);
     if (membersError) throw new InternalServerErrorException('Failed to load members');
-    const members = (memberRows ?? []) as MemberRow[];
+    const rows = (memberRows ?? []) as MemberRow[];
+    const members = rows.filter((m) => m.status === 'invited' || m.status === 'joined');
+    // Every invite there's been: its invitee's row, whatever became of it.
+    const invited = rows.filter((m) => m.invited_at);
 
     const { data: workouts, error: workoutsError } = await client
       .from('workouts')
@@ -278,8 +334,35 @@ export class GroupsService {
       ).map((w) => [w.user_id, { id: w.id, name: w.name, splitDayId: w.workout_split_day_id }]),
     );
 
-    const names = await this.loadDisplayNames(members.map((m) => m.user_id));
+    const names = await this.loadDisplayNames([
+      ...rows.map((m) => m.user_id),
+      ...invited.flatMap((m) => (m.added_by ? [m.added_by] : [])),
+    ]);
+    const live = groupRow.status === 'live';
+    const invitations = invited
+      .map((m): GroupInvitation => {
+        const status =
+          m.status === 'invited'
+            ? live
+              ? 'pending'
+              : 'expired'
+            : m.status === 'joined' || m.status === 'left'
+              ? 'accepted'
+              : m.status;
+        return {
+          userId: m.user_id,
+          displayName: names.get(m.user_id) ?? null,
+          status,
+          invitedById: m.added_by ?? null,
+          invitedByDisplayName: m.added_by ? (names.get(m.added_by) ?? null) : null,
+          invitedAt: m.invited_at as string,
+          respondedAt: m.responded_at ?? null,
+          canCancel: status === 'pending' && (m.added_by === userId || groupRow.host_id === userId),
+        };
+      })
+      .sort((a, b) => b.invitedAt.localeCompare(a.invitedAt));
     return {
+      invitations,
       id: groupRow.id,
       name: groupRow.name,
       status: groupRow.status,
@@ -290,7 +373,7 @@ export class GroupsService {
         userId: m.user_id,
         displayName: names.get(m.user_id) ?? null,
         role: m.role,
-        status: m.status === 'left' ? 'invited' : m.status,
+        status: m.status === 'joined' ? 'joined' : 'invited',
         isGuest: m.is_guest,
         workoutId: workoutByUser.get(m.user_id)?.id ?? null,
         workoutSplitDayId: workoutByUser.get(m.user_id)?.splitDayId ?? null,
@@ -299,16 +382,13 @@ export class GroupsService {
     };
   }
 
-  /** Invites a friend or a client. Anyone in the group can invite, and the invitee must accept. */
+  /** Invites a friend or a client by username (as a group starts). See inviteUser. */
   async inviteMember(
     userId: string,
     groupId: string,
     username: string,
   ): Promise<{ userId: string; status: 'invited' | 'joined' }> {
-    await this.requireLive(groupId);
-    await this.requireJoined(userId, groupId);
     const client = this.supabaseService.getClient();
-
     const { data: target, error } = await client
       .from('users')
       .select('id')
@@ -317,7 +397,35 @@ export class GroupsService {
     if (error) throw new InternalServerErrorException('Failed to look up that username');
     const targetId = (target as { id: string } | null)?.id;
     if (!targetId) throw new NotFoundException('No Progresso user has that username');
+    return this.inviteUser(userId, groupId, targetId);
+  }
+
+  /**
+   * Invites a friend or a client (an accepted follow, or an active trainer link, either way --
+   * never across a block). Anyone in a live group can invite, as it starts or while it's going;
+   * the invitee accepts or declines, with no code to type. Never twice: someone invited already,
+   * or in the group, is as they are. Someone who declined, or whose invite was cancelled, can be
+   * invited again -- a new invite. A new one is pushed to them (when they want it).
+   */
+  async inviteUser(
+    userId: string,
+    groupId: string,
+    targetId: string,
+  ): Promise<{ userId: string; status: 'invited' | 'joined' }> {
+    await this.requireLive(groupId);
+    await this.requireJoined(userId, groupId);
+    const client = this.supabaseService.getClient();
     if (targetId === userId) throw new BadRequestException('You are already in this group');
+
+    // Only someone with an account: a guest or a tracked client is added, never invited.
+    const { data: target, error: targetError } = await client
+      .from('users')
+      .select('id')
+      .eq('id', targetId)
+      .not('onboarding_completed_at', 'is', null)
+      .maybeSingle();
+    if (targetError) throw new InternalServerErrorException('Failed to look up that person');
+    if (!target) throw new NotFoundException('No Progresso user has that username');
 
     // A block in either direction reads exactly like not being connected.
     const blocks = await loadBlocks(client, userId);
@@ -334,6 +442,8 @@ export class GroupsService {
       status: 'invited' as const,
       is_guest: false,
       added_by: userId,
+      invited_at: new Date().toISOString(),
+      responded_at: null,
     };
     const { error: writeError } = existing
       ? await client.from('workout_group_members').update(row).eq('id', existing.id)
@@ -341,7 +451,54 @@ export class GroupsService {
           .from('workout_group_members')
           .insert({ group_id: groupId, user_id: targetId, ...row });
     if (writeError) throw new InternalServerErrorException('Failed to send the invite');
+    void this.pushInvite(userId, targetId, groupId);
     return { userId: targetId, status: 'invited' };
+  }
+
+  /**
+   * Invites several friends to a live group at once, from inside it (any joined member). Each is
+   * invited on its own, so one who can't be (not a friend, blocked, no account) is `skipped` and
+   * the rest still go.
+   */
+  async inviteMany(userId: string, groupId: string, targetIds: string[]): Promise<InviteResult[]> {
+    await this.requireLive(groupId);
+    await this.requireJoined(userId, groupId);
+    const results: InviteResult[] = [];
+    for (const targetId of targetIds) {
+      try {
+        results.push(await this.inviteUser(userId, groupId, targetId));
+      } catch {
+        results.push({ userId: targetId, status: 'skipped' });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Takes back an invite still waiting: its sender's, or anyone's for the host. It reads as
+   * cancelled from then on -- the invitee can no longer accept it -- and can be sent again later.
+   */
+  async cancelInvite(userId: string, groupId: string, targetId: string): Promise<void> {
+    await this.requireJoined(userId, groupId);
+    const client = this.supabaseService.getClient();
+    const member = await this.findMember(groupId, targetId);
+    if (!member || member.status !== 'invited') throw new NotFoundException('Invite not found');
+    const { data: group, error: groupError } = await client
+      .from('workout_groups')
+      .select('host_id')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (groupError) throw new InternalServerErrorException('Failed to load the group');
+    const hostId = (group as { host_id: string } | null)?.host_id;
+    if (member.added_by !== userId && hostId !== userId) {
+      throw new ForbiddenException('Only whoever sent an invite, or the host, can cancel it');
+    }
+    const { error } = await client
+      .from('workout_group_members')
+      .update({ status: 'cancelled', responded_at: new Date().toISOString() })
+      .eq('id', member.id)
+      .eq('status', 'invited');
+    if (error) throw new InternalServerErrorException('Failed to cancel the invite');
   }
 
   /** Adds someone with no account. They get a placeholder account and their own workout in the group. */
@@ -389,21 +546,37 @@ export class GroupsService {
     const member = await this.findMember(groupId, userId);
     if (!member || member.status !== 'invited') throw new NotFoundException('Invite not found');
     const client = this.supabaseService.getClient();
+    // A group that's finished takes no answers: its invites have expired.
+    const { data: group, error: groupError } = await client
+      .from('workout_groups')
+      .select('status')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (groupError) throw new InternalServerErrorException('Failed to load the group');
+    if ((group as { status: string } | null)?.status !== 'live') {
+      throw new GoneException('This workout has already finished');
+    }
+    const respondedAt = new Date().toISOString();
 
     if (action === 'decline') {
       const { error } = await client
         .from('workout_group_members')
-        .update({ status: 'left' })
-        .eq('id', member.id);
+        .update({ status: 'declined', responded_at: respondedAt })
+        .eq('id', member.id)
+        .eq('status', 'invited');
       if (error) throw new InternalServerErrorException('Failed to decline the invite');
+      void this.pushAnswer(userId, member.added_by ?? null, groupId, 'declined');
       return;
     }
 
+    // Only this invite's own row changes: nobody else in the group is touched.
     const { error } = await client
       .from('workout_group_members')
-      .update({ status: 'joined' })
-      .eq('id', member.id);
+      .update({ status: 'joined', responded_at: respondedAt })
+      .eq('id', member.id)
+      .eq('status', 'invited');
     if (error) throw new InternalServerErrorException('Failed to accept the invite');
+    void this.pushAnswer(userId, member.added_by ?? null, groupId, 'accepted');
 
     const { data: existing, error: existingError } = await client
       .from('workouts')
@@ -537,7 +710,7 @@ export class GroupsService {
     if (!link) throw new ForbiddenException('Only your active clients can be added this way');
 
     const existing = await this.findMember(groupId, clientId);
-    if (existing && existing.status !== 'left') {
+    if (existing && (existing.status === 'invited' || existing.status === 'joined')) {
       return { userId: clientId, status: existing.status };
     }
 
@@ -552,13 +725,22 @@ export class GroupsService {
 
     const joinsNow = tracked !== null;
     const status = joinsNow ? 'joined' : 'invited';
-    const row = { role: 'member' as const, status, is_guest: false, added_by: userId };
+    const row = {
+      role: 'member' as const,
+      status,
+      is_guest: false,
+      added_by: userId,
+      // A client with an account is invited, as a friend is; a tracked client joins straight off.
+      invited_at: joinsNow ? null : new Date().toISOString(),
+      responded_at: null,
+    };
     const { error: writeError } = existing
       ? await client.from('workout_group_members').update(row).eq('id', existing.id)
       : await client
           .from('workout_group_members')
           .insert({ group_id: groupId, user_id: clientId, ...row });
     if (writeError) throw new InternalServerErrorException('Failed to add the client');
+    if (!joinsNow) void this.pushInvite(userId, clientId, groupId);
 
     if (joinsNow) {
       const name = await this.loadGroupName(groupId);
@@ -686,11 +868,62 @@ export class GroupsService {
     return member;
   }
 
+  /** "Sam wants to start a live workout with you." -- to the invitee, opening their invites. */
+  private async pushInvite(fromId: string, toId: string, groupId: string): Promise<void> {
+    if (!this.socialPush) return;
+    try {
+      const [name, group] = await Promise.all([
+        this.socialPush.nameOf(fromId),
+        this.loadGroupName(groupId),
+      ]);
+      await this.socialPush.notify(toId, 'groupInvites', {
+        title: 'Live workout invite',
+        body: `${name} wants to start a live workout with you: ${group}.`,
+        path: 'groups',
+      });
+    } catch (err) {
+      this.logger.warn(`Invite push failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /** The answer, to whoever sent the invite, opening the group. */
+  private async pushAnswer(
+    fromId: string,
+    toId: string | null,
+    groupId: string,
+    answer: 'accepted' | 'declined',
+  ): Promise<void> {
+    if (!this.socialPush || !toId || toId === fromId) return;
+    try {
+      const [name, group] = await Promise.all([
+        this.socialPush.nameOf(fromId),
+        this.loadGroupName(groupId),
+      ]);
+      await this.socialPush.notify(
+        toId,
+        'groupInvites',
+        answer === 'accepted'
+          ? {
+              title: 'Invite accepted',
+              body: `${name} is joining your live workout: ${group}.`,
+              path: `groups/${groupId}`,
+            }
+          : {
+              title: 'Invite declined',
+              body: `${name} can't join your live workout: ${group}.`,
+              path: `groups/${groupId}`,
+            },
+      );
+    } catch (err) {
+      this.logger.warn(`Answer push failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   private async findMember(groupId: string, userId: string): Promise<MemberRow | null> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('workout_group_members')
-      .select('id, user_id, role, status, is_guest')
+      .select(MEMBER_COLUMNS)
       .eq('group_id', groupId)
       .eq('user_id', userId)
       .maybeSingle();
