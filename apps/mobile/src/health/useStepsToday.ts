@@ -13,27 +13,27 @@ export interface StepsToday {
   connecting: boolean;
   /** Why Apple Health couldn't be reached, when it couldn't -- shown on the card, not hidden. */
   failure: string | null;
-  /** Reads the count again -- Feed calls it each time it's shown. */
+  /** Reads the count again -- Progress calls it each time it's shown. */
   refresh: () => Promise<void>;
   /** Asks Apple Health for steps, then reads them. */
   connect: () => Promise<void>;
 }
 
-/** What Feed last showed of today's steps, for `userId` (lib/lastShown.ts). */
+/** What Progress last showed of today's steps, for `userId` (lib/lastShown.ts). */
 interface ShownSteps {
   access: StepsAccess;
   steps: number | null;
   /** The day it was read (toDateString), so yesterday's count never shows as today's. */
   day: string;
 }
-const SHOWN_KEY = 'feed.steps';
+const SHOWN_KEY = 'progress.steps';
 
 /**
- * Today's steps for Feed's Steps card. Read from Apple Health on the phone each time Feed is
- * shown (Feed calls `refresh` on every focus, its first included) and when the app comes back to
- * the front -- it's a local read, so nothing is cached -- and handed to the Steps widget as it's
- * read. A reopened Feed starts from what it last showed today, so the card is there at once
- * with the page while it's read again.
+ * Today's steps for the Steps block at the top of Progress's Overview. Read from Apple Health on
+ * the phone each time Progress is shown (it calls `refresh` as it opens and on every focus after)
+ * and when the app comes back to the front -- it's a local read, so nothing is cached -- and
+ * handed to the Steps widget as it's read. A reopened Progress starts from what it last showed
+ * today, so the block is there at once while it's read again.
  */
 export function useStepsToday(userId?: string): StepsToday {
   const [shown] = useState(() => {
@@ -72,7 +72,7 @@ export function useStepsToday(userId?: string): StepsToday {
       rememberShown<ShownSteps>(userId, SHOWN_KEY, { access: nextAccess, steps: count, day });
       void showStepsWidget(count);
     } catch (error) {
-      // Feed goes on; the card says what went wrong.
+      // Progress goes on; the block says what went wrong.
       failed(error);
     }
   }, [failed, userId]);

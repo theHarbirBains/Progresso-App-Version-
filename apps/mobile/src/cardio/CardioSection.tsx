@@ -84,9 +84,9 @@ export function CardioSection<T extends CardioValues>({
 
 /**
  * A finished workout's cardio -- yours or a friend's -- and its time, told apart: each activity as
- * its own widget (CardioActivityCard: its glyph, name and figures), then a Time widget --
- * Strength Training, each activity's time and Total Active Training, rests and breaks in none of
- * them -- and the session's own time, start to finish, under them.
+ * its own widget (CardioActivityCard: its glyph, name and figures), then a Time widget -- how much
+ * of the workout was Strength Training and how much each activity, and the Total Workout Time they
+ * make together (cardio/workoutTime.ts).
  */
 export function WorkoutCardio<T extends CardioValues>({
   entries,
@@ -131,20 +131,12 @@ export function WorkoutCardio<T extends CardioValues>({
             value={formatMinutes(entry.durationSeconds)}
           />
         ))}
-        {times.activeSeconds !== null ? (
+        {times.totalSeconds !== null ? (
           <TimeRow
-            testID={`${testID}-active`}
-            label="Total Active Training"
-            value={formatMinutes(times.activeSeconds)}
+            testID={`${testID}-total`}
+            label="Total Workout Time"
+            value={formatMinutes(times.totalSeconds)}
             total
-          />
-        ) : null}
-        {times.sessionSeconds !== null ? (
-          <TimeRow
-            testID={`${testID}-session`}
-            label="Session, start to finish"
-            value={formatMinutes(times.sessionSeconds)}
-            quiet
           />
         ) : null}
       </Card>
@@ -156,13 +148,11 @@ function TimeRow({
   label,
   value,
   total = false,
-  quiet = false,
   testID,
 }: {
   label: string;
   value: string;
   total?: boolean;
-  quiet?: boolean;
   testID: string;
 }) {
   return (
@@ -172,12 +162,8 @@ function TimeRow({
       accessible
       accessibilityLabel={`${label}: ${value}`}
     >
-      <Text style={[styles.timeLabel, total && styles.totalText, quiet && styles.quiet]}>
-        {label}
-      </Text>
-      <Text style={[styles.timeValue, total && styles.totalText, quiet && styles.quiet]}>
-        {value}
-      </Text>
+      <Text style={[styles.timeLabel, total && styles.totalText]}>{label}</Text>
+      <Text style={[styles.timeValue, total && styles.totalText]}>{value}</Text>
     </View>
   );
 }
@@ -228,8 +214,5 @@ const styles = StyleSheet.create({
   totalText: {
     color: colors.textPrimary,
     fontFamily: typeScale.label.fontFamily,
-  },
-  quiet: {
-    color: colors.textMuted,
   },
 });

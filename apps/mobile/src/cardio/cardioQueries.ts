@@ -142,39 +142,6 @@ export async function deleteCardio(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-/**
- * Where a live workout's strength part ended, worked out at Finish with nothing asked: at its last
- * finished set. Cardio added after that set was done after the lifting; anything added before it
- * was done during it, and comes out of the strength time (cardio/workoutTime.ts). Only the
- * activities whose side of that moment changed are written.
- */
-export async function settleStrengthTime(
-  workoutId: string,
-  lastSetAt: string,
-  cardio: { id: string; createdAt: string; afterStrength: boolean }[],
-): Promise<void> {
-  const end = Date.parse(lastSetAt);
-  const { error } = await supabase
-    .from('workouts')
-    .update({ strength_ended_at: lastSetAt })
-    .eq('id', workoutId)
-    .is('deleted_at', null);
-  if (error) throw new Error(error.message);
-  for (const after of [true, false]) {
-    const ids = cardio
-      .filter(
-        (entry) => Date.parse(entry.createdAt) > end === after && entry.afterStrength !== after,
-      )
-      .map((entry) => entry.id);
-    if (ids.length === 0) continue;
-    const { error: cardioError } = await supabase
-      .from('workout_cardio')
-      .update({ after_strength: after })
-      .in('id', ids);
-    if (cardioError) throw new Error(cardioError.message);
-  }
-}
-
 /** A cardio activity in the person's history: when its workout was, as well as its figures. */
 export interface CardioHistoryEntry extends CardioEntry {
   /** When the workout it's in started. */

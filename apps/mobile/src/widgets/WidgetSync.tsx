@@ -1,16 +1,32 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { sumDailyTotals, type NutritionGoalValues } from '../nutrition/nutritionCalculations';
 import { useAppTheme } from '../theme/appThemeContext';
 import { useMembership } from '../membership/useMembership';
+import { recordQuietFailure } from '../lib/sentry';
+import { stepsAccess, stepsToday } from '../health/steps';
 import {
   applyWidgetTheme,
   clearWidgets,
   showNutritionLockedWidget,
   showNutritionWidget,
+  showStepsWidget,
 } from './widgetUpdates';
+
+/** Today's steps from Apple Health, handed to Today's Steps -- nothing off iPhone, or not asked. */
+async function refreshStepsWidget(): Promise<void> {
+  try {
+    const access = await stepsAccess();
+    if (access === 'unavailable') return;
+    await showStepsWidget(access === 'asked' ? await stepsToday() : null);
+  } catch (error) {
+    // The widget keeps what it last showed; Progress's Steps block says what went wrong.
+    recordQuietFailure('health.steps', error);
+  }
+}
 
 const NO_TARGETS: NutritionGoalValues = {
   calories: null,
@@ -20,7 +36,9 @@ const NO_TARGETS: NutritionGoalValues = {
 };
 
 /**
- * Keeps Today's Nutrition in step with the app, from the same shared food log and daily targets
+ * Keeps Today's Steps in step with Apple Health -- read as the app opens signed in and whenever it
+ * comes back to the front (Progress's Steps block hands it a count too, as it reads one) -- keeps
+ * Today's Nutrition in step with the app, from the same shared food log and daily targets
  * Nutrition shows -- every log, edit, delete and target save reaches it with no fetch of its own
  * -- dresses every widget in the app's theme whenever it changes (Settings > Appearance, or the
  * season turning), and clears every widget on sign-out. Mounted once, inside the providers
@@ -40,6 +58,15 @@ export function WidgetSync() {
 
   useEffect(() => {
     if (status === 'signedOut') void clearWidgets();
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'signedIn') return undefined;
+    void refreshStepsWidget();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshStepsWidget();
+    });
+    return () => subscription.remove();
   }, [status]);
 
   useEffect(() => {

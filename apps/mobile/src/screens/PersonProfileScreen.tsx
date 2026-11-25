@@ -346,7 +346,7 @@ export function PersonProfilePage({
           completedSetCount: item.workout.completedSetCount,
           topSets: item.workout.topSets,
           cardio: item.workout.cardio,
-          activeMinutes: item.workout.activeMinutes,
+          totalMinutes: item.workout.totalMinutes ?? item.workout.activeMinutes ?? null,
         }}
         authorName={name}
         avatarUrl={target.user.avatarUrl}

@@ -144,7 +144,7 @@ describe('enrichWorkoutSummaries', () => {
         name: 'Push Day',
         // No cardio: no active time of its own (its duration says how long).
         cardio: [],
-        activeMinutes: null,
+        totalMinutes: null,
         performedAt: '2026-09-05T00:00:00Z',
         completedAt: '2026-09-05T01:00:00Z',
         workoutSplitDayId: 'day-push',
@@ -364,8 +364,8 @@ describe('enrichWorkoutSummaries', () => {
         ],
         error: null,
       },
-      // 10 min on the bike to warm up, before the strength part ended at 45 min; 15 on the
-      // treadmill after it. The workout ran an hour.
+      // 10 min on the bike to warm up and 15 on the treadmill after the lifting. The workout ran
+      // an hour.
       workout_cardio: {
         data: [
           {
@@ -401,7 +401,6 @@ describe('enrichWorkoutSummaries', () => {
         ],
         error: null,
       },
-      workouts: { data: [{ id: 'w1', strength_ended_at: '2026-09-05T00:45:00Z' }], error: null },
     });
 
     const [result] = await enrichWorkoutSummaries([workout({})]);
@@ -410,8 +409,8 @@ describe('enrichWorkoutSummaries', () => {
       ['cycling', 600, null],
       ['treadmill', 900, 2414.02],
     ]);
-    // 45 min less the 10 on the bike, then the bike and the treadmill: 35 + 25.
-    expect(result.activeMinutes).toBe(60);
+    // The hour it ran, the 25 minutes of cardio and 35 of strength training in it.
+    expect(result.totalMinutes).toBe(60);
     expect(result.completedSetCount).toBe(1);
   });
 });

@@ -626,7 +626,7 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(screen.getByTestId('top-set-we2')).toHaveTextContent(/60/);
   });
 
-  it('shows its cardio, and its time told apart: strength, each activity, active and the session', async () => {
+  it('shows its cardio, and its total time told apart: the strength training and each activity', async () => {
     const treadmill = {
       id: 'c1',
       workoutId: 'w1',
@@ -642,10 +642,9 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
       afterStrength: true,
       createdAt: '2026-01-01T12:42:00Z',
     };
-    // Lifted until 40 min in, then 15 on the treadmill; finished at an hour.
+    // An hour in all, 15 minutes of it on the treadmill.
     await ready({
       ...twoExercises,
-      strengthEndedAt: '2026-01-01T12:40:00Z',
       cardio: [treadmill],
     } as typeof twoExercises);
 
@@ -659,12 +658,16 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
     expect(screen.getByTestId('workout-detail-cardio-entry-c1')).toBeTruthy();
     expect(screen.queryByText(/\bcal\b/)).toBeNull();
-    expect(screen.getByTestId('workout-detail-cardio-strength')).toHaveTextContent(/40 min/);
+    expect(screen.getByTestId('workout-detail-cardio-strength')).toHaveTextContent(/45 min/);
     expect(screen.getByTestId('workout-detail-cardio-time-c1')).toHaveTextContent(/15 min/);
-    expect(screen.getByTestId('workout-detail-cardio-active')).toHaveTextContent(/55 min/);
-    expect(screen.getByTestId('workout-detail-cardio-session')).toHaveTextContent(/1h 0m/);
-    // Its figure is the active time, not the session's; cardio is never a set or volume.
-    expect(screen.getByTestId('workout-detail-stat-active')).toHaveTextContent(/55 min/);
+    expect(screen.getByTestId('workout-detail-cardio-total')).toHaveTextContent(
+      /Total Workout Time\s*1h 0m/,
+    );
+    // Its figure is the whole workout's time, cardio in it; cardio is never a set or volume.
+    expect(screen.getByTestId('workout-detail-stat-duration')).toHaveTextContent(
+      /1h 0m\s*Duration/,
+    );
+    expect(screen.queryByText('Active')).toBeNull();
     expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
     expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,360 kg/);
   });
@@ -694,7 +697,7 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(screen.getByTestId('workout-detail-stat-activities')).toHaveTextContent(/1/);
     expect(screen.queryByTestId('workout-detail-stat-sets')).toBeNull();
     expect(screen.queryByTestId('workout-detail-cardio-strength')).toBeNull();
-    expect(screen.getByTestId('workout-detail-cardio-active')).toHaveTextContent(/40 min/);
+    expect(screen.getByTestId('workout-detail-cardio-total')).toHaveTextContent(/40 min/);
   });
 
   it('leaves Duration out of a workout logged with none, the other figures on one row', async () => {

@@ -73,11 +73,12 @@ export interface WorkoutRowProps {
 
 // One completed workout as a row (sat inside a widget): the split day (or the workout's own
 // name), the muscles trained, and one muted line of date, duration and sets -- with cardio, its
-// active time and its activities (cardio alone has no sets to count).
+// total time (the strength training and the cardio together) and its activities (cardio alone has
+// no sets to count).
 export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
   const muscles = musclesLabel(workout);
   const cardio = workout.cardio ?? [];
-  const minutes = cardio.length > 0 ? (workout.activeMinutes ?? null) : workout.durationMinutes;
+  const minutes = cardio.length > 0 ? (workout.totalMinutes ?? null) : workout.durationMinutes;
   return (
     <ListRow
       testID={`workout-item-${workout.id}`}

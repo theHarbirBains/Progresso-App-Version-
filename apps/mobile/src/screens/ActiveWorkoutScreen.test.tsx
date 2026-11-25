@@ -14,13 +14,7 @@ import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { createExercise, updateMyProfile } from '../lib/api';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
-import {
-  addCardio,
-  deleteCardio,
-  fetchRecentCardio,
-  settleStrengthTime,
-  updateCardio,
-} from '../cardio/cardioQueries';
+import { addCardio, deleteCardio, fetchRecentCardio, updateCardio } from '../cardio/cardioQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import {
@@ -125,7 +119,6 @@ jest.mock('../cardio/cardioQueries', () => ({
   addCardio: jest.fn(),
   updateCardio: jest.fn(),
   deleteCardio: jest.fn(),
-  settleStrengthTime: jest.fn(),
   fetchRecentCardio: jest.fn(),
 }));
 
@@ -268,7 +261,6 @@ beforeEach(async () => {
   // What a test typed into a set is kept on the device for the workout; each test starts clean.
   await clearLiveWorkoutDraft('w1');
   (fetchRecentCardio as jest.Mock).mockReset().mockResolvedValue([]);
-  (settleStrengthTime as jest.Mock).mockReset().mockResolvedValue(undefined);
   (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(new Map());
   (saveExerciseSetting as jest.Mock).mockReset();
   mockUseAuth.mockReturnValue({
@@ -752,8 +744,6 @@ describe('ActiveWorkoutScreen', () => {
     for (const [title, message] of alert.mock.calls) {
       expect(`${title} ${message ?? ''}`).not.toMatch(/cardio/i);
     }
-    // The last set was finished at 0:05: the strength part ended there.
-    expect(settleStrengthTime).toHaveBeenCalledWith('w1', '2026-01-01T00:05:00Z', [walk, row]);
     alert.mockRestore();
   });
 
@@ -774,8 +764,6 @@ describe('ActiveWorkoutScreen', () => {
       'Are you sure you want to finish this workout?',
       expect.any(Array),
     );
-    // No set: no strength part to work out.
-    expect(settleStrengthTime).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 

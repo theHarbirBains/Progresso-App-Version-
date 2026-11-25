@@ -1,3 +1,4 @@
+import { totalMinutesOf } from '../cardio/workoutTime';
 import {
   CARDIO_INFO,
   cardioDetails,
@@ -74,7 +75,7 @@ export interface ShareCardData {
   musclesTrained: string;
   /**
    * The workout's whole duration in minutes -- start to finish, so the cardio done in it is in it
-   * once -- or null when none was logged.
+   * once (with lifting, its total time: cardio/workoutTime.ts) -- or null when none was logged.
    */
   durationMinutes: number | null;
   /** Every cardio activity, in the order it was done. Empty without cardio. */
@@ -187,7 +188,15 @@ export async function fetchShareCardData(
     title: shareTitle(detail.name, muscles, cardioEntries.length > 0),
     performedAt: detail.performedAt,
     musclesTrained: muscles.join(', '),
-    durationMinutes: computeDurationMinutes(detail.performedAt, detail.completedAt),
+    durationMinutes:
+      cardioEntries.length > 0 && logged.some((sets) => sets.length > 0)
+        ? totalMinutesOf({
+            performedAt: detail.performedAt,
+            completedAt: detail.completedAt,
+            hasStrength: true,
+            cardio: cardioEntries,
+          })
+        : computeDurationMinutes(detail.performedAt, detail.completedAt),
     cardio: cardioEntries.map((entry) => ({
       activity: entry.activity,
       icon: CARDIO_INFO[entry.activity].icon,

@@ -1,6 +1,6 @@
 import type { CardioValues } from '../cardio/cardioActivities';
 import { fetchCardioFor } from '../cardio/cardioQueries';
-import { activeMinutesOf } from '../cardio/workoutTime';
+import { totalMinutesOf } from '../cardio/workoutTime';
 import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { supabase } from '../lib/supabase';
@@ -32,8 +32,8 @@ export interface EnrichedWorkoutSummary extends WorkoutSummary {
   topSets: WorkoutTopSet[];
   /** Its cardio, in the order added -- never sets or exercises (absent where none was read). */
   cardio?: CardioValues[];
-  /** Strength and cardio together, in minutes, for a workout with cardio (cardio/workoutTime.ts). */
-  activeMinutes?: number | null;
+  /** The workout's total time in minutes, for a workout with cardio (cardio/workoutTime.ts). */
+  totalMinutes?: number | null;
 }
 
 /**
@@ -208,16 +208,6 @@ export async function enrichWorkoutSummaries(
   }
 
   const cardioByWorkout = await cardioRead;
-  // When a workout's strength part ended (Finish's Add Cardio): only those with cardio need it.
-  const strengthEndedAt = new Map<string, string | null>();
-  if (cardioByWorkout.size > 0) {
-    const { data, error } = await supabase
-      .from('workouts')
-      .select('id, strength_ended_at')
-      .in('id', [...cardioByWorkout.keys()]);
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) strengthEndedAt.set(row.id, row.strength_ended_at ?? null);
-  }
 
   return workouts.map((workout) => {
     const day = workout.workoutSplitDayId ? splitDayInfo.get(workout.workoutSplitDayId) : undefined;
@@ -236,12 +226,11 @@ export async function enrichWorkoutSummaries(
       completedExerciseCount: countCompletedExercises(exerciseRows),
       topSets: computeWorkoutTopSets(exerciseRows),
       cardio,
-      activeMinutes:
+      totalMinutes:
         cardio.length > 0
-          ? activeMinutesOf({
+          ? totalMinutesOf({
               performedAt: workout.performedAt,
               completedAt: workout.completedAt,
-              strengthEndedAt: strengthEndedAt.get(workout.id) ?? null,
               hasStrength: (completedSetCountByWorkoutId.get(workout.id) ?? 0) > 0,
               cardio,
             })

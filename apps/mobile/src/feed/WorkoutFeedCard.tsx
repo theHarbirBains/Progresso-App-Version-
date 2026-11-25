@@ -28,7 +28,7 @@ export type WorkoutCardData = Pick<
   | 'completedSetCount'
   | 'topSets'
   | 'cardio'
-  | 'activeMinutes'
+  | 'totalMinutes'
 >;
 
 interface Props {
@@ -131,14 +131,13 @@ export function WorkoutFeedCard({
       ) : null}
 
       <View style={styles.statRow}>
-        {/* With cardio, its time is the active training -- strength and cardio, never the
-            session's rests and breaks. Logged with no duration (Log Past Workout's is optional):
-            none shown. */}
-        {cardio.length > 0 && workout.activeMinutes != null ? (
+        {/* With cardio, its total time: the strength training and the cardio together. Logged
+            with no duration (Log Past Workout's is optional): none shown. */}
+        {cardio.length > 0 && workout.totalMinutes != null ? (
           <StatBlock
-            testID={`${idPrefix}-${workout.id}-active`}
-            value={formatCardDuration(workout.activeMinutes)}
-            label="Active"
+            testID={`${idPrefix}-${workout.id}-duration`}
+            value={formatCardDuration(workout.totalMinutes)}
+            label="Duration"
           />
         ) : workout.durationMinutes !== null ? (
           <StatBlock
@@ -183,11 +182,7 @@ export function WorkoutFeedCard({
               accessible
               accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}`}
             >
-              <GlyphWell
-                icon={CARDIO_INFO[entry.activity].icon}
-                accentColor={accent}
-                size={24}
-              />
+              <GlyphWell icon={CARDIO_INFO[entry.activity].icon} accentColor={accent} size={24} />
               <Text style={styles.itemSubtitle} numberOfLines={1}>
                 <Text style={cardioNameStyle}>{cardioName(entry)}</Text> · {cardioDetails(entry)}
               </Text>

@@ -3,7 +3,7 @@ import type { MeasurementType } from '../exercises/movement-type';
 import { FollowsService, type FollowUserSummary } from '../follows/follows.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import {
-  activeMinutes,
+  totalMinutes,
   CARDIO_COLUMNS,
   cardioByWorkout,
   type CardioRow,
@@ -71,7 +71,9 @@ export type FeedItem = {
     topSets: FeedTopSet[];
     /** Its cardio, in the order added -- never sets or exercises. */
     cardio: WorkoutCardio[];
-    /** Strength and cardio together, in minutes, for a workout with cardio. */
+    /** The workout's total time in minutes, for a workout with cardio (workout-cardio.ts). */
+    totalMinutes: number | null;
+    /** The same, for app versions from before totalMinutes, which read this name. */
     activeMinutes: number | null;
   };
 };
@@ -187,7 +189,8 @@ export class FeedService {
             completedExerciseCount: workout.completedExerciseCount,
             topSets: workout.topSets,
             cardio: workout.cardio,
-            activeMinutes: workout.activeMinutes,
+            totalMinutes: workout.totalMinutes,
+            activeMinutes: workout.totalMinutes,
           },
         });
       }
@@ -418,10 +421,9 @@ export class FeedService {
         completedExerciseCount,
         topSets,
         cardio: cardioOf.get(workout.id) ?? [],
-        activeMinutes: activeMinutes({
+        totalMinutes: totalMinutes({
           performedAt: workout.performed_at,
           completedAt: workout.completed_at,
-          strengthEndedAt: workout.strength_ended_at ?? null,
           hasStrength: (completedSetCountByWorkoutId.get(workout.id) ?? 0) > 0,
           cardio: cardioOf.get(workout.id) ?? [],
         }),

@@ -344,7 +344,6 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const times = workoutTimes({
     performedAt: shown.performedAt,
     completedAt: shown.completedAt,
-    strengthEndedAt: shown.strengthEndedAt,
     hasStrength: loggedSetCount > 0,
     cardio,
   });
@@ -450,9 +449,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         ) : null}
         {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
         {/* A workout logged with no duration (Log Past Workout's is optional) shows none: the
-            other three figures share one row instead. With cardio, its time is the active
-            training -- strength and cardio -- never the session's rests and breaks; cardio alone
-            shows its time and how many activities. */}
+            other three figures share one row instead. With cardio, its Duration is its total time
+            -- the strength training and the cardio together, told apart in its Time card; cardio
+            alone shows its time and how many activities. */}
         {cardioOnly ? (
           <View style={styles.statRow}>
             <StatBlock
@@ -466,13 +465,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
               label={cardio.length === 1 ? 'Activity' : 'Activities'}
             />
           </View>
-        ) : cardio.length > 0 && times.activeSeconds !== null ? (
+        ) : cardio.length > 0 && times.totalSeconds !== null ? (
           <View style={styles.statGrid}>
             <View style={styles.statRow}>
               <StatBlock
-                testID="workout-detail-stat-active"
-                value={formatMinutes(times.activeSeconds)}
-                label="Active"
+                testID="workout-detail-stat-duration"
+                value={formatMinutes(times.totalSeconds)}
+                label="Duration"
               />
               {setsStat}
             </View>

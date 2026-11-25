@@ -99,7 +99,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
 - Feedback & Suggestions (Support & About): send a bug report, feature request, usability issue or general feedback, with an optional screenshot and the app version and platform it came from, then see each one's status as it's looked at. Support and full admins get a Feedback Inbox (Settings › Admin) to filter, search, move each on and keep internal notes, every change recorded
 - Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")
-- Apple Health is connected from Feed's Steps card (iPhone only), not from onboarding or Settings; it's turned off in the Health app
+- Apple Health is connected from onboarding or from the Steps block at the top of Progress (iPhone only), not from Settings; it's turned off in the Health app
 
 **Social**
 

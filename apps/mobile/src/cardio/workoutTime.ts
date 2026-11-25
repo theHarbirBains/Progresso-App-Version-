@@ -1,30 +1,27 @@
-// A workout's time, told apart (explicitly requested): its session -- start to finish, rests,
-// pauses and breaks all in it -- and its active training, the strength part and the cardio.
-//
-// Strength training runs from the workout's start to the moment the strength part ended -- Finish's
-// "Add Cardio" in the live workout (`workouts.strength_ended_at`), or the workout's finish when it
-// never ended early -- less the cardio done before that moment (warming up on the bike before
-// lifting, a run between exercises). Cardio is each activity's own typed-in time. Total active
-// training is the two together. Nothing here is stored: it's worked out from the workout and its
-// cardio wherever it's shown, so an edit or a removal puts every figure right at once.
+// A workout's time (Harbir's rule): its total time, and how much of it was cardio and how much
+// strength training. The total is the workout's time start to finish -- the cardio and the strength
+// training together -- or, where the cardio typed in comes to more than that (logged afterwards),
+// the cardio's; for cardio alone, the cardio's time. Cardio is each activity's own typed-in time;
+// strength training is the rest of the total. Nothing here is stored: it's worked out from the
+// workout and its cardio wherever it's shown, so an edit or a removal puts every figure right at
+// once.
 
 export interface WorkoutTimeInput {
   performedAt: string;
   completedAt: string | null;
-  strengthEndedAt?: string | null;
   /** Whether it has a working set finished -- with none, there's no strength part. */
   hasStrength: boolean;
-  cardio: { durationSeconds: number; afterStrength?: boolean }[];
+  cardio: { durationSeconds: number }[];
 }
 
 export interface WorkoutTimes {
-  /** Start to finish; null while it's going, or when it was logged with no duration. */
-  sessionSeconds: number | null;
-  /** Null when unknown (logged with no duration) or when there's no strength part at all. */
+  /** The workout's whole time; null while it's going, when it was logged with no duration and
+   * has strength training (whose time isn't known then), or when there's nothing in it. */
+  totalSeconds: number | null;
+  /** Of the total, the strength training; null with no strength part, or no total. */
   strengthSeconds: number | null;
+  /** Of the total, the cardio: every activity's own time together. */
   cardioSeconds: number;
-  /** Strength and cardio together; null when the strength part's time is unknown. */
-  activeSeconds: number | null;
 }
 
 function seconds(from: string, to: string): number {
@@ -34,35 +31,27 @@ function seconds(from: string, to: string): number {
 /** A finished workout's times (or, with `now`, one still going). */
 export function workoutTimes(input: WorkoutTimeInput, now?: Date): WorkoutTimes {
   const cardioSeconds = input.cardio.reduce((sum, entry) => sum + entry.durationSeconds, 0);
-  const end = input.completedAt ?? (now ? now.toISOString() : null);
-  const session = end === null ? null : seconds(input.performedAt, end);
-  // Logged with no duration (Log Past Workout's is optional): its session isn't known.
-  const sessionSeconds = session === 0 ? null : session;
-
+  // Cardio alone: its time is the cardio's -- there's nothing else to add to it.
   if (!input.hasStrength) {
-    return { sessionSeconds, strengthSeconds: null, cardioSeconds, activeSeconds: cardioSeconds };
+    return {
+      totalSeconds: cardioSeconds > 0 ? cardioSeconds : null,
+      strengthSeconds: null,
+      cardioSeconds,
+    };
   }
-  const strengthEnd = input.strengthEndedAt ?? end;
-  const window = strengthEnd === null ? 0 : seconds(input.performedAt, strengthEnd);
-  if (window === 0) {
-    return { sessionSeconds, strengthSeconds: null, cardioSeconds, activeSeconds: null };
-  }
-  const cardioBefore = input.cardio
-    .filter((entry) => !entry.afterStrength)
-    .reduce((sum, entry) => sum + entry.durationSeconds, 0);
-  const strengthSeconds = Math.max(0, window - cardioBefore);
-  return {
-    sessionSeconds,
-    strengthSeconds,
-    cardioSeconds,
-    activeSeconds: strengthSeconds + cardioSeconds,
-  };
+  const end = input.completedAt ?? (now ? now.toISOString() : null);
+  const span = end === null ? 0 : seconds(input.performedAt, end);
+  // No span: going without `now`, or logged with no duration (Log Past Workout's is optional) --
+  // the strength training's time isn't known then, so neither is the total.
+  if (span === 0) return { totalSeconds: null, strengthSeconds: null, cardioSeconds };
+  const totalSeconds = Math.max(span, cardioSeconds);
+  return { totalSeconds, strengthSeconds: totalSeconds - cardioSeconds, cardioSeconds };
 }
 
-/** Total active training in whole minutes, as a workout's card shows it; null when unknown. */
-export function activeMinutesOf(input: WorkoutTimeInput): number | null {
-  const { activeSeconds } = workoutTimes(input);
-  return activeSeconds === null ? null : Math.round(activeSeconds / 60);
+/** The workout's total time in whole minutes, as its card shows it; null when unknown. */
+export function totalMinutesOf(input: WorkoutTimeInput): number | null {
+  const { totalSeconds } = workoutTimes(input);
+  return totalSeconds === null ? null : Math.round(totalSeconds / 60);
 }
 
 /** "35 min", "1h 5m" -- whole minutes, rounded, as a workout's duration is shown everywhere. */

@@ -28,13 +28,7 @@ import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups
 import { FilterChips } from '../design/FilterChips';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
 import { type CardioValues } from '../cardio/cardioActivities';
-import {
-  addCardio,
-  deleteCardio,
-  settleStrengthTime,
-  updateCardio,
-  type CardioEntry,
-} from '../cardio/cardioQueries';
+import { addCardio, deleteCardio, updateCardio, type CardioEntry } from '../cardio/cardioQueries';
 import { CardioSheet } from '../cardio/CardioSheet';
 import { LiveCardioPage } from '../cardio/LiveCardioPage';
 import { useRecentCardio } from '../cardio/useRecentCardio';
@@ -109,19 +103,6 @@ const CARDIO_PAGE = 1;
 // The first live workout on a phone nudges toward the Cardio page and back, once.
 const SWIPE_HINT_KEY = '@progresso/liveCardioSwipeHint';
 const SWIPE_HINT_DISTANCE = 72;
-
-/** When the workout's last set was finished (warm-ups and drops too); null with none. */
-function lastFinishedSetAt(exercises: { sets: { completedAt: string | null }[] }[]): string | null {
-  let last: string | null = null;
-  for (const exercise of exercises) {
-    for (const set of exercise.sets) {
-      if (set.completedAt && (last === null || Date.parse(set.completedAt) > Date.parse(last))) {
-        last = set.completedAt;
-      }
-    }
-  }
-  return last;
-}
 
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
@@ -955,12 +936,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           ],
         );
         return;
-      }
-      // With cardio, the strength part ended at the last set finished: cardio added after it was
-      // after the lifting, and none of the time after it -- packing up, a break -- is training.
-      const lastSetAt = lastFinishedSetAt(saved.exercises);
-      if (savedCardio.length > 0 && lastSetAt !== null) {
-        await settleStrengthTime(workout.id, lastSetAt, savedCardio);
       }
       await completeWorkout(workout.id);
       void forgetGuided(workout.id);

@@ -48,13 +48,12 @@ describe('WorkoutFeedCard', () => {
     expect(screen.getByTestId('card-w1-duration')).toHaveTextContent(/1h 15m/);
     expect(screen.getByTestId('card-w1-sets')).toHaveTextContent(/12/);
     expect(screen.queryByTestId('card-w1-cardio')).toBeNull();
-    expect(screen.queryByTestId('card-w1-active')).toBeNull();
   });
 
-  it('shows its cardio, and its active time rather than the session’s, with the lifting', () => {
-    renderCard(workout({ cardio: [run], activeMinutes: 65 }));
-    expect(screen.getByTestId('card-w1-active')).toHaveTextContent(/1h 5m/);
-    expect(screen.queryByTestId('card-w1-duration')).toBeNull();
+  it('shows its cardio, and its total time -- the lifting and the cardio together', () => {
+    renderCard(workout({ cardio: [run], totalMinutes: 65 }));
+    expect(screen.getByTestId('card-w1-duration')).toHaveTextContent(/1h 5m\s*Duration/);
+    expect(screen.queryByText('Active')).toBeNull();
     expect(screen.getByTestId('card-w1-sets')).toHaveTextContent(/12/);
     // Its activity's glyph beside it, then its name and figures.
     expect(screen.getByTestId('card-w1-cardio')).toHaveTextContent(
@@ -68,10 +67,10 @@ describe('WorkoutFeedCard', () => {
         completedExerciseCount: 0,
         completedSetCount: 0,
         cardio: [run],
-        activeMinutes: 30,
+        totalMinutes: 30,
       }),
     );
-    expect(screen.getByTestId('card-w1-active')).toHaveTextContent(/30 min/);
+    expect(screen.getByTestId('card-w1-duration')).toHaveTextContent(/30 min/);
     expect(screen.getByTestId('card-w1-activities')).toHaveTextContent(/1/);
     expect(screen.queryByTestId('card-w1-sets')).toBeNull();
   });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
@@ -25,6 +25,9 @@ import { ownProgressSections, type ProgressSection } from '../progress/progressS
 import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
 import { StepsSection } from '../progress/StepsSection';
+import { StepsTodayBlock } from '../progress/StepsTodayBlock';
+import { useAuth } from '../auth/AuthProvider';
+import { useStepsToday } from '../health/useStepsToday';
 import { CardioProgressSection } from '../progress/CardioProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
@@ -61,6 +64,23 @@ function remembered<K extends object, V>(cache: WeakMap<K, V>, key: K, make: () 
 // (ProgressExerciseDetail), unaffected by this restructuring.
 export function ProgressOverviewScreen({ navigation }: Props) {
   const { theme, weightUnit, themeLoading } = useProgressTheme();
+  const { user } = useAuth();
+  // Today's steps from Apple Health, at the top of Overview (iPhone only). A local read, so it's
+  // read as Progress opens and again whenever it comes back into view -- and, inside the hook, when
+  // the app comes back to the front.
+  const steps = useStepsToday(user?.id);
+  const refreshStepsRef = useRef(steps.refresh);
+  refreshStepsRef.current = steps.refresh;
+  useEffect(() => {
+    void refreshStepsRef.current();
+    let opened = false;
+    const unsubscribe = navigation.addListener?.('focus', () => {
+      // The first focus is the opening itself, already read above.
+      if (opened) void refreshStepsRef.current();
+      opened = true;
+    });
+    return unsubscribe;
+  }, [navigation]);
   // Progress always shows the same real content (Overview/Top Sets/
   // Nutrition/All-Time) regardless of which
   // tab the user was on before -- there is no more Workout/Nutrition
@@ -183,6 +203,11 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 }}
                 top={
                   <>
+                    <StepsTodayBlock
+                      steps={steps}
+                      accentColor={theme.accent}
+                      onOpenSteps={() => setActiveSection('Steps')}
+                    />
                     <WeeklySummaryBlock
                       summaries={weekSummaries}
                       error={weekError}

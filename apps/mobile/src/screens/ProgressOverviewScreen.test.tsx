@@ -19,6 +19,13 @@ import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import { ProgressOverviewScreen } from './ProgressOverviewScreen';
+import {
+  getRequestStatusForAuthorization,
+  isHealthDataAvailable,
+  queryStatisticsForQuantity,
+  requestAuthorization,
+} from '@kingstinct/react-native-healthkit';
+import { homeWidgets } from '../widgets/homeWidgets';
 import { updateSet } from '../workouts/workoutQueries';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -590,5 +597,83 @@ describe('ProgressOverviewScreen -- Weekly Summary', () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-summary-error')).toHaveTextContent('network error');
+  });
+});
+
+describe('ProgressOverviewScreen -- Steps Today', () => {
+  const { stepsWidget } = homeWidgets();
+
+  beforeEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(stepsWidget.updateTimeline).mockClear();
+  });
+
+  afterEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+  });
+
+  it('shows nothing where Apple Health is not available', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    renderScreen();
+
+    await screen.findByTestId('progress-section-card');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('progress-steps-today')).toBeNull();
+  });
+
+  it("offers to connect Apple Health, then shows today's steps and hands them to the widget", async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(1).mockResolvedValue(2);
+    jest
+      .mocked(queryStatisticsForQuantity)
+      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 8412 }, sources: [] } as never);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('progress-steps-today-connect'));
+
+    expect(await screen.findByTestId('progress-steps-today-count')).toHaveTextContent(
+      /^8,412\s*Steps$/,
+    );
+    expect(requestAuthorization).toHaveBeenCalledWith({
+      toRead: ['HKQuantityTypeIdentifierStepCount'],
+    });
+    expect(jest.mocked(stepsWidget.updateTimeline).mock.calls.at(-1)?.[0][0].props.steps).toBe(
+      '8,412',
+    );
+  });
+
+  it('opens the Steps tab for the last four weeks', async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest
+      .mocked(queryStatisticsForQuantity)
+      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 5000 }, sources: [] } as never);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('progress-steps-today-history'));
+    expect(screen.queryByTestId('progress-steps-today')).toBeNull();
+  });
+
+  it("says Apple Health couldn't be reached, and why, rather than hiding the block", async () => {
+    jest.mocked(isHealthDataAvailable).mockImplementation(() => {
+      throw new Error('NitroModules are not installed');
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('progress-steps-today-failure')).toHaveTextContent(
+      'NitroModules are not installed',
+    );
+  });
+
+  it('says where to check when no steps come back', async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest.mocked(queryStatisticsForQuantity).mockResolvedValue({ sources: [] } as never);
+    renderScreen();
+
+    expect(await screen.findByTestId('progress-steps-today-count')).toHaveTextContent(
+      /^0\s*Steps$/,
+    );
+    expect(screen.getByTestId('progress-steps-today-hint')).toHaveTextContent(/Health app/);
   });
 });

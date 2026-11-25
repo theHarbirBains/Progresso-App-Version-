@@ -54,21 +54,31 @@ function saved(typed: CardioDraft, original: CardioValues | null = null): Cardio
 describe('workoutTimes', () => {
   const start = '2026-11-20T10:00:00Z';
 
-  it('takes cardio done before the strength part ended out of it, and adds every activity back', () => {
-    // 10 min on the bike first, lifting until 45 min, then 20 on the treadmill; finished at 70.
+  it("splits the workout's total time into its cardio and the strength training", () => {
+    // Harbir's example: 25 minutes on the treadmill in a workout that took an hour in all.
     const times = workoutTimes({
       performedAt: start,
-      completedAt: '2026-11-20T11:10:00Z',
-      strengthEndedAt: '2026-11-20T10:45:00Z',
+      completedAt: '2026-11-20T11:00:00Z',
       hasStrength: true,
-      cardio: [{ durationSeconds: 600 }, { durationSeconds: 1200, afterStrength: true }],
+      cardio: [{ durationSeconds: 25 * 60 }],
     });
     expect(times).toEqual({
-      sessionSeconds: 70 * 60,
+      totalSeconds: 60 * 60,
       strengthSeconds: 35 * 60,
-      cardioSeconds: 30 * 60,
-      activeSeconds: 65 * 60,
+      cardioSeconds: 25 * 60,
     });
+  });
+
+  it('counts every activity toward the cardio, wherever in the workout it was done', () => {
+    // 10 min on the bike first and 20 on the treadmill after the lifting; finished at 70.
+    expect(
+      workoutTimes({
+        performedAt: start,
+        completedAt: '2026-11-20T11:10:00Z',
+        hasStrength: true,
+        cardio: [{ durationSeconds: 600 }, { durationSeconds: 1200 }],
+      }),
+    ).toEqual({ totalSeconds: 70 * 60, strengthSeconds: 40 * 60, cardioSeconds: 30 * 60 });
   });
 
   it("is a strength-only workout's own duration, as before", () => {
@@ -79,39 +89,41 @@ describe('workoutTimes', () => {
         hasStrength: true,
         cardio: [],
       }),
-    ).toEqual({
-      sessionSeconds: 3600,
-      strengthSeconds: 3600,
-      cardioSeconds: 0,
-      activeSeconds: 3600,
-    });
+    ).toEqual({ totalSeconds: 3600, strengthSeconds: 3600, cardioSeconds: 0 });
   });
 
-  it('is only the cardio for a workout of cardio alone -- never the session', () => {
-    const times = workoutTimes({
-      performedAt: start,
-      completedAt: '2026-11-20T10:50:00Z',
-      hasStrength: false,
-      cardio: [{ durationSeconds: 1800 }],
-    });
-    expect(times.strengthSeconds).toBeNull();
-    expect(times.activeSeconds).toBe(1800);
-    expect(times.sessionSeconds).toBe(3000);
+  it('takes the cardio as the total where it comes to more than the workout lasted', () => {
+    // Started, then finished 20 minutes later with 30 minutes of cardio typed in.
+    expect(
+      workoutTimes({
+        performedAt: start,
+        completedAt: '2026-11-20T10:20:00Z',
+        hasStrength: true,
+        cardio: [{ durationSeconds: 1800 }],
+      }),
+    ).toEqual({ totalSeconds: 1800, strengthSeconds: 0, cardioSeconds: 1800 });
   });
 
-  it('knows no strength time for a workout logged with no duration', () => {
-    const times = workoutTimes({
-      performedAt: start,
-      completedAt: start,
-      hasStrength: true,
-      cardio: [{ durationSeconds: 900 }],
-    });
-    expect(times).toEqual({
-      sessionSeconds: null,
-      strengthSeconds: null,
-      cardioSeconds: 900,
-      activeSeconds: null,
-    });
+  it('is only the cardio for a workout of cardio alone', () => {
+    expect(
+      workoutTimes({
+        performedAt: start,
+        completedAt: '2026-11-20T10:50:00Z',
+        hasStrength: false,
+        cardio: [{ durationSeconds: 1800 }],
+      }),
+    ).toEqual({ totalSeconds: 1800, strengthSeconds: null, cardioSeconds: 1800 });
+  });
+
+  it('knows no total for a workout with strength training logged with no duration', () => {
+    expect(
+      workoutTimes({
+        performedAt: start,
+        completedAt: start,
+        hasStrength: true,
+        cardio: [{ durationSeconds: 900 }],
+      }),
+    ).toEqual({ totalSeconds: null, strengthSeconds: null, cardioSeconds: 900 });
   });
 });
 

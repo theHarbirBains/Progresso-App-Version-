@@ -39,8 +39,6 @@ import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { FeedGreeting } from '../feed/FeedGreeting';
 import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
-import { StepsCard } from '../feed/StepsCard';
-import { useStepsToday } from '../health/useStepsToday';
 import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
 import { endClosedWorkoutActivities } from '../widgets/workoutActivity';
 import { recallLiveWorkout, rememberLiveWorkout } from '../feed/liveWorkoutMemory';
@@ -144,11 +142,6 @@ export function FeedScreen({ navigation }: Props) {
   const workspace = useWorkspace();
   const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId, themeLoading } =
     useProgressTheme();
-  // Today's steps from Apple Health, under Next Workout (iPhone only). A local read, so it's read
-  // again on every visit, never gated.
-  const steps = useStepsToday(userId);
-  const refreshStepsRef = useRef(steps.refresh);
-  refreshStepsRef.current = steps.refresh;
 
   // What Feed showed last time (lib/lastShown.ts): a reopened Feed starts from
   // it -- no spinner -- and refreshes in the background as always.
@@ -476,7 +469,6 @@ export function FeedScreen({ navigation }: Props) {
       if (isStale(lastBadgeLoadAtRef.current)) void loadNotificationBadgeCount();
       if (isStale(lastNextWorkoutLoadAtRef.current)) void loadNextWorkoutRef.current();
       void loadLiveWorkoutRef.current();
-      void refreshStepsRef.current();
       handNextWorkoutToWidgetRef.current();
     });
     return unsubscribe;
@@ -550,7 +542,7 @@ export function FeedScreen({ navigation }: Props) {
       completedExerciseCount: item.workout.completedExerciseCount,
       topSets: item.workout.topSets,
       cardio: item.workout.cardio,
-      activeMinutes: item.workout.activeMinutes,
+      totalMinutes: item.workout.totalMinutes,
     },
   }));
 
@@ -586,7 +578,7 @@ export function FeedScreen({ navigation }: Props) {
       completedExerciseCount: item.workout.completedExerciseCount,
       topSets: item.workout.topSets,
       cardio: item.workout.cardio,
-      activeMinutes: item.workout.activeMinutes,
+      totalMinutes: item.workout.totalMinutes ?? item.workout.activeMinutes ?? null,
     },
   }));
 
@@ -605,15 +597,13 @@ export function FeedScreen({ navigation }: Props) {
   const initialLoading = loading || friendsLoading;
 
   // The page shows all at once: the first time it opens in a session, its placeholders stay
-  // until everything is in -- your workouts and friends', the live check, the next workout,
-  // today's steps and the likes on the cards -- or a few seconds pass (useShowAllAtOnce), so one
+  // until everything is in -- your workouts and friends', the live check, the next workout and
+  // the likes on the cards -- or a few seconds pass (useShowAllAtOnce), so one
   // slow part never holds the rest back for long. Reopened -- or with a workout going, noted as it opened
   // -- it starts from what it last showed, at once.
   const startsKnown = shown.feed !== undefined || Boolean(shown.liveWorkout);
-  const stepsKnown = steps.access !== null || steps.failure !== null;
   const nextDone = !themeLoading && (activeWorkoutSplitId === null || nextSettled);
-  const settled =
-    startsKnown || (!initialLoading && liveKnown && nextDone && stepsKnown && social.loaded);
+  const settled = startsKnown || (!initialLoading && liveKnown && nextDone && social.loaded);
   const showPage = useShowAllAtOnce(settled);
   // Graceful degradation, same philosophy as feedQueries.ts's own
   // degrade-to-empty-page on failure: a failure on one source only blocks
@@ -772,18 +762,6 @@ export function FeedScreen({ navigation }: Props) {
               actionLabel="Start Workout"
               onPress={() => navigation.navigate('NewWorkout')}
               accessibilityLabel={`Start a workout. ${noNextDayLine}`}
-            />
-          </RiseIn>
-        ) : null}
-
-        {showPage && (steps.access === 'notAsked' || steps.access === 'asked' || steps.failure) ? (
-          <RiseIn>
-            <StepsCard
-              access={steps.access}
-              steps={steps.steps}
-              connecting={steps.connecting}
-              failure={steps.failure}
-              onConnect={() => void steps.connect()}
             />
           </RiseIn>
         ) : null}

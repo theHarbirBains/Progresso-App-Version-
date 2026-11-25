@@ -428,8 +428,8 @@ describe('FeedService', () => {
       client.queue('workouts', {
         data: [
           workout('run'),
-          // Lifted for 40 min, then 15 min on the treadmill; finished at an hour.
-          workout('both', { strength_ended_at: '2026-09-20T10:40:00.000Z' }),
+          // An hour in all, 15 minutes of it on the treadmill.
+          workout('both'),
         ],
         error: null,
       });
@@ -503,6 +503,8 @@ describe('FeedService', () => {
       const byId = new Map(result.items.map((item) => [item.workout.id, item.workout]));
       expect(byId.get('run')).toMatchObject({
         completedSetCount: 0,
+        // Cardio alone: its own time.
+        totalMinutes: 30,
         activeMinutes: 30,
         // Calories are never handed out (always null, for app versions that read it).
         cardio: [
@@ -511,8 +513,10 @@ describe('FeedService', () => {
       });
       expect(byId.get('both')).toMatchObject({
         completedSetCount: 1,
-        // 40 min of lifting and 15 on the treadmill -- not the hour start to finish.
-        activeMinutes: 55,
+        // The whole hour: the lifting and the treadmill together. activeMinutes is the same figure,
+        // for app versions from before totalMinutes.
+        totalMinutes: 60,
+        activeMinutes: 60,
         cardio: [
           {
             activity: 'treadmill',

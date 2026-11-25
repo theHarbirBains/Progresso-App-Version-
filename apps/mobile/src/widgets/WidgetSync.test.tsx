@@ -8,6 +8,11 @@ import { useAppTheme } from '../theme/appThemeContext';
 import { themeById } from '../theme/appThemes';
 import { homeWidgets } from './homeWidgets';
 import { WidgetSync } from './WidgetSync';
+import {
+  getRequestStatusForAuthorization,
+  isHealthDataAvailable,
+  queryStatisticsForQuantity,
+} from '@kingstinct/react-native-healthkit';
 
 const { nutritionWidget, nextWorkoutWidget, stepsWidget } = homeWidgets();
 
@@ -120,4 +125,31 @@ it("tells Today's Nutrition that Nutrition isn't in the membership, with no figu
     expect(widgetShown(nutritionWidget)).toMatchObject({ signedIn: true, locked: true }),
   );
   expect(widgetShown(nutritionWidget)).not.toHaveProperty('calories', '1,500');
+});
+
+it("hands Today's Steps today's count as the app opens signed in -- with no page showing steps", async () => {
+  const { stepsWidget } = homeWidgets();
+  jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+  jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+  jest
+    .mocked(queryStatisticsForQuantity)
+    .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 6120 }, sources: [] } as never);
+  try {
+    signedInWith([]);
+    render(<WidgetSync />);
+
+    await waitFor(() => expect(widgetShown(stepsWidget)).toMatchObject({ steps: '6,120' }));
+  } finally {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+  }
+});
+
+it("reads no steps where Apple Health isn't on the phone", async () => {
+  jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+  signedInWith([]);
+  render(<WidgetSync />);
+
+  await waitFor(() => expect(widgetShown(nutritionWidget)).toBeTruthy());
+  expect(queryStatisticsForQuantity).not.toHaveBeenCalled();
 });

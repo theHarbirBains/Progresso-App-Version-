@@ -41,7 +41,9 @@ export type FriendsFeedItem = {
     }[];
     /** Its cardio, in the order added. Absent from an API before cardio. */
     cardio?: CardioValues[];
-    /** Strength and cardio together, in minutes, for a workout with cardio. */
+    /** The workout's total time in minutes, for a workout with cardio (cardio/workoutTime.ts). */
+    totalMinutes?: number | null;
+    /** What an API from before totalMinutes sends in its place. */
     activeMinutes?: number | null;
   };
 };

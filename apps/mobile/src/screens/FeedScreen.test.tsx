@@ -23,7 +23,6 @@ import {
   getRequestStatusForAuthorization,
   isHealthDataAvailable,
   queryStatisticsForQuantity,
-  requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
 import { widgetShown } from '../testUtils/widgetShown';
 import { homeWidgets } from '../widgets/homeWidgets';
@@ -32,7 +31,7 @@ import { greetingFor } from '../feed/greeting';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
-const { nextWorkoutWidget, stepsWidget, workoutActivity } = homeWidgets();
+const { nextWorkoutWidget, workoutActivity } = homeWidgets();
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -1293,75 +1292,17 @@ describe('FeedScreen -- the home-screen widgets', () => {
 });
 
 describe('FeedScreen -- Steps', () => {
-  beforeEach(() => {
+  it("shows no Steps card: today's steps are on Progress", async () => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(true);
-    jest.mocked(stepsWidget.updateTimeline).mockClear();
-  });
-
-  afterEach(() => {
-    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
-  });
-
-  it('shows no Steps card in Expo Go, which has no Apple Health', async () => {
-    const { hasHealthKitNative } = jest.requireMock('../lib/nativeModules') as {
-      hasHealthKitNative: jest.Mock;
-    };
-    hasHealthKitNative.mockReturnValue(false);
-    jest.mocked(isHealthDataAvailable).mockClear();
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
     try {
       renderScreen();
       await screen.findByTestId('feed-empty');
       expect(screen.queryByTestId('feed-steps')).toBeNull();
-      expect(isHealthDataAvailable).not.toHaveBeenCalled();
+      expect(queryStatisticsForQuantity).not.toHaveBeenCalled();
     } finally {
-      hasHealthKitNative.mockReturnValue(true);
+      jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+      jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
     }
-  });
-
-  it('shows no Steps card where Apple Health is not available', async () => {
-    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
-    renderScreen();
-
-    await screen.findByTestId('feed-empty');
-    expect(screen.queryByTestId('feed-steps')).toBeNull();
-  });
-
-  it("offers to connect Apple Health, then shows today's steps and hands them to the widget", async () => {
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(1).mockResolvedValue(2);
-    jest
-      .mocked(queryStatisticsForQuantity)
-      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 8412 }, sources: [] } as never);
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('feed-steps-connect'));
-
-    await waitFor(() => expect(screen.getByTestId('feed-steps-count')).toHaveTextContent('8,412'));
-    expect(requestAuthorization).toHaveBeenCalledWith({
-      toRead: ['HKQuantityTypeIdentifierStepCount'],
-    });
-    expect(jest.mocked(stepsWidget.updateTimeline).mock.calls.at(-1)?.[0][0].props.steps).toBe(
-      '8,412',
-    );
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
-  });
-
-  it("says Apple Health couldn't be reached, and why, rather than hiding the card", async () => {
-    jest.mocked(isHealthDataAvailable).mockImplementation(() => {
-      throw new Error('NitroModules are not installed');
-    });
-    renderScreen();
-
-    expect(await screen.findByTestId('feed-steps-failure')).toHaveTextContent(
-      'NitroModules are not installed',
-    );
-  });
-
-  it('says where to check when no steps come back', async () => {
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(2);
-    jest.mocked(queryStatisticsForQuantity).mockResolvedValueOnce({ sources: [] } as never);
-    renderScreen();
-
-    expect(await screen.findByTestId('feed-steps-count')).toHaveTextContent('0');
-    expect(screen.getByTestId('feed-steps-hint')).toHaveTextContent(/Health app/);
   });
 });
