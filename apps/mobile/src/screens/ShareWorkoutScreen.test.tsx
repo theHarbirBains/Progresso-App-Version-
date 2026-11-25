@@ -1,4 +1,6 @@
 import { StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import * as Sharing from 'expo-sharing';
@@ -12,6 +14,8 @@ import { AppThemeContext } from '../theme/appThemeContext';
 import { themeById } from '../theme/appThemes';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { fetchOwnMontage } from '../profile/montage/montageQueries';
+import { photoRect } from '../sharing/sharePhoto';
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
@@ -39,6 +43,47 @@ jest.mock('expo-media-library/legacy', () => ({
   requestPermissionsAsync: jest.fn(),
   saveToLibraryAsync: jest.fn(),
 }));
+
+// Your own montage, as the photo chooser reads it.
+jest.mock('../profile/montage/montageQueries', () => ({
+  fetchOwnMontage: jest.fn(),
+}));
+
+// A photo picked from the phone is scaled down (native) and kept in the app's files: these stand
+// in for both -- which files exist, and what's deleted.
+jest.mock('../lib/imageResize', () => ({
+  resizeForUpload: jest.fn(async (uri: string) => uri),
+}));
+const mockFiles = new Set<string>();
+jest.mock('expo-file-system', () => {
+  const join = (parts: unknown[]) =>
+    parts
+      .map((part) => (typeof part === 'string' ? part : (part as { uri: string }).uri))
+      .join('/');
+  class Directory {
+    uri: string;
+    constructor(...parts: unknown[]) {
+      this.uri = join(parts);
+    }
+    create() {}
+  }
+  class File {
+    uri: string;
+    constructor(...parts: unknown[]) {
+      this.uri = join(parts);
+    }
+    get exists() {
+      return mockFiles.has(this.uri);
+    }
+    copy(to: File) {
+      mockFiles.add(to.uri);
+    }
+    delete() {
+      mockFiles.delete(this.uri);
+    }
+  }
+  return { Directory, File, Paths: { document: 'file:///docs' } };
+});
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
@@ -555,5 +600,221 @@ describe('ShareWorkoutScreen -- cheering a new PR', () => {
     await settle();
 
     expect(scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShareWorkoutScreen -- your photo on the card', () => {
+  const AVATAR = 'https://cdn.example.com/avatars/user-1/1.jpg';
+  const KEY = '@progresso/sharePhoto/user-1';
+  const mockFetchOwnMontage = fetchOwnMontage as jest.Mock;
+  const withAvatar = () =>
+    mockFetchMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      avatarUrl: AVATAR,
+    });
+  const stored = async () => JSON.parse((await AsyncStorage.getItem(KEY)) ?? 'null');
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    mockFiles.clear();
+    mockFetchOwnMontage.mockReset().mockResolvedValue([]);
+    jest.mocked(ImagePicker.requestMediaLibraryPermissionsAsync).mockResolvedValue({
+      granted: true,
+    } as never);
+  });
+
+  it('leaves the card exactly as it was without one, and says how to add one', async () => {
+    renderShare();
+    await screen.findByTestId('share-card');
+
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
+    expect(screen.getByTestId('share-photo-status')).toHaveTextContent(
+      'Add your photo to the card',
+    );
+    expect(screen.getByTestId('share-photo-switch').props.value).toBe(false);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('share-card-top-set-name-0').props.style).fontSize,
+    ).toBe(DENSITY.roomy.name);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('share-workout-share'));
+    });
+    expect(mockCaptureRef).toHaveBeenCalled();
+    expectNoBareText();
+  });
+
+  it('puts the profile picture on the card, and shares only once it is drawn', async () => {
+    withAvatar();
+    renderShare();
+    fireEvent.press(await screen.findByTestId('share-photo-open'));
+    fireEvent.press(await screen.findByTestId('share-photo-choice-avatar'));
+
+    const image = screen.getByTestId('share-card-photo-image');
+    expect(image.props.source).toEqual({ uri: AVATAR });
+    // Between the brand and WORKOUT COMPLETE, in its circle.
+    expect(screen.getByTestId('share-story').props.accessibilityLabel).toMatch(/With your photo/);
+    expect(screen.getByTestId('share-photo-status')).toHaveTextContent(
+      'Profile Picture · On the card',
+    );
+    // Not captured before it's there.
+    fireEvent.press(screen.getByTestId('share-workout-share'));
+    expect(mockCaptureRef).not.toHaveBeenCalled();
+
+    fireEvent(image, 'load');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('share-workout-share'));
+    });
+    expect(mockCaptureRef).toHaveBeenCalled();
+    expect(await stored()).toEqual({ include: true, choice: { kind: 'avatar' } });
+  });
+
+  it('remembers it for the next card, and switches it off and on again without losing it', async () => {
+    withAvatar();
+    await AsyncStorage.setItem(KEY, JSON.stringify({ include: true, choice: { kind: 'avatar' } }));
+    renderShare();
+    expect(await screen.findByTestId('share-card-photo')).toBeTruthy();
+
+    fireEvent(screen.getByTestId('share-photo-switch'), 'valueChange', false);
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
+    expect(screen.getByTestId('share-photo-status')).toHaveTextContent('Not on the card');
+    await waitFor(async () =>
+      expect(await stored()).toEqual({ include: false, choice: { kind: 'avatar' } }),
+    );
+
+    fireEvent(screen.getByTestId('share-photo-switch'), 'valueChange', true);
+    expect(screen.getByTestId('share-card-photo')).toBeTruthy();
+  });
+
+  it("offers the montage's photos -- never its videos -- framed as their owner framed them", async () => {
+    const photo = {
+      id: 'gym',
+      kind: 'photo',
+      url: 'https://signed.example.com/gym.jpg',
+      width: 1080,
+      height: 1920,
+      durationSeconds: null,
+      frame: { x: 0.5, y: 0.3, zoom: 1.5 },
+      path: 'user-1/gym.jpg',
+    };
+    mockFetchOwnMontage.mockResolvedValue([
+      { ...photo, id: 'clip', kind: 'video', url: 'https://signed.example.com/clip.mp4' },
+      photo,
+    ]);
+    renderShare();
+    fireEvent.press(await screen.findByTestId('share-photo-open'));
+
+    fireEvent.press(await screen.findByTestId('share-photo-choice-montage-gym'));
+    expect(screen.queryByTestId('share-photo-choice-montage-clip')).toBeNull();
+    expect(mockFetchOwnMontage).toHaveBeenCalledWith('user-1');
+
+    const image = screen.getByTestId('share-card-photo-image');
+    expect(image.props.source).toEqual({
+      uri: photo.url,
+      cacheKey: 'profile-montage-gym',
+    });
+    // Two lifts and the photo still start roomy; the photo covers its circle at its own shape.
+    const rect = photoRect(DENSITY.roomy.photo, {
+      size: { width: photo.width, height: photo.height },
+      frame: photo.frame,
+    })!;
+    expect(StyleSheet.flatten(image.props.style)).toMatchObject({
+      position: 'absolute',
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    expect(screen.getByTestId('share-photo-status')).toHaveTextContent(
+      'Montage Photo 2 · On the card',
+    );
+  });
+
+  it("adds one from the phone's photos, cropped square as it's picked, and removes it", async () => {
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///cache/ImagePicker/p.jpg', width: 900, height: 900 }],
+    } as never);
+    renderShare();
+    fireEvent.press(await screen.findByTestId('share-photo-open'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('share-photo-library'));
+    });
+
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsEditing: true, aspect: [1, 1] }),
+    );
+    const image = await screen.findByTestId('share-card-photo-image');
+    const kept = image.props.source.uri as string;
+    expect(kept).toMatch(/^file:\/\/\/docs\/share-photo\/user-1\/\d+\.jpg$/);
+    expect(screen.getByTestId('share-photo-status')).toHaveTextContent(
+      'From Your Photos · On the card',
+    );
+
+    fireEvent.press(screen.getByTestId('share-photo-open'));
+    fireEvent.press(screen.getByTestId('share-photo-remove'));
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
+    expect(mockFiles.has(kept)).toBe(false);
+    await waitFor(async () => expect(await stored()).toBeNull());
+  });
+
+  it('says how to allow Photos when turned down, adding nothing', async () => {
+    jest.mocked(ImagePicker.requestMediaLibraryPermissionsAsync).mockResolvedValueOnce({
+      granted: false,
+    } as never);
+    renderShare();
+    fireEvent.press(await screen.findByTestId('share-photo-open'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('share-photo-library'));
+    });
+
+    expect(screen.getByTestId('share-photo-error')).toHaveTextContent(
+      'Allow Progresso to use Photos in iPhone Settings to add a photo.',
+    );
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
+  });
+
+  it("leaves a photo that can't be loaded off the card, and still shares", async () => {
+    withAvatar();
+    await AsyncStorage.setItem(KEY, JSON.stringify({ include: true, choice: { kind: 'avatar' } }));
+    renderShare();
+    fireEvent(await screen.findByTestId('share-card-photo-image'), 'error');
+
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
+    expect(screen.getByTestId('share-photo-failed')).toHaveTextContent(
+      "Your photo couldn't be loaded, so it's left off the card.",
+    );
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('share-workout-share'));
+    });
+    expect(mockCaptureRef).toHaveBeenCalled();
+  });
+
+  it('starts a longer workout a step tighter with the photo, and roomy again without it', async () => {
+    withAvatar();
+    const six = Array.from({ length: 6 }, (_, i) => topSet(`Lift ${i + 1}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: six, exerciseCount: 6 });
+    await AsyncStorage.setItem(KEY, JSON.stringify({ include: true, choice: { kind: 'avatar' } }));
+    renderShare();
+    await screen.findByTestId('share-card-photo');
+
+    const nameSize = () =>
+      StyleSheet.flatten(screen.getByTestId('share-card-top-set-name-0').props.style).fontSize;
+    expect(nameSize()).toBe(DENSITY.snug.name);
+    fireEvent(screen.getByTestId('share-photo-switch'), 'valueChange', false);
+    expect(nameSize()).toBe(DENSITY.roomy.name);
+  });
+
+  it('says when there are no profile photos to choose from', async () => {
+    renderShare();
+    fireEvent.press(await screen.findByTestId('share-photo-open'));
+
+    expect(await screen.findByTestId('share-photo-none')).toHaveTextContent(
+      'No profile picture or montage photos yet.',
+    );
+    expect(screen.queryByTestId('share-photo-remove')).toBeNull();
   });
 });

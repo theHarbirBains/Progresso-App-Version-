@@ -56,6 +56,8 @@ interface DensitySpec {
   value: number;
   /** The landscape's height, at the foot of the image. */
   landscape: number;
+  /** The person's own photo, when they add one: its circle's diameter. */
+  photo: number;
 }
 
 /** Each density's sizes, in canvas points. Even tight keeps names at 10.5pt -- 31px in the image. */
@@ -78,6 +80,7 @@ export const DENSITY: Readonly<Record<StoryDensity, DensitySpec>> = {
     label: 9.5,
     value: 14.5,
     landscape: 112,
+    photo: 76,
   },
   snug: {
     top: 36,
@@ -97,6 +100,7 @@ export const DENSITY: Readonly<Record<StoryDensity, DensitySpec>> = {
     label: 8.5,
     value: 12.5,
     landscape: 84,
+    photo: 62,
   },
   tight: {
     top: 32,
@@ -116,6 +120,7 @@ export const DENSITY: Readonly<Record<StoryDensity, DensitySpec>> = {
     label: 8,
     value: 11,
     landscape: 60,
+    photo: 50,
   },
 };
 
@@ -170,6 +175,23 @@ function densityStyles(d: DensitySpec) {
       fontSize: d.date * 0.72,
       letterSpacing: 3,
       color: STORY_PALETTE.textSoft,
+    },
+    // The person's own photo, when they add one, between the brand and WORKOUT COMPLETE: a
+    // circle in a fine gold ring, a sliver of the green between -- like the card's other wells.
+    photoRing: {
+      padding: 3,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: withAlpha(STORY_PALETTE.gold, 0.85),
+      marginTop: 6,
+      marginBottom: 3,
+    },
+    photoCircle: {
+      width: d.photo,
+      height: d.photo,
+      borderRadius: d.photo / 2,
+      overflow: 'hidden',
+      backgroundColor: STORY_PALETTE.well,
     },
     title: {
       fontFamily: SERIF_HEAVY,

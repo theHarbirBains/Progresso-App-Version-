@@ -18,6 +18,8 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { STORY_CANVAS, STORY_CAPTURE, ShareStory } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
+import { SharePhotoControl } from '../sharing/SharePhotoControl';
+import { useSharePhoto } from '../sharing/useSharePhoto';
 import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'ShareWorkout'>;
@@ -31,7 +33,9 @@ const MAX_PREVIEW_SCALE = 1.2;
 // always laid out at its one size (360x640pt, captured at 1080x1920), so the image never depends
 // on the device -- only the preview is scaled, to fill the room above the buttons. The image is
 // made on the phone and only leaves through the share sheet or into the person's own Photos --
-// nothing is uploaded. Opened as the workout is finished, a new PR in it is cheered with a
+// nothing is uploaded. Above the buttons, Your Photo puts the person's own photo on the card if
+// they want it (sharing/useSharePhoto.ts: their profile picture, a montage photo or one from their
+// photos, kept on the phone); without one the card is exactly as it was. Opened as the workout is finished, a new PR in it is cheered with a
 // notification ("KEEP GOING, HARBIR!"), when PR Cheers is on; the achievements it earned wait
 // until this page is left (AchievementUnlockHost).
 export function ShareWorkoutScreen({ route, navigation }: Props) {
@@ -55,6 +59,18 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null);
 
   const [busy, setBusy] = useState<'share' | 'save' | null>(null);
+
+  // The person's own photo on the card, if they want one -- and whether it's drawn yet, so the
+  // card is never captured before it's there. One that can't be loaded is left off.
+  const sharePhoto = useSharePhoto(userId, profile?.avatarUrl ?? null);
+  const [photoLoad, setPhotoLoad] = useState<{ key: string; ok: boolean } | null>(null);
+  const chosenPhoto = sharePhoto.onCard ? sharePhoto.photo : null;
+  const photoFailed = chosenPhoto !== null && photoLoad?.key === chosenPhoto.key && !photoLoad.ok;
+  const cardPhoto = photoFailed ? null : chosenPhoto;
+  const photoWaiting =
+    sharePhoto.resolving ||
+    sharePhoto.picking ||
+    (cardPhoto !== null && photoLoad?.key !== cardPhoto.key);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -211,17 +227,35 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
               data={cardData}
               weightUnit={weightUnit}
               festive={decorating}
+              photo={cardPhoto}
+              onPhotoLoad={(key) => setPhotoLoad({ key, ok: true })}
+              onPhotoError={(key) => setPhotoLoad({ key, ok: false })}
             />
           </View>
         </View>
       </View>
 
       <View style={styles.actions}>
+        <SharePhotoControl
+          state={sharePhoto}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+          disabled={busy !== null}
+        />
+        {sharePhoto.error ? (
+          <Text testID="share-photo-error" style={styles.actionError}>
+            {sharePhoto.error}
+          </Text>
+        ) : photoFailed ? (
+          <Text testID="share-photo-failed" style={styles.actionNote}>
+            {"Your photo couldn't be loaded, so it's left off the card."}
+          </Text>
+        ) : null}
         <PrimaryButton
           testID="share-workout-share"
           label="Share"
           loading={busy === 'share'}
-          disabled={busy !== null}
+          disabled={busy !== null || photoWaiting}
           onPress={handleShare}
           accentColor={theme.accent}
           onAccentColor={theme.onAccent}
@@ -231,7 +265,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
           label={saved ? 'Saved to Photos' : 'Save to Photos'}
           icon={saved ? 'check' : 'download'}
           loading={busy === 'save'}
-          disabled={busy !== null}
+          disabled={busy !== null || photoWaiting}
           onPress={handleSave}
         />
         {actionError ? (

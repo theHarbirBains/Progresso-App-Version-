@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useState, type ComponentProps, type Ref } from 'react';
 import { View, type LayoutChangeEvent, type ViewInstance } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
@@ -11,6 +12,7 @@ import { withAlpha } from '../theme/accentColor';
 import { formatSetValues } from '../workouts/setValues';
 import { formatCardDuration } from '../workouts/workoutFormat';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
+import { photoRect, type SharePhoto } from './sharePhoto';
 import {
   DENSITIES,
   DENSITY,
@@ -37,6 +39,11 @@ interface Props {
   weightUnit: 'kg' | 'lb';
   /** Through the holidays (Settings > Appearance > Holiday Decorations): lights, a hat, pines and a deer. */
   festive: boolean;
+  /** The person's own photo, when they've added one (sharePhoto.ts); none leaves the card as it was. */
+  photo?: SharePhoto | null;
+  /** The photo is drawn (or couldn't be): the card can be captured with it. */
+  onPhotoLoad?: (key: string) => void;
+  onPhotoError?: (key: string) => void;
   storyRef?: Ref<ViewInstance>;
 }
 
@@ -66,12 +73,61 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /**
  * How roomy a workout's card can start: by its rows, a long name counting for half another
- * (it may wrap). The card then measures itself and tightens until it fits (ShareStory).
+ * (it may wrap), and the person's photo for two. The card then measures itself and tightens until
+ * it fits (ShareStory).
  */
-export function startingDensity(data: ShareCardData): StoryDensity {
+export function startingDensity(data: ShareCardData, withPhoto = false): StoryDensity {
   const longNames = data.topSets.filter((set) => set.displayName.length > 24).length;
-  const rows = data.topSets.length + data.cardio.length * 1.3 + longNames * 0.5;
+  const rows =
+    data.topSets.length + data.cardio.length * 1.3 + longNames * 0.5 + (withPhoto ? 2 : 0);
   return rows <= 6.5 ? 'roomy' : rows <= 10 ? 'snug' : 'tight';
+}
+
+/**
+ * The person's photo in its gold ring: covering its circle, never stretched -- framed as its owner
+ * framed it where it's a montage photo, else from its middle (a photo picked for it was cropped
+ * square as it was picked).
+ */
+function StoryPhoto({
+  photo,
+  density,
+  onLoad,
+  onError,
+}: {
+  photo: SharePhoto;
+  density: StoryDensity;
+  onLoad?: (key: string) => void;
+  onError?: (key: string) => void;
+}) {
+  const s = storyStyles[density];
+  const diameter = DENSITY[density].photo;
+  const rect = photoRect(diameter, photo);
+  return (
+    <View testID="share-card-photo" style={s.photoRing}>
+      <View style={s.photoCircle}>
+        <Image
+          testID="share-card-photo-image"
+          source={photo.source}
+          style={
+            rect
+              ? {
+                  position: 'absolute',
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                }
+              : { width: diameter, height: diameter }
+          }
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          onLoad={() => onLoad?.(photo.key)}
+          onError={() => onError?.(photo.key)}
+          accessibilityIgnoresInvertColors
+        />
+      </View>
+    </View>
+  );
 }
 
 /** A small dumbbell, the card's mark for a lift (Feather has none). */
@@ -160,7 +216,8 @@ function Landscape({ height: h, festive }: { height: number; festive: boolean })
  * The shareable workout image, after Harbir's reference: a 9:16 story (360x640pt, captured at
  * 1080x1920) on Holiday Gym's deep green, gold sparkles across it -- and through the holidays a
  * string of lights along the top, a Santa hat on the brand and pines and a deer on the hills at
- * its foot. Then the brand, WORKOUT COMPLETE, the workout's name and date; its four figures
+ * its foot. Then the brand -- and, if they've added one, the person's own photo in a gold ring --
+ * WORKOUT COMPLETE, the workout's name and date; its four figures
  * (duration -- start to finish, its cardio in it once -- sets, volume in the user's unit and
  * records held); every exercise's top set in the order done -- its name, which wraps rather than
  * shrinking, "Top Set" under it and the figure in a gold pill in its own column; its cardio,
@@ -172,11 +229,23 @@ function Landscape({ height: h, festive }: { height: number; festive: boolean })
  * tight can't hold every exercise readably, the last rows give way to "+N more exercises", said
  * on the card, never dropped silently. The whole canvas is what gets captured.
  */
-export function ShareStory({ data, weightUnit, festive, storyRef }: Props) {
-  const [fit, setFit] = useState<{ density: StoryDensity; limit: number }>(() => ({
-    density: startingDensity(data),
-    limit: Infinity,
-  }));
+export function ShareStory({
+  data,
+  weightUnit,
+  festive,
+  photo = null,
+  onPhotoLoad,
+  onPhotoError,
+  storyRef,
+}: Props) {
+  const withPhoto = photo !== null;
+  const [fit, setFit] = useState<{ density: StoryDensity; limit: number; withPhoto: boolean }>(
+    () => ({ density: startingDensity(data, withPhoto), limit: Infinity, withPhoto }),
+  );
+  // A photo added or taken off: fit the card afresh, from as roomy as it can start.
+  if (fit.withPhoto !== withPhoto) {
+    setFit({ density: startingDensity(data, withPhoto), limit: Infinity, withPhoto });
+  }
   const { density, limit } = fit;
   const s = storyStyles[density];
   const d = DENSITY[density];
@@ -193,8 +262,8 @@ export function ShareStory({ data, weightUnit, festive, storyRef }: Props) {
     const next = DENSITIES[DENSITIES.indexOf(density) + 1];
     // The exercise rows there are now, "+N more" included: one fewer.
     const rows = overflow ? limit : data.topSets.length;
-    if (next) setFit({ density: next, limit });
-    else if (rows > 2) setFit({ density, limit: rows - 1 });
+    if (next) setFit({ density: next, limit, withPhoto });
+    else if (rows > 2) setFit({ density, limit: rows - 1, withPhoto });
   }
 
   const duration = data.durationMinutes !== null ? formatCardDuration(data.durationMinutes) : '—';
@@ -242,6 +311,7 @@ export function ShareStory({ data, weightUnit, festive, storyRef }: Props) {
   // A picture to VoiceOver: what's on it, in one label.
   const accessibilityLabel = [
     `${data.title}, ${formatCardDate(data.performedAt)}`,
+    ...(withPhoto ? ['With your photo'] : []),
     ...stats.map((stat) => `${stat.label} ${stat.value}`),
     ...data.topSets.map((set) => `${set.displayName}: ${topSetValue(set, weightUnit)}`),
     ...data.cardio.map((entry) => `${entry.name}: ${entry.figures}`),
@@ -281,6 +351,14 @@ export function ShareStory({ data, weightUnit, festive, storyRef }: Props) {
               <SantaHat testID="share-card-hat" size={d.brand * 0.8} style={s.hat} />
             ) : null}
           </View>
+          {photo ? (
+            <StoryPhoto
+              photo={photo}
+              density={density}
+              onLoad={onPhotoLoad}
+              onError={onPhotoError}
+            />
+          ) : null}
           <View style={s.kickerRow}>
             <View style={s.kickerRule} />
             <CardText style={s.kicker}>WORKOUT COMPLETE</CardText>
