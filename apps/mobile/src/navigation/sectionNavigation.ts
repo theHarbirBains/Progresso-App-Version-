@@ -28,12 +28,17 @@ type StackState = NavigationState | PartialState<NavigationState>;
 export function sectionAction(
   state: StackState | undefined,
   route: keyof RootStackParamList,
+  params?: object,
 ): NavigationAction | null {
   const routes = state?.routes ?? [];
-  if (routes[0]?.name === route) {
+  // With params (a section opened on one of its tabs) it always starts afresh, on them.
+  if (routes[0]?.name === route && !params) {
     return routes.length > 1 ? StackActions.popToTop() : null;
   }
-  return CommonActions.reset({ index: 0, routes: [{ name: route }] });
+  return CommonActions.reset({
+    index: 0,
+    routes: [params ? { name: route, params } : { name: route }],
+  });
 }
 
 /** A screen's (or the container's) navigation object, as much of it as going to a section needs. */
@@ -42,8 +47,12 @@ interface Navigator {
   dispatch(action: NavigationAction): void;
 }
 
-/** Goes to `route` as a section (see sectionAction). */
-export function goToSection(navigation: Navigator, route: keyof RootStackParamList) {
-  const action = sectionAction(navigation.getState(), route);
+/** Goes to `route` as a section (see sectionAction), with `params` where given. */
+export function goToSection(
+  navigation: Navigator,
+  route: keyof RootStackParamList,
+  params?: object,
+) {
+  const action = sectionAction(navigation.getState(), route, params);
   if (action) navigation.dispatch(action);
 }

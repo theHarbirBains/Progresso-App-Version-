@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MontageItem } from '../lib/api';
+import type { ProgressSection } from '../progress/progressSections';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 
 // The signed-in app's navigation structure. Sign-in/forgot-password/reset
@@ -124,7 +125,8 @@ export type RootStackParamList = {
   Micronutrients: { day?: string } | undefined;
   /** One nutrient: the day's intake (or the week's average) and what it does. */
   NutrientDetail: { nutrientId: string; day: string; range: 'day' | 'week' };
-  ProgressOverview: undefined;
+  /** Progress, on a section (Feed's Daily Steps widget opens Steps); Overview when absent. */
+  ProgressOverview: { section?: ProgressSection } | undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   /** Workout Splits, on its My Splits or Programs tab (My Splits when absent). */
   WorkoutSplits: { tab?: 'splits' | 'programs' } | undefined;

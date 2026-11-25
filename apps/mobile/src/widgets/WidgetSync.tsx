@@ -23,7 +23,7 @@ async function refreshStepsWidget(): Promise<void> {
     if (access === 'unavailable') return;
     await showStepsWidget(access === 'asked' ? await stepsToday() : null);
   } catch (error) {
-    // The widget keeps what it last showed; Progress's Steps block says what went wrong.
+    // The widget keeps what it last showed; Feed's Daily Steps widget says what went wrong.
     recordQuietFailure('health.steps', error);
   }
 }
@@ -37,7 +37,7 @@ const NO_TARGETS: NutritionGoalValues = {
 
 /**
  * Keeps Today's Steps in step with Apple Health -- read as the app opens signed in and whenever it
- * comes back to the front (Progress's Steps block hands it a count too, as it reads one) -- keeps
+ * comes back to the front (Feed's Daily Steps widget hands it a count too, as it reads one) -- keeps
  * Today's Nutrition in step with the app, from the same shared food log and daily targets
  * Nutrition shows -- every log, edit, delete and target save reaches it with no fetch of its own
  * -- dresses every widget in the app's theme whenever it changes (Settings > Appearance, or the

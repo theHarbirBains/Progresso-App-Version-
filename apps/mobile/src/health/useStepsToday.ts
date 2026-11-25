@@ -3,37 +3,46 @@ import { AppState, Platform } from 'react-native';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { recordQuietFailure } from '../lib/sentry';
 import { showStepsWidget } from '../widgets/widgetUpdates';
-import { askForSteps, stepsAccess, stepsToday, type StepsAccess } from './steps';
+import { askForSteps, stepsAccess, stepsByDay, stepsToday, type StepsAccess } from './steps';
 
 export interface StepsToday {
   /** Null until it's known; 'unavailable' off iPhone. */
   access: StepsAccess | null;
   /** Today's count once asked, else null. */
   steps: number | null;
+  /** The average of the 7 days before today, as the Steps tab works it out -- what Feed's
+   * Daily Steps widget's bar measures today against (there's no step goal). Null until read, or
+   * when it couldn't be. */
+  average: number | null;
   connecting: boolean;
   /** Why Apple Health couldn't be reached, when it couldn't -- shown on the card, not hidden. */
   failure: string | null;
-  /** Reads the count again -- Progress calls it each time it's shown. */
+  /** Reads the count again -- Feed calls it each time it's shown. */
   refresh: () => Promise<void>;
   /** Asks Apple Health for steps, then reads them. */
   connect: () => Promise<void>;
 }
 
-/** What Progress last showed of today's steps, for `userId` (lib/lastShown.ts). */
+/** What Feed last showed of today's steps, for `userId` (lib/lastShown.ts). */
 interface ShownSteps {
   access: StepsAccess;
   steps: number | null;
+  average: number | null;
   /** The day it was read (toDateString), so yesterday's count never shows as today's. */
   day: string;
 }
-const SHOWN_KEY = 'progress.steps';
+const SHOWN_KEY = 'feed.steps';
+
+/** How many days are read for the average: the 7 before today, and today. */
+const AVERAGE_DAYS = 8;
 
 /**
- * Today's steps for the Steps block at the top of Progress's Overview. Read from Apple Health on
- * the phone each time Progress is shown (it calls `refresh` as it opens and on every focus after)
- * and when the app comes back to the front -- it's a local read, so nothing is cached -- and
- * handed to the Steps widget as it's read. A reopened Progress starts from what it last showed
- * today, so the block is there at once while it's read again.
+ * Today's steps for Feed's Daily Steps widget, beside the greeting -- and the 7-day average its
+ * bar measures today against. Read from Apple Health on the phone each time Feed is shown (Feed
+ * calls `refresh` on every focus, its first included) and when the app comes back to the front --
+ * it's a local read, so nothing is cached -- and today's count is handed to the Home Screen's
+ * Steps widget as it's read. A reopened Feed starts from what it last showed today, so the widget
+ * is there at once while it's read again.
  */
 export function useStepsToday(userId?: string): StepsToday {
   const [shown] = useState(() => {
@@ -42,6 +51,7 @@ export function useStepsToday(userId?: string): StepsToday {
   });
   const [access, setAccess] = useState<StepsAccess | null>(shown?.access ?? null);
   const [steps, setSteps] = useState<number | null>(shown?.steps ?? null);
+  const [average, setAverage] = useState<number | null>(shown?.average ?? null);
   const [connecting, setConnecting] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const mounted = useRef(true);
@@ -62,17 +72,38 @@ export function useStepsToday(userId?: string): StepsToday {
       const day = new Date().toDateString();
       if (nextAccess === 'unavailable') return;
       if (nextAccess === 'notAsked') {
-        rememberShown<ShownSteps>(userId, SHOWN_KEY, { access: nextAccess, steps: null, day });
+        rememberShown<ShownSteps>(userId, SHOWN_KEY, {
+          access: nextAccess,
+          steps: null,
+          average: null,
+          day,
+        });
         void showStepsWidget(null);
         return;
       }
       const count = await stepsToday();
       if (!mounted.current) return;
       setSteps(count);
-      rememberShown<ShownSteps>(userId, SHOWN_KEY, { access: nextAccess, steps: count, day });
       void showStepsWidget(count);
+      // The average is extra: a failure leaves the count as it is, with no bar.
+      let nextAverage: number | null = null;
+      try {
+        const days = await stepsByDay(AVERAGE_DAYS);
+        const before = days.slice(0, -1);
+        nextAverage = Math.round(before.reduce((sum, d) => sum + d.steps, 0) / before.length);
+      } catch (error) {
+        recordQuietFailure('health.steps.average', error);
+      }
+      if (!mounted.current) return;
+      setAverage(nextAverage);
+      rememberShown<ShownSteps>(userId, SHOWN_KEY, {
+        access: nextAccess,
+        steps: count,
+        average: nextAverage,
+        day,
+      });
     } catch (error) {
-      // Progress goes on; the block says what went wrong.
+      // Feed goes on; the widget says what went wrong.
       failed(error);
     }
   }, [failed, userId]);
@@ -100,5 +131,5 @@ export function useStepsToday(userId?: string): StepsToday {
     };
   }, [refresh]);
 
-  return { access, steps, connecting, failure, refresh, connect };
+  return { access, steps, average, connecting, failure, refresh, connect };
 }

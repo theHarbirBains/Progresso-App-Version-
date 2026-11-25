@@ -37,6 +37,9 @@ import { useAppTheme } from '../theme/appThemeContext';
 import { useSocialSummaries } from '../social/useSocialSummaries';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { FeedGreeting } from '../feed/FeedGreeting';
+import { DailyStepsWidget } from '../feed/DailyStepsWidget';
+import { useStepsToday } from '../health/useStepsToday';
+import { goToSection } from '../navigation/sectionNavigation';
 import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
 import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
@@ -142,6 +145,11 @@ export function FeedScreen({ navigation }: Props) {
   const workspace = useWorkspace();
   const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId, themeLoading } =
     useProgressTheme();
+  // Today's steps from Apple Health, in the Daily Steps widget beside the greeting (iPhone only).
+  // A local read, so it's read again on every visit, never gated.
+  const steps = useStepsToday(userId);
+  const refreshStepsRef = useRef(steps.refresh);
+  refreshStepsRef.current = steps.refresh;
 
   // What Feed showed last time (lib/lastShown.ts): a reopened Feed starts from
   // it -- no spinner -- and refreshes in the background as always.
@@ -469,6 +477,7 @@ export function FeedScreen({ navigation }: Props) {
       if (isStale(lastBadgeLoadAtRef.current)) void loadNotificationBadgeCount();
       if (isStale(lastNextWorkoutLoadAtRef.current)) void loadNextWorkoutRef.current();
       void loadLiveWorkoutRef.current();
+      void refreshStepsRef.current();
       handNextWorkoutToWidgetRef.current();
     });
     return unsubscribe;
@@ -697,7 +706,15 @@ export function FeedScreen({ navigation }: Props) {
         </BubbleMenu>
 
         <RiseIn>
-          <FeedGreeting displayName={displayName} />
+          <FeedGreeting
+            displayName={displayName}
+            aside={
+              <DailyStepsWidget
+                steps={steps}
+                onOpen={() => goToSection(navigation, 'ProgressOverview', { section: 'Steps' })}
+              />
+            }
+          />
         </RiseIn>
 
         {!showPage ? <SkeletonCards testID="feed-loading" heights={[200, 220, 220]} /> : null}

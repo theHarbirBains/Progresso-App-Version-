@@ -23,6 +23,18 @@ export const feedStyles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
   },
+  // With the Daily Steps widget beside it: the words take the rest of the row, the widget its
+  // own width on the right, the two centred on each other.
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingRight: 0,
+  },
+  greetingWords: {
+    flex: 1,
+    minWidth: 0,
+  },
   // The headline, and the holidays' star beside it.
   greetingHeadlineRow: {
     flexDirection: 'row',

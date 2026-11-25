@@ -23,9 +23,7 @@ import {
   getRequestStatusForAuthorization,
   isHealthDataAvailable,
   queryStatisticsForQuantity,
-  requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
-import { homeWidgets } from '../widgets/homeWidgets';
 import { updateSet } from '../workouts/workoutQueries';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -94,7 +92,7 @@ const navigation: any = {
     return jest.fn();
   }),
 };
-const route = {} as never;
+let route = {} as never;
 
 const mockOpenMenu = jest.fn();
 
@@ -600,21 +598,17 @@ describe('ProgressOverviewScreen -- Weekly Summary', () => {
   });
 });
 
-describe('ProgressOverviewScreen -- Steps Today', () => {
-  const { stepsWidget } = homeWidgets();
-
-  beforeEach(() => {
-    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
-    jest.mocked(stepsWidget.updateTimeline).mockClear();
-  });
-
+describe('ProgressOverviewScreen -- steps', () => {
   afterEach(() => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(false);
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+    route = {} as never;
   });
 
-  it('shows nothing where Apple Health is not available', async () => {
-    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+  it("shows no steps on Overview: today's are Feed's Daily Steps widget", async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest.mocked(queryStatisticsForQuantity).mockClear();
     renderScreen();
 
     await screen.findByTestId('progress-section-card');
@@ -622,58 +616,31 @@ describe('ProgressOverviewScreen -- Steps Today', () => {
       await Promise.resolve();
     });
     expect(screen.queryByTestId('progress-steps-today')).toBeNull();
+    expect(queryStatisticsForQuantity).not.toHaveBeenCalled();
   });
 
-  it("offers to connect Apple Health, then shows today's steps and hands them to the widget", async () => {
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(1).mockResolvedValue(2);
-    jest
-      .mocked(queryStatisticsForQuantity)
-      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 8412 }, sources: [] } as never);
+  it('opens on the Steps tab when asked (from Feed)', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+    route = { params: { section: 'Steps' } } as never;
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('progress-steps-today-connect'));
-
-    expect(await screen.findByTestId('progress-steps-today-count')).toHaveTextContent(
-      /^8,412\s*Steps$/,
-    );
-    expect(requestAuthorization).toHaveBeenCalledWith({
-      toRead: ['HKQuantityTypeIdentifierStepCount'],
+    expect(await screen.findByTestId('progress-steps')).toBeTruthy();
+    expect(screen.getByTestId('progress-tabs-Steps').props.accessibilityState).toMatchObject({
+      selected: true,
     });
-    expect(jest.mocked(stepsWidget.updateTimeline).mock.calls.at(-1)?.[0][0].props.steps).toBe(
-      '8,412',
-    );
   });
 
-  it('opens the Steps tab for the last four weeks', async () => {
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
-    jest
-      .mocked(queryStatisticsForQuantity)
-      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 5000 }, sources: [] } as never);
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('progress-steps-today-history'));
-    expect(screen.queryByTestId('progress-steps-today')).toBeNull();
-  });
-
-  it("says Apple Health couldn't be reached, and why, rather than hiding the block", async () => {
-    jest.mocked(isHealthDataAvailable).mockImplementation(() => {
-      throw new Error('NitroModules are not installed');
-    });
-    renderScreen();
-
-    expect(await screen.findByTestId('progress-steps-today-failure')).toHaveTextContent(
-      'NitroModules are not installed',
-    );
-  });
-
-  it('says where to check when no steps come back', async () => {
-    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
-    jest.mocked(queryStatisticsForQuantity).mockResolvedValue({ sources: [] } as never);
-    renderScreen();
-
-    expect(await screen.findByTestId('progress-steps-today-count')).toHaveTextContent(
-      /^0\s*Steps$/,
-    );
-    expect(screen.getByTestId('progress-steps-today-hint')).toHaveTextContent(/Health app/);
+  it('opens on Overview when asked for Steps off iPhone', async () => {
+    const os = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
+    route = { params: { section: 'Steps' } } as never;
+    try {
+      renderScreen();
+      expect(await screen.findByTestId('progress-section-card')).toBeTruthy();
+      expect(screen.queryByTestId('progress-steps')).toBeNull();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+    }
   });
 });

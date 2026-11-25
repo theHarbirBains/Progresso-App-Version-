@@ -22,7 +22,9 @@ import { forgetShown } from '../lib/lastShown';
 import {
   getRequestStatusForAuthorization,
   isHealthDataAvailable,
+  queryStatisticsCollectionForQuantity,
   queryStatisticsForQuantity,
+  requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
 import { widgetShown } from '../testUtils/widgetShown';
 import { homeWidgets } from '../widgets/homeWidgets';
@@ -31,7 +33,7 @@ import { greetingFor } from '../feed/greeting';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
-const { nextWorkoutWidget, workoutActivity } = homeWidgets();
+const { nextWorkoutWidget, stepsWidget, workoutActivity } = homeWidgets();
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -99,6 +101,9 @@ const navigation: any = {
     if (event === 'focus') cb();
     return jest.fn();
   }),
+  // Going to another section (goToSection) reads where it is and dispatches.
+  getState: jest.fn(() => ({ routes: [{ name: 'Dashboard' }] })),
+  dispatch: jest.fn(),
 };
 const route = {} as never;
 
@@ -1291,18 +1296,115 @@ describe('FeedScreen -- the home-screen widgets', () => {
   });
 });
 
-describe('FeedScreen -- Steps', () => {
-  it("shows no Steps card: today's steps are on Progress", async () => {
+describe('FeedScreen -- Daily Steps', () => {
+  // The 7 days before today, then today: an average of 9,000.
+  const week = (today: number) =>
+    [...Array.from({ length: 7 }, () => 9000), today].map((quantity, i) => ({
+      startDate: new Date(2026, 10, 18 + i),
+      sumQuantity: { unit: 'count', quantity },
+    }));
+
+  beforeEach(() => {
+    jest.mocked(stepsWidget.updateTimeline).mockClear();
+    navigation.dispatch.mockClear();
     jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+    jest.mocked(queryStatisticsForQuantity).mockResolvedValue({ sources: [] } as never);
+    jest.mocked(queryStatisticsCollectionForQuantity).mockResolvedValue([] as never);
+  });
+
+  it('shows no widget where Apple Health is not available, the greeting taking the row', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    renderScreen();
+
+    await screen.findByTestId('feed-empty');
+    expect(screen.queryByTestId('feed-daily-steps')).toBeNull();
+    expect(screen.getByTestId('feed-greeting')).toBeTruthy();
+  });
+
+  it("shows today's steps beside the greeting, against the 7-day average, and hands them to the Home Screen widget", async () => {
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
-    try {
-      renderScreen();
-      await screen.findByTestId('feed-empty');
-      expect(screen.queryByTestId('feed-steps')).toBeNull();
-      expect(queryStatisticsForQuantity).not.toHaveBeenCalled();
-    } finally {
-      jest.mocked(isHealthDataAvailable).mockReturnValue(false);
-      jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
-    }
+    jest
+      .mocked(queryStatisticsForQuantity)
+      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 8412 }, sources: [] } as never);
+    jest.mocked(queryStatisticsCollectionForQuantity).mockResolvedValue(week(8412) as never);
+    renderScreen();
+
+    const widget = await screen.findByTestId('feed-daily-steps');
+    // Inside the greeting's row, on its right.
+    expect(within(screen.getByTestId('feed-greeting')).getByTestId('feed-daily-steps')).toBe(
+      widget,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('feed-daily-steps-count')).toHaveTextContent('8,412'),
+    );
+    expect(screen.getByTestId('feed-daily-steps-note')).toHaveTextContent('7-day avg 9,000');
+    // Hidden from VoiceOver: the widget's label says it.
+    expect(
+      screen.getByTestId('feed-daily-steps-bar', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    expect(widget.props.accessibilityLabel).toMatch(
+      /Daily steps: 8,412 today, 93% of your 7-day average of 9,000\. Opens your steps\./,
+    );
+    expect(jest.mocked(stepsWidget.updateTimeline).mock.calls.at(-1)?.[0][0].props.steps).toBe(
+      '8,412',
+    );
+    expectNoBareText();
+  });
+
+  it("opens Progress's Steps tab when tapped, as a section", async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('feed-daily-steps'));
+    expect(navigation.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'RESET',
+        payload: { index: 0, routes: [{ name: 'ProgressOverview', params: { section: 'Steps' } }] },
+      }),
+    );
+  });
+
+  it('shows the count alone when the average cannot be read', async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest
+      .mocked(queryStatisticsForQuantity)
+      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 1200 }, sources: [] } as never);
+    jest.mocked(queryStatisticsCollectionForQuantity).mockRejectedValue(new Error('busy'));
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('feed-daily-steps-count')).toHaveTextContent('1,200'),
+    );
+    expect(screen.getByTestId('feed-daily-steps-note')).toHaveTextContent('Today');
+    expect(
+      screen.queryByTestId('feed-daily-steps-bar', { includeHiddenElements: true }),
+    ).toBeNull();
+  });
+
+  it('says Connect until Apple Health is asked, and reads it again on coming back', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-daily-steps-connect')).toHaveTextContent('Connect');
+    // Never asked from here: the Steps tab explains first, then connects.
+    fireEvent.press(screen.getByTestId('feed-daily-steps'));
+    expect(requestAuthorization).not.toHaveBeenCalled();
+    expect(navigation.dispatch).toHaveBeenCalled();
+  });
+
+  it("says Apple Health couldn't be reached rather than hiding the widget", async () => {
+    jest.mocked(isHealthDataAvailable).mockImplementation(() => {
+      throw new Error('NitroModules are not installed');
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-daily-steps-note')).toHaveTextContent(
+      'Health unavailable',
+    );
+    expect(screen.getByTestId('feed-daily-steps-count')).toHaveTextContent('—');
   });
 });
