@@ -3851,6 +3851,114 @@ async function main() {
     /finish or cancel/,
   );
 
+  // A tracked client in a group workout keeps their place in the group when they claim: the
+  // place goes with the workout (it used to stay with the placeholder, and went when the API
+  // deleted it).
+  const groupClaimant = randomUUID();
+  const groupPlaceholder = randomUUID();
+  await admin.query(
+    `insert into auth.users (id, email) values
+       ($1, 'group-claimant@test.local'),
+       ($2, 'placeholder-group@placeholders.invalid')`,
+    [groupClaimant, groupPlaceholder],
+  );
+  await trackPlaceholder(groupPlaceholder, 'code-hash-group');
+  const claimGroup = randomUUID();
+  const sharedGroup = randomUUID();
+  await admin.query(
+    `insert into public.workout_groups (id, host_id, name, status, finished_at) values
+       ($1, $3, 'Claimed group', 'finished', now()),
+       ($2, $3, 'Shared group', 'finished', now())`,
+    [claimGroup, sharedGroup, T],
+  );
+  await admin.query(
+    `insert into public.workout_group_members (group_id, user_id, role, status, is_guest, added_by) values
+       ($1, $3, 'host', 'joined', false, $3),
+       ($1, $4, 'member', 'joined', false, $3),
+       ($2, $3, 'host', 'joined', false, $3),
+       ($2, $4, 'member', 'joined', false, $3),
+       ($2, $5, 'member', 'invited', false, $3)`,
+    [claimGroup, sharedGroup, T, groupPlaceholder, groupClaimant],
+  );
+  await admin.query(
+    `insert into public.workouts (user_id, name, performed_at, completed_at, group_id) values
+       ($1, 'Claimed group', now(), now(), $2),
+       ($1, 'Shared group', now(), now(), $3)`,
+    [groupPlaceholder, claimGroup, sharedGroup],
+  );
+  await admin.query('select public.claim_placeholder_history($1, $2)', [
+    groupPlaceholder,
+    groupClaimant,
+  ]);
+  const groupPlaces = await admin.query(
+    `select group_id, user_id, status from public.workout_group_members
+     where user_id = any($1::uuid[]) order by group_id, user_id`,
+    [[groupPlaceholder, groupClaimant]],
+  );
+  const placeIn = (groupId) =>
+    groupPlaces.rows
+      .filter((row) => row.group_id === groupId)
+      .map((row) => [row.user_id, row.status]);
+  record(
+    'Claiming keeps a tracked client in their group workout: the place moves to the client, joined',
+    JSON.stringify(placeIn(claimGroup)) === JSON.stringify([[groupClaimant, 'joined']]),
+    JSON.stringify(groupPlaces.rows),
+  );
+  record(
+    'A group the client was already invited to keeps one place for them, joined, and none for the placeholder',
+    JSON.stringify(placeIn(sharedGroup)) === JSON.stringify([[groupClaimant, 'joined']]),
+    JSON.stringify(groupPlaces.rows),
+  );
+  // As the API does once a claim is done: nothing of the client's group places goes with it.
+  await admin.query('delete from auth.users where id = $1', [groupPlaceholder]);
+  const keptPlaces = await admin.query(
+    "select count(*)::int as n from public.workout_group_members where user_id = $1 and status = 'joined'",
+    [groupClaimant],
+  );
+  record(
+    'Deleting the claimed placeholder leaves the client in both groups',
+    keptPlaces.rows[0].n === 2,
+    JSON.stringify(keptPlaces.rows[0]),
+  );
+
+  // Someone a claim took out before this: their group workout is theirs, their place gone. The
+  // repair gives it back, joined -- and never brings back someone who left (their workout there
+  // is deleted when they leave).
+  const lostMember = randomUUID();
+  const leaver = randomUUID();
+  await admin.query(
+    "insert into auth.users (id, email) values ($1, 'lost-member@test.local'), ($2, 'leaver@test.local')",
+    [lostMember, leaver],
+  );
+  await admin.query(
+    "insert into public.workout_group_members (group_id, user_id, role, status, is_guest, added_by) values ($1, $2, 'member', 'left', false, $3)",
+    [claimGroup, leaver, T],
+  );
+  await admin.query(
+    `insert into public.workouts (user_id, name, performed_at, completed_at, group_id, deleted_at) values
+       ($1, 'Claimed group', now(), now(), $3, null),
+       ($2, 'Claimed group', now(), now(), $3, now())`,
+    [lostMember, leaver, claimGroup],
+  );
+  const restored = await admin.query('select public.restore_lost_group_places() as n');
+  const afterRestore = await admin.query(
+    `select user_id, role, status from public.workout_group_members
+     where group_id = $1 and user_id = any($2::uuid[]) order by user_id`,
+    [claimGroup, [lostMember, leaver]],
+  );
+  const statusOf = (id) => afterRestore.rows.find((row) => row.user_id === id)?.status;
+  record(
+    'The repair gives back a lost group place, joined, and leaves someone who left out',
+    restored.rows[0].n === 1 && statusOf(lostMember) === 'joined' && statusOf(leaver) === 'left',
+    JSON.stringify({ restored: restored.rows[0], rows: afterRestore.rows }),
+  );
+  const restoredAgain = await admin.query('select public.restore_lost_group_places() as n');
+  record(
+    'The repair changes nothing when run again',
+    restoredAgain.rows[0].n === 0,
+    JSON.stringify(restoredAgain.rows[0]),
+  );
+
   const expectSucceeds = async (promise, name) => {
     try {
       await promise;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
+import { FilterChips } from '../design/FilterChips';
 import { RiseInStack } from '../design/RiseIn';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
@@ -8,6 +9,7 @@ import { Text } from '../design/Text';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { colors, typeScale, widgetGap } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
+import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { computeTotalSets } from './workoutSummary';
 import { WorkoutStats } from './WorkoutStats';
@@ -29,12 +31,14 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
+  hasDraftInput,
   type SetInputDraft,
 } from './setInputDrafts';
 import { LiveProgressionSheets, RepRangeRow, useLiveProgression } from './useLiveProgression';
 import { useSetInputDrafts } from './useSetInputDrafts';
 import { useSetAutosave, type LiveSet } from './useSetAutosave';
 import { discardSetTimer } from './setTimers';
+import { workoutMuscleTabs, type MuscleTab } from './workoutMuscleTabs';
 import {
   addExerciseToWorkout,
   createSet,
@@ -117,6 +121,8 @@ export function GroupWorkoutEditor({
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  // The muscle tab showing: every exercise, or one primary muscle group's (as Active Workout).
+  const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
   const progression = useLiveProgression({ userId, weightUnit, onError: setError });
 
   // Every person's sets save as they're typed, whoever types them -- see useSetAutosave.
@@ -151,6 +157,18 @@ export function GroupWorkoutEditor({
           },
         ]),
       );
+  /** Deletes sets and forgets them: their inputs and any timer. */
+  async function removeSetRows(setIds: string[]) {
+    await Promise.all(setIds.map((setId) => deleteSet(setId)));
+    const gone = new Set(setIds);
+    setDetails(withSets((sets) => sets.filter((set) => !gone.has(set.id))));
+    setSetInputs((prev) => {
+      const next = { ...prev };
+      for (const setId of setIds) delete next[setId];
+      return next;
+    });
+    for (const setId of setIds) discardSetTimer(setId);
+  }
   const autosave = useSetAutosave({
     sets: liveSets,
     setInputs,
@@ -158,17 +176,7 @@ export function GroupWorkoutEditor({
     save: (setId, update) => updateSet(setId, update),
     onSaved: (saved) =>
       setDetails(withSets((sets) => sets.map((set) => (set.id === saved.id ? saved : set)))),
-    remove: async (setIds) => {
-      await Promise.all(setIds.map((setId) => deleteSet(setId)));
-      const gone = new Set(setIds);
-      setDetails(withSets((sets) => sets.filter((set) => !gone.has(set.id))));
-      setSetInputs((prev) => {
-        const next = { ...prev };
-        for (const setId of setIds) delete next[setId];
-        return next;
-      });
-      for (const setId of setIds) discardSetTimer(setId);
-    },
+    remove: removeSetRows,
     onTimersStopped: (drafts) => setSetInputs((prev) => ({ ...prev, ...drafts })),
     onError: setError,
   });
@@ -367,6 +375,8 @@ export function GroupWorkoutEditor({
 
   async function addExercise(exercise: ExerciseRow) {
     setPickerOpen(false);
+    // On a muscle tab, the new exercise's own tab, so it's never added out of sight.
+    setMuscleTab((tab) => (tab === 'all' ? tab : exercise.muscleGroup));
     await change(async () => {
       for (const member of members) {
         const detail = details[member.userId];
@@ -399,6 +409,45 @@ export function GroupWorkoutEditor({
     });
   }
 
+  /**
+   * Removes one of the shown person's sets -- a unilateral set's two sides together. An empty set
+   * goes straight away; one with numbers in it, or done, is asked about first, as in Active
+   * Workout, so a stray tap never loses a logged set.
+   */
+  function removeSet(setId: string) {
+    const exercise = selectedDetail?.exercises.find((ex) =>
+      ex.sets.some((set) => set.id === setId),
+    );
+    const set = exercise?.sets.find((candidate) => candidate.id === setId);
+    if (!exercise || !set) return;
+    const rows = exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex);
+    const remove = () =>
+      void removeSetRows(rows.map((row) => row.id)).catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : 'Failed to remove set'),
+      );
+    const hasData = rows.some(
+      (row) => row.completedAt !== null || hasDraftInput(setInputs[row.id]),
+    );
+    if (!hasData) {
+      remove();
+      return;
+    }
+    const indexes = Array.from(new Set(exercise.sets.map((row) => row.setIndex))).sort(
+      (a, b) => a - b,
+    );
+    const number = indexes.indexOf(set.setIndex) + 1;
+    Alert.alert(
+      `Remove set ${number}?`,
+      indexes.length === 1
+        ? `It's the only set of ${exercise.exerciseName}. The exercise stays in the workout, so a set can be added again.`
+        : 'What was entered for it is removed from this workout.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove Set', style: 'destructive', onPress: remove },
+      ],
+    );
+  }
+
   function confirmRemove(exercise: WorkoutExerciseWithSets) {
     Alert.alert(
       'Remove exercise',
@@ -419,6 +468,15 @@ export function GroupWorkoutEditor({
 
   // The signed-in person's own tab: the one their own records and settings apply to.
   const ownTab = selected?.userId === userId;
+
+  // One muscle tab per primary muscle group the group's exercises train, in the order first
+  // added; a tab whose last exercise is removed goes, and All shows again.
+  const muscleTabs = workoutMuscleTabs(exercises);
+  const activeMuscleTab: MuscleTab =
+    muscleTab !== 'all' && muscleTabs.includes(muscleTab) ? muscleTab : 'all';
+  const shownExercises = exercises.filter(
+    (exercise) => activeMuscleTab === 'all' || exercise.muscleGroup === activeMuscleTab,
+  );
 
   const tabs = members.map((m) => ({
     key: m.userId,
@@ -467,7 +525,24 @@ export function GroupWorkoutEditor({
           <EmptyState testID={`${testID}-empty`} title="Add your first exercise to get started." />
         ) : null}
 
-        {exercises.map((shape) => {
+        {muscleTabs.length > 0 ? (
+          <FilterChips<MuscleTab>
+            testID={`${testID}-muscle-tabs`}
+            options={[
+              { value: 'all', label: 'All' },
+              ...muscleTabs.map((muscle) => ({
+                value: muscle,
+                label: MUSCLE_GROUP_LABELS[muscle],
+              })),
+            ]}
+            value={activeMuscleTab}
+            onChange={setMuscleTab}
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+          />
+        ) : null}
+
+        {shownExercises.map((shape) => {
           const row = rowFor(shape.exerciseId);
           if (!row) return null;
           const prior = selected ? previous[`${selected.userId}:${row.exerciseId}`] : undefined;
@@ -505,6 +580,7 @@ export function GroupWorkoutEditor({
               onChangeReps={changeReps}
               onChangeDuration={changeDuration}
               onAddSet={() => void addSet(row)}
+              onRemoveSet={removeSet}
               onRemoveExercise={() => confirmRemove(row)}
               accentColor={accentColor}
               onAccentColor={onAccentColor}

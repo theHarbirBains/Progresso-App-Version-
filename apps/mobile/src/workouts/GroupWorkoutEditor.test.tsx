@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import {
   addExerciseToWorkout,
   createSet,
+  deleteSet,
   fetchNextExerciseOrderIndex,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
@@ -18,6 +19,7 @@ import { colors } from '../design/theme';
 jest.mock('./workoutQueries', () => ({
   addExerciseToWorkout: jest.fn(),
   createSet: jest.fn(),
+  deleteSet: jest.fn(async () => undefined),
   fetchNextExerciseOrderIndex: jest.fn(),
   fetchPreviousPerformance: jest.fn(async () => null),
   fetchWorkoutDetail: jest.fn(),
@@ -452,5 +454,76 @@ describe('GroupWorkoutEditor -- sets save as they are typed', () => {
     );
     expect(ready).toBe(false);
     alert.mockRestore();
+  });
+});
+
+describe('GroupWorkoutEditor -- removing a set, and muscle tabs', () => {
+  it("removes one of the shown person's sets, asking first when it holds anything", async () => {
+    renderEditor();
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-set-1-remove'),
+    );
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Remove set 1?',
+      expect.stringMatching(/only set of Back Squat/),
+      expect.any(Array),
+    );
+    const buttons = alertSpy.mock.calls[0][2] ?? [];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Remove Set')?.onPress?.();
+    });
+    alertSpy.mockRestore();
+
+    expect(deleteSet).toHaveBeenCalledWith('w-me-set-1');
+    await waitFor(() =>
+      expect(screen.queryByTestId('group-workout-exercise-squat-set-w-me-set-1')).toBeNull(),
+    );
+    // Only the shown person's: Sam's set is still there.
+    expect(deleteSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes an empty set straight away', async () => {
+    renderEditor();
+    await screen.findByTestId('group-workout-exercise-squat');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-workout-exercise-squat-add-set'));
+    });
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-we-1-set-2-remove'),
+    );
+
+    await waitFor(() => expect(deleteSet).toHaveBeenCalledWith('w-me-we-1-set-2'));
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('filters the exercises by the muscle groups the group has trained so far', async () => {
+    const curl = (workoutId: string) => ({
+      id: `${workoutId}-we-curl`,
+      exerciseId: 'curl',
+      exerciseName: 'Dumbbell Curl',
+      photoUrl: null,
+      muscleGroup: 'biceps',
+      movementType: 'bilateral',
+      loggingStyle: 'weight_reps',
+      orderIndex: 2,
+      sets: [],
+    });
+    addedExercises = {
+      'w-me': [curl('w-me')] as unknown as WorkoutDetail['exercises'],
+      'w-sam': [curl('w-sam')] as unknown as WorkoutDetail['exercises'],
+    };
+    renderEditor();
+
+    fireEvent.press(await screen.findByTestId('group-workout-muscle-tabs-biceps'));
+
+    expect(screen.getByTestId('group-workout-exercise-curl')).toBeTruthy();
+    expect(screen.queryByTestId('group-workout-exercise-squat')).toBeNull();
+    fireEvent.press(screen.getByTestId('group-workout-muscle-tabs-all'));
+    expect(screen.getByTestId('group-workout-exercise-squat')).toBeTruthy();
   });
 });
