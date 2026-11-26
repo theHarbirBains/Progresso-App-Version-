@@ -71,7 +71,7 @@ interface Props {
    */
   equipment?: Equipment | null;
   onEquipmentChange?: (equipment: Equipment | null) => void;
-  /** The library's Browse by Muscle tiles above the list, while nothing's searched or chosen. */
+  /** Browse by Muscle's tiles above the list (the library's and the picker's), while nothing's searched or chosen. */
   browseByMuscle?: boolean;
   source: ExerciseSource;
   onSourceChange: (source: ExerciseSource) => void;
@@ -122,7 +122,7 @@ interface Props {
  * The Exercise Library's browse layout, shared so every exercise picker looks the same:
  * a browse card (search; Muscle, Equipment and Movement filter pills, each opening its choices
  * with their counts; and All / Built-in / Mine with real counts), then a list card with the count
- * and the exercises A-Z under letter headings -- in the library, Browse by Muscle's tiles first --
+ * and the exercises A-Z under letter headings -- Browse by Muscle's tiles first --
  * each with its photo, name, and muscle, equipment, grip and attachment, and a Built-in or Mine
  * marker. In Friends the count gives way to a choice of friend (FriendPicker).
  */

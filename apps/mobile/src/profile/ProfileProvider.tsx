@@ -1,22 +1,11 @@
-import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
+import { useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useSignedInResource } from '../lib/useSignedInResource';
 import { updateMyProfile, type ProfileResponse, type UpdateProfileInput } from '../lib/api';
 import { fetchMyProfile } from './profileQueries';
+import { ProfileContext, type ProfileContextValue } from './profileContext';
 
-export interface ProfileContextValue {
-  /** Null until the first fetch resolves, or if it fails before ever succeeding once. */
-  profile: ProfileResponse | null;
-  /** True only until the first fetch settles -- a later refetch/update never flips this back to true, so no screen should see a loading->loaded->loading flicker just from navigating around. */
-  loading: boolean;
-  error: string | null;
-  /** Re-fetches from the server. Rarely needed directly -- prefer `updateProfile` after a write, which updates the cache from that write's own response instead of a second round trip. */
-  refetch: () => Promise<boolean>;
-  /** Saves via the same PATCH updateMyProfile already used, then updates the shared cache from the response -- every other screen reading `profile` sees the change immediately, with no extra fetch. */
-  updateProfile: (updates: UpdateProfileInput) => Promise<ProfileResponse>;
-}
-
-const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
+export { useProfileIfAny, type ProfileContextValue } from './profileContext';
 
 /**
  * The one shared fetch of the signed-in user's profile row. Previously,
@@ -77,14 +66,6 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
-}
-
-/**
- * The signed-in person's profile where a ProfileProvider is above, else null -- for a widget that
- * shows more with it and still works without (a food's vitamins against the person's targets).
- */
-export function useProfileIfAny(): ProfileContextValue['profile'] | null {
-  return useContext(ProfileContext)?.profile ?? null;
 }
 
 export function useProfile(): ProfileContextValue {

@@ -67,23 +67,6 @@ export function sideOf(group: MuscleGroup): 'front' | 'back' {
   return SEEN_FROM_BEHIND.has(group) ? 'back' : 'front';
 }
 
-const groupFigures = new Map<MuscleGroup, MuscleMapView | null>();
-
-/**
- * One muscle group on the anatomy figure, from the side that shows it, in the primary red -- the
- * Exercise Library's Browse by Muscle. Null for Other, which is no muscle. Drawn once a session.
- */
-export function groupFigure(group: MuscleGroup): MuscleMapView | null {
-  if (groupFigures.has(group)) return groupFigures.get(group) ?? null;
-  const regions = regionsOf(group);
-  const figure =
-    regions.length > 0
-      ? renderAnatomySide(sideOf(group), { primary: regions, secondary: [] })
-      : null;
-  groupFigures.set(group, figure);
-  return figure;
-}
-
 /** The muscle groups the key names: the primary ones, then the secondary ones not already named. */
 export function legendGroups(
   highlight: MuscleHighlight,

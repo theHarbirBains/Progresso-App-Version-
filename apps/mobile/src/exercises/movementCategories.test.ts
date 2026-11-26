@@ -1,5 +1,5 @@
 import { BUILTIN_CATALOG } from './illustrations/builtinCatalog.generated';
-import { groupFigure, regionsOf, sideOf } from './illustrations/muscleMap';
+import { regionsOf, sideOf } from './illustrations/muscleMap';
 import { REGION_GROUP } from './illustrations/muscles';
 import { matchesExerciseSearch } from './exerciseQueries';
 import {
@@ -68,20 +68,11 @@ describe('movement categories', () => {
 });
 
 describe('a muscle group on the anatomy figure', () => {
-  it('draws each muscle group from the side that shows it, Other as none', () => {
-    for (const group of MUSCLE_GROUPS) {
-      const figure = groupFigure(group);
-      if (group === 'other') {
-        expect(figure).toBeNull();
-        continue;
-      }
-      expect(figure?.side).toBe(sideOf(group));
-      // Its own muscles are coloured on it.
-      const coloured = new Set(figure?.frame.shapes.map((shape) => shape.region).filter(Boolean));
-      expect(regionsOf(group).some((region) => coloured.has(region))).toBe(true);
-    }
+  it('shows each muscle group from the side it is on', () => {
     expect(sideOf('back')).toBe('back');
+    expect(sideOf('hamstrings')).toBe('back');
     expect(sideOf('chest')).toBe('front');
+    expect(regionsOf('other')).toEqual([]);
   });
 
   it('gives every muscle on the figure to one of the app’s muscle groups', () => {

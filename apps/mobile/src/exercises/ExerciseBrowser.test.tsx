@@ -140,7 +140,7 @@ describe('ExerciseBrowser and the built-in library', () => {
     expect(onMuscleGroupChange).toHaveBeenCalledWith('triceps');
   });
 
-  it('puts Browse by Muscle away while searching or once a muscle is chosen, and in the picker', () => {
+  it('puts Browse by Muscle away while searching or once a muscle is chosen, or when not asked for', () => {
     const { rerender } = renderBrowser({ browseByMuscle: true, searchInput: 'curl' });
     expect(screen.queryByTestId('exercise-browser-muscle-browse')).toBeNull();
     rerender(

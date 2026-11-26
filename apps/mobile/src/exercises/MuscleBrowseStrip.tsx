@@ -1,44 +1,27 @@
-import { memo } from 'react';
+import { Image } from 'expo-image';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Text } from '../design/Text';
 import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
-import { Frame, usePrefix } from './illustrations/ExerciseIllustration';
-import { groupFigure } from './illustrations/muscleMap';
+import { useProfileIfAny } from '../profile/profileContext';
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { MUSCLE_TILES } from './muscleTiles.generated';
 
-const FIGURE_HEIGHT = 78;
+const TILE_WIDTH = 100;
+const TILE_HEIGHT = 116;
 
-/** One muscle group on the anatomy figure, from the side that shows it. */
-const GroupFigure = memo(function GroupFigure({ group }: { group: MuscleGroup }) {
-  const prefix = usePrefix();
-  const figure = groupFigure(group);
-  if (!figure) {
-    return (
-      <View style={[styles.figure, styles.noFigure]}>
-        <Feather name="grid" size={22} color={colors.textMuted} />
-      </View>
-    );
-  }
-  const width = Math.round((FIGURE_HEIGHT * figure.viewBox.width) / figure.viewBox.height);
-  return (
-    <View style={styles.figure}>
-      <Frame
-        frame={figure.frame}
-        viewBox={figure.viewBox}
-        width={width}
-        height={FIGURE_HEIGHT}
-        prefix={prefix}
-      />
-    </View>
-  );
-});
+/** Whose figures the tiles show: a woman's for a woman, a man's otherwise. */
+export function figureSexFor(gender: string | null | undefined): 'male' | 'female' {
+  return gender === 'female' ? 'female' : 'male';
+}
 
 /**
- * The Exercise Library's Browse by Muscle: a sideways row of tiles, one for each muscle group with
- * exercises, each its muscles on the anatomy figure (in the guides' primary red), its name and how
- * many exercises are for it -- a tap shows just those (the Muscle filter). Shown above the list
- * while nothing is searched for and no muscle is chosen.
+ * The library's and the picker's Browse by Muscle: a sideways row of tiles, one for each muscle
+ * group with exercises -- Harbir's figure of that group, a man's or a woman's by the person's sex
+ * (their profile's; a man's when it says neither), the group's name over its faded bottom and how
+ * many exercises are for it in the accent -- a tap shows just those (the Muscle filter). Full Body
+ * and Other, which have no figure, show a glyph. Shown above the list while nothing is searched
+ * for and no muscle is chosen.
  */
 export function MuscleBrowseStrip({
   counts,
@@ -51,6 +34,7 @@ export function MuscleBrowseStrip({
   accentColor: string;
   testID?: string;
 }) {
+  const sex = figureSexFor(useProfileIfAny()?.gender);
   const groups = MUSCLE_GROUPS.filter((group) => (counts[group] ?? 0) > 0);
   if (groups.length === 0) return null;
   return (
@@ -63,23 +47,45 @@ export function MuscleBrowseStrip({
         contentContainerStyle={styles.row}
         keyboardShouldPersistTaps="handled"
       >
-        {groups.map((group) => (
-          <TouchableOpacity
-            key={group}
-            testID={`${testID}-${group}`}
-            style={styles.tile}
-            onPress={() => onChoose(group)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`${MUSCLE_GROUP_LABELS[group]}, ${counts[group]} exercises`}
-          >
-            <GroupFigure group={group} />
-            <Text style={styles.name} numberOfLines={1}>
-              {MUSCLE_GROUP_LABELS[group]}
-            </Text>
-            <Text style={[styles.count, { color: accentColor }]}>{counts[group]}</Text>
-          </TouchableOpacity>
-        ))}
+        {groups.map((group) => {
+          const tile = MUSCLE_TILES[sex][group];
+          return (
+            <TouchableOpacity
+              key={group}
+              testID={`${testID}-${group}`}
+              style={styles.tile}
+              onPress={() => onChoose(group)}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={`${MUSCLE_GROUP_LABELS[group]}, ${counts[group]} exercises`}
+            >
+              {tile ? (
+                <Image
+                  testID={`${testID}-${group}-${sex}`}
+                  source={tile.image}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  contentPosition="top"
+                  accessibilityIgnoresInvertColors
+                />
+              ) : (
+                <View style={styles.glyph}>
+                  <Feather
+                    name={group === 'full_body' ? 'user' : 'grid'}
+                    size={28}
+                    color={colors.textMuted}
+                  />
+                </View>
+              )}
+              <View style={styles.words}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {MUSCLE_GROUP_LABELS[group]}
+                </Text>
+                <Text style={[styles.count, { color: accentColor }]}>{counts[group]}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -100,26 +106,31 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   tile: {
-    width: 88,
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: spacing.sm,
+    width: TILE_WIDTH,
+    height: TILE_HEIGHT,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.background,
+    overflow: 'hidden',
   },
-  figure: {
-    height: FIGURE_HEIGHT,
+  glyph: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    paddingBottom: spacing.xxl,
   },
-  noFigure: {
-    width: FIGURE_HEIGHT * 0.6,
+  // The name and count over the figure's faded bottom, as on Harbir's tiles.
+  words: {
+    position: 'absolute',
+    left: spacing.xs,
+    right: spacing.xs,
+    bottom: spacing.sm,
+    alignItems: 'center',
   },
   name: {
     ...typeScale.label,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
   },
   count: {

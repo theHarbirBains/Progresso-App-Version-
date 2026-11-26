@@ -558,6 +558,8 @@ describe('ExercisePickerModal', () => {
     );
     await screen.findByText('Barbell Bench Press');
 
+    // Browse by Muscle is here too, above the list.
+    expect(screen.getByTestId('exercise-picker-muscle-browse')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-picker-filters-muscle'));
     fireEvent.press(screen.getByTestId('exercise-picker-filters-option-chest'));
     const pill = screen.getByTestId('exercise-picker-filters-muscle');

@@ -356,6 +356,7 @@ export function ExercisePickerModal({
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
             onDeleteMine={deleteMine}
             friends={friends}
+            browseByMuscle
             listHeader={
               onCreateCustom ? (
                 <ListRow
