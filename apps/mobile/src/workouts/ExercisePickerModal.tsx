@@ -357,6 +357,7 @@ export function ExercisePickerModal({
             onDeleteMine={deleteMine}
             friends={friends}
             browseByMuscle
+            onCreate={onCreateCustom ? () => onCreateCustom() : undefined}
             listHeader={
               onCreateCustom ? (
                 <ListRow

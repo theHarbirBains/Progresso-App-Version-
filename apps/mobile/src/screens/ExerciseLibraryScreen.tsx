@@ -25,7 +25,8 @@ import { exerciseLibraryStyles as styles } from './exerciseLibraryStyles';
 
 type Props = RootStackScreenProps<'ExerciseLibrary'>;
 
-type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: ExerciseRow };
+type Mode =
+  { type: 'list' } | { type: 'create'; name?: string } | { type: 'edit'; exercise: ExerciseRow };
 
 // The Workout Mode "browse every exercise" screen -- built-ins plus the
 // user's own custom exercises, searchable/filterable, sectioned
@@ -159,6 +160,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     return (
       <ExerciseFormScreen
         mode="create"
+        initialName={mode.name}
         onDone={handleDone}
         onCancel={() => setMode({ type: 'list' })}
         accentColor={theme.accent}
@@ -233,6 +235,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         onDeleteMine={deleteMine}
         friends={friends}
         browseByMuscle
+        onCreate={(searched) => setMode({ type: 'create', name: searched })}
         testID="exercise-library"
       />
     </Screen>

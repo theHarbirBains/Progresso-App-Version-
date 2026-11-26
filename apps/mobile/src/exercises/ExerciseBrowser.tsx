@@ -116,6 +116,11 @@ interface Props {
   friends?: SharingFriend[];
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
+  /**
+   * Where a search or filter finds nothing: "Can't find it?" with Create Exercise, handed what was
+   * searched for (the library's Create Exercise starts with it as the name).
+   */
+  onCreate?: (searched: string) => void;
   testID?: string;
 }
 
@@ -153,6 +158,7 @@ export function ExerciseBrowser({
   friends = [],
   listHeader,
   browseByMuscle = false,
+  onCreate,
   testID = 'exercise-browser',
 }: Props) {
   // The movement category chosen (the built-ins' own movement pattern), the grip and the handle --
@@ -539,6 +545,22 @@ export function ExerciseBrowser({
                     testID="exercise-library-empty"
                     title="Nothing from friends yet"
                     description="Exercises made by the people you follow show here, to add to your own library."
+                  />
+                ) : onCreate ? (
+                  <EmptyState
+                    testID="exercise-library-empty"
+                    icon={<Feather name="plus-circle" size={28} color={accent.color} />}
+                    title="Can't find it?"
+                    description={
+                      searchInput.trim()
+                        ? `Nothing matches "${searchInput.trim()}". Create it as your own exercise and it stays in your library.`
+                        : 'Nothing matches these filters. Create it as your own exercise and it stays in your library.'
+                    }
+                    action={{
+                      label: 'Create Exercise',
+                      onPress: () => onCreate(searchInput.trim()),
+                      testID: 'exercise-library-empty-create',
+                    }}
                   />
                 ) : (
                   <EmptyState testID="exercise-library-empty" title="No exercises found" />

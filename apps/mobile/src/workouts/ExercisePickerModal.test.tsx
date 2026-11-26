@@ -518,7 +518,25 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    expect(await screen.findByText('No exercises found')).toBeTruthy();
+    // Nothing found: it offers to create one, with the picker's own Create Custom Exercise.
+    expect(await screen.findByText("Can't find it?")).toBeTruthy();
+  });
+
+  it('opens Create Custom Exercise from the empty list', async () => {
+    mockFetchExercises.mockResolvedValue([]);
+    const onCreateCustom = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible={true}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        onCreateCustom={onCreateCustom}
+      />,
+    );
+    fireEvent.press(await screen.findByTestId('exercise-library-empty-create'));
+    expect(onCreateCustom).toHaveBeenCalled();
   });
 
   it('shows a Create Custom Exercise row at the top of the list and calls onCreateCustom when pressed', async () => {

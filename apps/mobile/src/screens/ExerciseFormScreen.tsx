@@ -64,7 +64,14 @@ type Props = {
   /** The user's current Workout accent -- omit to fall back to the shared default accent token. */
   accentColor?: string;
   onAccentColor?: string;
-} & ({ mode: 'create' } | { mode: 'edit'; exercise: ExerciseRow });
+} & (
+  | {
+      mode: 'create';
+      /** A name to start with -- what was searched for when nothing was found. */
+      initialName?: string;
+    }
+  | { mode: 'edit'; exercise: ExerciseRow }
+);
 
 // The setup notes worth a line on a machine, to start one with a tap.
 const SETUP_PROMPTS = ['Seat height', 'Backrest', 'Chest pad', 'Leg pad', 'Foot placement'];
@@ -119,7 +126,9 @@ export function ExerciseFormScreen(props: Props) {
   const onAccentColor = props.onAccentColor ?? themeAccent.onAccent;
   const existing = props.mode === 'edit' ? props.exercise : null;
 
-  const [name, setName] = useState(existing?.name ?? '');
+  const [name, setName] = useState(
+    existing?.name ?? (props.mode === 'create' ? (props.initialName?.trim() ?? '') : ''),
+  );
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(existing?.muscleGroup ?? null);
   const [isUnilateral, setIsUnilateral] = useState(existing?.movementType === 'unilateral');
   const [measurementType, setMeasurementType] = useState<MeasurementType>(

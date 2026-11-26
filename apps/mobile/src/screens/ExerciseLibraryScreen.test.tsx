@@ -59,7 +59,11 @@ jest.mock('./ExerciseFormScreen', () => {
         react.createElement(Text, { testID: 'mock-exercise-form-mode' }, props.mode),
         props.mode === 'edit'
           ? react.createElement(Text, { testID: 'mock-exercise-form-name' }, props.exercise.name)
-          : null,
+          : react.createElement(
+              Text,
+              { testID: 'mock-exercise-form-initial-name' },
+              props.initialName ?? '',
+            ),
         react.createElement(
           TouchableOpacity,
           { testID: 'mock-exercise-form-done', onPress: props.onDone },
@@ -392,6 +396,24 @@ describe('ExerciseLibraryScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-library-empty')).toBeTruthy();
+    await settle();
+  });
+
+  it("offers to create what's searched for when nothing is found, starting it with that name", async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+    mockFetchAllExercises.mockResolvedValue([]);
+    fireEvent.changeText(screen.getByTestId('exercise-search'), 'Zercher Squat');
+
+    expect(await screen.findByTestId('exercise-library-empty')).toHaveTextContent(
+      /Can't find it\?/,
+    );
+    expect(screen.getByText(/Nothing matches "Zercher Squat"/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-library-empty-create'));
+    expect(screen.getByTestId('mock-exercise-form-mode')).toHaveTextContent('create');
+    expect(screen.getByTestId('mock-exercise-form-initial-name')).toHaveTextContent(
+      'Zercher Squat',
+    );
     await settle();
   });
 });
