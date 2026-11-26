@@ -99,6 +99,9 @@ export interface ProfileResponse {
   profileVisibility: 'private' | 'public';
   /** Whether a workout invite, and the answer to one they sent, is pushed to them. */
   notifyGroupInvites: boolean;
+  /** What they have at home, for home programs (programs/homeEquipment.ts); empty when not
+   * answered. */
+  homeEquipment: string[];
 }
 
 export interface UpdateProfileInput {
@@ -151,6 +154,7 @@ export interface UpdateProfileInput {
   showRank?: boolean;
   profileVisibility?: 'private' | 'public';
   notifyGroupInvites?: boolean;
+  homeEquipment?: string[];
 }
 
 export function updateMyProfile(

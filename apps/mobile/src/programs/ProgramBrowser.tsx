@@ -20,11 +20,12 @@ import {
   entryChoice,
   entryDays,
   entryVariations,
+  HOME_LIBRARY,
   LIBRARY_FREQUENCIES,
-  LIBRARY_SPLIT_COUNT,
   librarySections,
   PROGRAM_LIBRARY,
   readySplitCount,
+  splitCountOf,
   splitTitle,
   type LibraryEntry,
   type LibrarySection,
@@ -46,7 +47,8 @@ import {
   variationMatches,
   type ProgramFilters,
 } from './programs';
-import type { ResolvedVariation } from './programTypes';
+import { HOME_EQUIPMENT_LABELS } from './homeEquipment';
+import type { ProgramSetting, ResolvedVariation } from './programTypes';
 import { recommendPrograms, type ProgramPreferences } from './recommendations';
 
 const PILL_HEIGHT = minTouchTarget - 8;
@@ -80,10 +82,10 @@ const FILTER_ORDER: readonly FilterKey[] = [
   'exclusion',
 ];
 
-// Every variation the library lists, each once, with its whole profile -- what the filters read.
-const LIBRARY_VARIATIONS: readonly ResolvedVariation[] = (() => {
+/** Every variation a library lists, each once, with its whole profile -- what the filters read. */
+function libraryVariations(library: readonly LibrarySection[]): ResolvedVariation[] {
   const seen = new Map<string, ResolvedVariation>();
-  for (const section of PROGRAM_LIBRARY) {
+  for (const section of library) {
     for (const entry of section.entries) {
       for (const variation of entryVariations(entry)) {
         seen.set(`${entry.program}/${variation.id}`, variation);
@@ -91,14 +93,15 @@ const LIBRARY_VARIATIONS: readonly ResolvedVariation[] = (() => {
     }
   }
   return [...seen.values()];
-})();
+}
+
+const GYM_VARIATIONS = libraryVariations(PROGRAM_LIBRARY);
+const HOME_VARIATIONS = libraryVariations(HOME_LIBRARY);
 
 /** A filter's choices, each only where some split has it -- never one that finds nothing. */
-function choicesFor(key: FilterKey): Choice[] {
+function choicesFor(key: FilterKey, variations: readonly ResolvedVariation[]): Choice[] {
   const finds = (patch: Partial<ProgramFilters>) =>
-    LIBRARY_VARIATIONS.some((variation) =>
-      variationMatches(variation, { ...NO_FILTERS, ...patch }),
-    );
+    variations.some((variation) => variationMatches(variation, { ...NO_FILTERS, ...patch }));
   switch (key) {
     case 'level':
       return PROGRAM_LEVELS.filter((level) => finds({ level })).map((level) => ({
@@ -346,6 +349,9 @@ interface Props {
   /** Where Recommended for You goes while there's nothing to recommend (Workout Splits' way to
    * Workout Preferences). */
   recommendationsPrompt?: ReactNode;
+  /** Opens where their home equipment is set (Settings > Workout Preferences); none in
+   * onboarding, which asks it as a question of its own. */
+  onEditHomeEquipment?: () => void;
   testID?: string;
 }
 
@@ -363,10 +369,20 @@ export function ProgramBrowser({
   preferences,
   chosen,
   recommendationsPrompt,
+  onEditHomeEquipment,
   testID = 'program-browser',
 }: Props) {
   const { accent } = useAppTheme();
   const programs = WORKOUT_PROGRAMS;
+  // Gym or home programs: home first for someone who trains with dumbbells or nothing.
+  const [setting, setSetting] = useState<ProgramSetting>(() =>
+    preferences.equipment === 'dumbbells' || preferences.equipment === 'bodyweight'
+      ? 'home'
+      : 'gym',
+  );
+  const library = setting === 'home' ? HOME_LIBRARY : PROGRAM_LIBRARY;
+  const variations = setting === 'home' ? HOME_VARIATIONS : GYM_VARIATIONS;
+  const splitCount = splitCountOf(library);
   const ownDays = preferences.daysPerWeek !== null ? Math.max(2, preferences.daysPerWeek) : null;
   const [days, setDays] = useState<Days>(() =>
     ownDays !== null &&
@@ -380,19 +396,19 @@ export function ProgramBrowser({
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   const recommendations = useMemo(
-    () => recommendPrograms(programs, preferences),
-    [programs, preferences],
+    () => recommendPrograms(programs, preferences, 3, setting),
+    [programs, preferences, setting],
   );
 
   const daysPerWeek = days === 'all' ? null : Number(days);
   const applied: ProgramFilters = { ...filters, daysPerWeek };
-  const sections = librarySections(applied);
+  const sections = librarySections(applied, library);
   const extra = filtersSet(filters);
   const showRecommended =
     recommendations.length > 0 && extra === 0 && (daysPerWeek === null || daysPerWeek === ownDays);
   const shownCount = new Set(sections.flatMap((shown) => shown.entries.map((entry) => entry.title)))
     .size;
-  const allReady = readySplitCount(programs) === LIBRARY_SPLIT_COUNT;
+  const allReady = readySplitCount(programs, library) === splitCount;
 
   function choose(key: FilterKey, value: string | null) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -413,14 +429,71 @@ export function ProgramBrowser({
     chosen?.programId === choice.programId &&
     chosen.variationId === choice.variationId;
 
-  const sheetChoices = sheet ? choicesFor(sheet) : [];
+  const sheetChoices = sheet ? choicesFor(sheet, variations) : [];
+
+  // Gym or home, before anything else.
+  const settingSwitch = (
+    <SegmentedControl<ProgramSetting>
+      testID={`${testID}-setting`}
+      stretch
+      options={[
+        { value: 'gym', label: 'Gym', accessibilityLabel: 'Gym workouts' },
+        { value: 'home', label: 'Home', accessibilityLabel: 'Home workouts' },
+      ]}
+      value={setting}
+      onChange={(next) => {
+        setSetting(next);
+        setFilters(NO_FILTERS);
+        setDays('all');
+      }}
+      accentColor={accent.accent}
+      onAccentColor={accent.onAccent}
+    />
+  );
+  // At home: what they have, which decides what's recommended -- changed where it's set.
+  const owned = preferences.homeEquipment;
+  const homeEquipment =
+    setting === 'home' && onEditHomeEquipment ? (
+      <AppCard>
+        <ListRow
+          testID={`${testID}-home-equipment`}
+          icon="tool"
+          title="Your Home Equipment"
+          subtitle={
+            owned.length > 0
+              ? owned.map((item) => HOME_EQUIPMENT_LABELS[item]).join(', ')
+              : 'Tell us what you have, for home workouts that use it.'
+          }
+          onPress={onEditHomeEquipment}
+        />
+      </AppCard>
+    ) : null;
+
+  // No home programs yet: say so, honestly -- nothing is made up to fill it.
+  if (setting === 'home' && splitCount === 0) {
+    return (
+      <View testID={testID} style={styles.browser}>
+        {settingSwitch}
+        {homeEquipment}
+        <EmptyState
+          testID={`${testID}-home-empty`}
+          title="Home workouts are on their way"
+          description="Home programs are being written, each with the equipment it needs. Every one will be here to browse, with the ones that fit what you have recommended."
+        />
+      </View>
+    );
+  }
 
   return (
     <View testID={testID} style={styles.browser}>
+      {settingSwitch}
       <Text testID={`${testID}-intro`} style={styles.intro}>
-        {`${LIBRARY_SPLIT_COUNT} splits in ${PROGRAM_LIBRARY.length} categories.`}
+        {`${splitCount} ${setting === 'home' ? 'home ' : ''}splits in ${library.length} ${
+          library.length === 1 ? 'category' : 'categories'
+        }.`}
         {allReady ? '' : ' Each one opens here once its workouts are in.'}
       </Text>
+      {homeEquipment}
 
       {/* How many days a week: the first thing to choose. */}
       <View style={styles.days}>
@@ -449,7 +522,7 @@ export function ProgramBrowser({
           const label =
             value === null
               ? FILTER_TITLES[key].pill
-              : (choicesFor(key).find((choice) => choice.value === value)?.label ??
+              : (choicesFor(key, variations).find((choice) => choice.value === value)?.label ??
                 FILTER_TITLES[key].pill);
           return (
             <FilterPill
@@ -535,7 +608,7 @@ export function ProgramBrowser({
 
       {sections.length > 0 && (extra > 0 || daysPerWeek !== null) ? (
         <Text testID={`${testID}-count`} style={styles.count}>
-          {shownCount} of {LIBRARY_SPLIT_COUNT} splits
+          {shownCount} of {splitCount} splits
         </Text>
       ) : null}
 

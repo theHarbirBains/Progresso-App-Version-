@@ -70,6 +70,7 @@ const FULL_DRAFT: OnboardingDraft = {
   fitnessGoals: ['build_muscle'],
   trainingPriorities: ['glutes', 'back'],
   equipmentAccess: 'dumbbells',
+  homeEquipment: ['dumbbells', 'bench'],
   trainingExclusions: ['chest'],
   membershipTier: 'everything',
   activityLevel: 'moderately_active',
@@ -421,8 +422,10 @@ describe('the questions programs are recommended from', () => {
       equipment: 'dumbbells',
       exclusions: ['chest'],
       sessionMinutes: { min: 45, max: 60 },
+      homeEquipment: ['dumbbells', 'bench'],
     });
     expect(draftPreferences(EMPTY_DRAFT).exclusions).toEqual([]);
+    expect(draftPreferences(EMPTY_DRAFT).homeEquipment).toEqual([]);
   });
 });
 
@@ -444,8 +447,9 @@ describe('onboarding in named parts', () => {
       stepsInSection: 3,
       progress: [
         { steps: 6, done: 6 },
-        // Goals, priorities, experience, days, length, where they train, what to leave out.
-        { steps: 7, done: 7 },
+        // Goals, priorities, experience, days, length, where they train, what they have at
+        // home, what to leave out.
+        { steps: 8, done: 8 },
         { steps: 3, done: 2 },
         { steps: 2, done: 0 },
         // The trainer's code, Your plan is ready, and Create your account.

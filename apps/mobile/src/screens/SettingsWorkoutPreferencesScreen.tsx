@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { HOME_EQUIPMENT_LABELS, type HomeEquipment } from '../programs/homeEquipment';
 import { useAuth } from '../auth/AuthProvider';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
@@ -26,7 +27,7 @@ import {
   type ExerciseProgressionSetting,
 } from '../workouts/exerciseSettingsQueries';
 import { formatRepRange, type RepRange } from '../workouts/progression';
-import { ExclusionTiles, PriorityTiles } from '../programs/PriorityChoices';
+import { HomeEquipmentTiles, ExclusionTiles, PriorityTiles } from '../programs/PriorityChoices';
 import {
   EQUIPMENT_ACCESS_OPTIONS,
   MAX_PRIORITIES,
@@ -87,6 +88,8 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     undefined,
   );
   const [equipmentSheetOpen, setEquipmentSheetOpen] = useState(false);
+  // What they have at home, while its sheet is open (null: closed).
+  const [homeDraft, setHomeDraft] = useState<HomeEquipment[] | null>(null);
   const { accent } = useAppTheme();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -138,12 +141,18 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     await save({ equipmentAccess: value });
   }
 
+  async function handleSaveHomeEquipment(next: HomeEquipment[]) {
+    setHomeDraft(null);
+    await save({ homeEquipment: next });
+  }
+
   async function handleSaveExclusions(next: TrainingExclusion[]) {
     setExclusionsDraft(undefined);
     await save({ trainingExclusions: next });
   }
 
   const priorities = profile?.trainingPriorities ?? [];
+  const homeEquipment = (profile?.homeEquipment ?? []) as HomeEquipment[];
   const exclusions = profile?.trainingExclusions ?? [];
   const equipment = EQUIPMENT_ACCESS_OPTIONS.find(
     (option) => option.value === profile?.equipmentAccess,
@@ -248,6 +257,19 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
           title="Where You Train"
           value={equipment ? equipment.label : 'Not set'}
           onPress={() => setEquipmentSheetOpen(true)}
+          disabled={saving}
+          divider
+        />
+        <ListRow
+          testID="open-home-equipment"
+          icon="home"
+          title="Home Equipment"
+          subtitle={
+            homeEquipment.length > 0
+              ? homeEquipment.map((item) => HOME_EQUIPMENT_LABELS[item]).join(', ')
+              : 'Not set'
+          }
+          onPress={() => setHomeDraft(homeEquipment)}
           disabled={saving}
           divider
         />
@@ -366,6 +388,36 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
             onPress={() => void handleSelectEquipment(option.value)}
           />
         ))}
+      </BottomSheet>
+
+      <BottomSheet
+        visible={homeDraft !== null}
+        onClose={() => setHomeDraft(null)}
+        testID="home-equipment-sheet"
+      >
+        <ScrollView>
+          <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+            What equipment do you have at home?
+          </Text>
+          <Text style={localStyles.sheetLine}>
+            Home programs that use it are recommended; every one can still be browsed.
+          </Text>
+          <View style={localStyles.sheetBody}>
+            <HomeEquipmentTiles
+              testID="home-equipment"
+              tilePrefix="home-equipment"
+              value={homeDraft ?? []}
+              onChange={setHomeDraft}
+            />
+          </View>
+          <PrimaryButton
+            testID="home-equipment-save"
+            label="Save"
+            onPress={() => void handleSaveHomeEquipment(homeDraft ?? [])}
+            accentColor={accent.accent}
+            onAccentColor={accent.onAccent}
+          />
+        </ScrollView>
       </BottomSheet>
 
       <BottomSheet

@@ -208,6 +208,7 @@ export function WorkoutSplitsScreen({ navigation, route }: Props) {
             preferences={preferences}
             chosen={null}
             onOpen={(choice) => navigation.navigate('ProgramDetail', choice)}
+            onEditHomeEquipment={() => navigation.navigate('SettingsWorkoutPreferences')}
             recommendationsPrompt={
               noPreferences ? (
                 <AppCard>

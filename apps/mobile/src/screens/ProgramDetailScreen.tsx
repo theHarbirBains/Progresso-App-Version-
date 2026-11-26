@@ -14,6 +14,7 @@ import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgramHost } from '../programs/programHost';
+import { meets, needLabel, variationNeeds } from '../programs/homeEquipment';
 import { ProgramFigure } from '../programs/ProgramFigure';
 import {
   Badge,
@@ -83,6 +84,11 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
   const onSchedule = variationsOn(program, variation.schedule);
   const day = variation.days[Math.min(dayIndex, variation.days.length - 1)]!;
   const chosen = host.chosen?.programId === program.id && host.chosen.variationId === variation.id;
+  // A home program: the equipment its exercises need, and which of it they haven't said they have.
+  const home = program.setting === 'home';
+  const owned = host.preferences.homeEquipment;
+  const needs = home ? variationNeeds(variation) : [];
+  const lacking = owned.length > 0 ? needs.filter((need) => !meets(need, owned)) : [];
 
   function showVariation(variationId: string) {
     navigation.setParams({ variationId });
@@ -206,11 +212,27 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
               divider
             />
             <ListRow
+              testID="program-detail-equipment"
               icon="tool"
-              title="Equipment"
-              subtitle={equipmentLabel(variation.equipment)}
+              title={home ? 'Equipment Needed' : 'Equipment'}
+              subtitle={
+                home
+                  ? needs.length > 0
+                    ? needs.map((need) => needLabel(need)).join(', ')
+                    : 'No equipment'
+                  : equipmentLabel(variation.equipment)
+              }
               divider
             />
+            {lacking.length > 0 ? (
+              <ListRow
+                testID="program-detail-equipment-missing"
+                icon="alert-circle"
+                title="You Don't Have"
+                subtitle={`${lacking.map((need) => needLabel(need)).join(', ')} -- its exercises that need it are marked.`}
+                divider
+              />
+            ) : null}
             {focusSummary(variation) ? (
               <ListRow
                 testID="program-detail-focus"
@@ -334,6 +356,7 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
           <ProgramExerciseList
             testID="program-detail-exercise"
             day={day}
+            owned={home ? owned : null}
             onOpen={(exerciseIndex) =>
               navigation.navigate('ProgramExercise', {
                 slug: day.exercises[exerciseIndex]!.slug,

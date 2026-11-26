@@ -79,7 +79,7 @@ import {
   splitNameFor,
   variationById,
 } from '../programs/programs';
-import { ExclusionTiles, PriorityTiles } from '../programs/PriorityChoices';
+import { ExclusionTiles, HomeEquipmentTiles, PriorityTiles } from '../programs/PriorityChoices';
 import { recommendPrograms } from '../programs/recommendations';
 import { SectionHeader } from '../design/SectionHeader';
 import { setWelcomeStage } from '../onboarding/welcomeStage';
@@ -110,6 +110,8 @@ const CONTINUE_STEPS = new Set<OnboardingStep>([
   'fitnessGoal',
   'trainingPriorities',
   'trainingExclusions',
+  // As much equipment as they have.
+  'homeEquipment',
   // The trainer's code is typed.
   'trainerCode',
   // How ranks work is read, then moved on from.
@@ -808,6 +810,33 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   label="Skip for now"
                   onPress={() => {
                     updateDraft({ equipmentAccess: null, equipmentSkipped: true });
+                    advance();
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
+
+          {step === 'homeEquipment' ? (
+            <>
+              <Text style={styles.stepTitle}>What equipment do you have at home?</Text>
+              <Text style={styles.stepExplanation}>
+                Pick everything you have, for home workouts that use it.
+              </Text>
+              <HomeEquipmentTiles
+                testID="onboarding-step-home-equipment"
+                tilePrefix="onboarding-home-equipment"
+                value={draft.homeEquipment ?? []}
+                onChange={(homeEquipment) =>
+                  updateDraft({ homeEquipment, homeEquipmentSkipped: false })
+                }
+              />
+              <View style={styles.footer}>
+                <TextButton
+                  testID="onboarding-skip-home-equipment"
+                  label="Skip for now"
+                  onPress={() => {
+                    updateDraft({ homeEquipment: [], homeEquipmentSkipped: true });
                     advance();
                   }}
                 />

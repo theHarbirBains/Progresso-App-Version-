@@ -1,9 +1,11 @@
 import type { FitnessGoal } from '../lib/api';
+import { variationFitsHome, type HomeEquipment } from './homeEquipment';
 import { equipmentFits, PRIORITY_LABELS, TRAINING_EXCLUSION_LABELS } from './programs';
 import type {
   EquipmentAccess,
   PriorityArea,
   ProgramLevel,
+  ProgramSetting,
   ProgramVariation,
   TrainingExclusion,
   WorkoutProgram,
@@ -26,6 +28,8 @@ export interface ProgramPreferences {
   exclusions: TrainingExclusion[];
   /** How long a session they usually have. */
   sessionMinutes: { min: number; max: number } | null;
+  /** What they have at home, for home programs; empty when they haven't said. */
+  homeEquipment: HomeEquipment[];
 }
 
 export const NO_PREFERENCES: ProgramPreferences = {
@@ -36,6 +40,7 @@ export const NO_PREFERENCES: ProgramPreferences = {
   equipment: null,
   exclusions: [],
   sessionMinutes: null,
+  homeEquipment: [],
 };
 
 /** A program recommended, on its variation that fits best, with why in a few words each. */
@@ -71,21 +76,34 @@ export function hasPreferences(prefs: ProgramPreferences): boolean {
     prefs.goals.length > 0 ||
     prefs.priorities.length > 0 ||
     prefs.equipment !== null ||
-    prefs.exclusions.length > 0
+    prefs.exclusions.length > 0 ||
+    prefs.homeEquipment.length > 0
   );
 }
 
 /**
  * How well one variation fits, with its reasons -- or null where it doesn't fit at all: more days
- * than they have (or two fewer), equipment they haven't got, a level it isn't for, putting first
- * what they'd leave out, or leaving out what they put first.
+ * than they have (or two fewer), equipment they haven't got (for a home program, any exercise
+ * needing what they haven't said they have at home), a level it isn't for, putting first what
+ * they'd leave out, or leaving out what they put first.
  */
 export function scoreVariation(
   variation: ProgramVariation,
   prefs: ProgramPreferences,
+  setting: ProgramSetting = 'gym',
 ): { score: number; reasons: string[] } | null {
   const reasons: string[] = [];
   let score = variation.default ? 1 : 0;
+  // A home program: every exercise doable with what they have, where they've said.
+  if (setting === 'home' && prefs.homeEquipment.length > 0) {
+    if (!variationFitsHome(variation, prefs.homeEquipment)) return null;
+    score += 10;
+    reasons.push('Uses what you have at home');
+  }
+  // Training at home (dumbbells or nothing): a home program first.
+  if (setting === 'home' && (prefs.equipment === 'dumbbells' || prefs.equipment === 'bodyweight')) {
+    score += 6;
+  }
 
   // Their days a week: exactly, or one fewer. 1-2 days a week is asked as 1.
   if (prefs.daysPerWeek !== null) {
@@ -189,7 +207,7 @@ export function bestVariation(
 ): { variation: ProgramVariation; score: number; reasons: string[] } | null {
   let best: { variation: ProgramVariation; score: number; reasons: string[] } | null = null;
   for (const variation of program.variations) {
-    const fit = scoreVariation(variation, prefs);
+    const fit = scoreVariation(variation, prefs, program.setting ?? 'gym');
     if (fit && (!best || fit.score > best.score)) best = { variation, ...fit };
   }
   return best;
@@ -197,16 +215,19 @@ export function bestVariation(
 
 /**
  * The programs to recommend, best first -- each once, on its variation that fits best -- or none
- * when there's nothing to go on. Ties keep the catalogue's order.
+ * when there's nothing to go on; only gym or home ones where `setting` says. Ties keep the
+ * catalogue's order.
  */
 export function recommendPrograms(
   programs: readonly WorkoutProgram[],
   prefs: ProgramPreferences,
   limit = 3,
+  setting?: ProgramSetting,
 ): Recommendation[] {
   if (!hasPreferences(prefs)) return [];
   const fits: Recommendation[] = [];
   for (const program of programs) {
+    if (setting && (program.setting ?? 'gym') !== setting) continue;
     const best = bestVariation(program, prefs);
     if (best) fits.push({ program, ...best });
   }

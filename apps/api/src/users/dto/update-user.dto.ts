@@ -317,6 +317,29 @@ export class UpdateUserDto {
   @IsBoolean()
   showRank?: boolean;
 
+  /** What they have at home (onboarding, Settings > Workout Preferences): for home programs.
+   * No Equipment ('bodyweight') is an answer of its own -- the database refuses it with others. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ArrayUnique()
+  @IsIn(
+    [
+      'bodyweight',
+      'dumbbells',
+      'adjustable_dumbbells',
+      'barbell',
+      'bench',
+      'resistance_bands',
+      'pull_up_bar',
+      'cable_machine',
+      'home_gym',
+      'other',
+    ],
+    { each: true },
+  )
+  homeEquipment?: string[];
+
   /** Settings > Notifications > Social: a workout invite, and the answer to one sent. */
   @IsOptional()
   @IsBoolean()

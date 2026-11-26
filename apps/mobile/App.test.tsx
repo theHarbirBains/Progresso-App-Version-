@@ -407,6 +407,7 @@ describe('Authentication flow', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           appleHealthPreference: 'not_now',

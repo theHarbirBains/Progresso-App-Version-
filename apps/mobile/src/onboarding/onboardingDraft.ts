@@ -29,6 +29,7 @@ import type { ProgramChoice } from '../programs/programHost';
 import { programById, variationById } from '../programs/programs';
 import { preferencesFrom } from '../programs/programPreferences';
 import type { EquipmentAccess, PriorityArea, TrainingExclusion } from '../programs/programTypes';
+import type { HomeEquipment } from '../programs/homeEquipment';
 import type { ProgramPreferences } from '../programs/recommendations';
 
 /**
@@ -66,6 +67,9 @@ export interface OnboardingDraft {
   /** What they'd rather not train directly: null until answered, empty to train everything. */
   trainingExclusions: TrainingExclusion[] | null;
   exclusionsSkipped: boolean;
+  /** What they have at home, for home programs: empty until picked. */
+  homeEquipment: HomeEquipment[];
+  homeEquipmentSkipped: boolean;
   /** Which parts of the app they'll use (membership/membershipTiers.ts). */
   membershipTier: MembershipTier | null;
   /** How active they are -- for the calorie estimate, with Nutrition in the membership. */
@@ -149,6 +153,8 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   equipmentSkipped: false,
   trainingExclusions: null,
   exclusionsSkipped: false,
+  homeEquipment: [],
+  homeEquipmentSkipped: false,
   membershipTier: null,
   activityLevel: null,
   nutritionTargets: null,
@@ -196,6 +202,8 @@ export const STEP_ORDER = [
   'workoutFrequency',
   'averageWorkoutLength',
   'equipmentAccess',
+  // What they have at home: what home programs are recommended from.
+  'homeEquipment',
   'trainingExclusions',
   'membership',
   // With Nutrition in the membership: how active they are, then their daily targets.
@@ -232,6 +240,7 @@ export const STEP_SECTIONS: readonly { title: string; steps: readonly Onboarding
       'workoutFrequency',
       'averageWorkoutLength',
       'equipmentAccess',
+      'homeEquipment',
       'trainingExclusions',
     ],
   },
@@ -364,6 +373,8 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.trainingPriorities.length > 0 || draft.prioritiesSkipped;
     case 'equipmentAccess':
       return draft.equipmentAccess != null || draft.equipmentSkipped;
+    case 'homeEquipment':
+      return (draft.homeEquipment ?? []).length > 0 || draft.homeEquipmentSkipped;
     case 'trainingExclusions':
       return draft.trainingExclusions != null || draft.exclusionsSkipped;
     case 'membership':
@@ -431,6 +442,7 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.fitnessGoals.length > 0) input.fitnessGoals = draft.fitnessGoals;
   if (draft.trainingPriorities.length > 0) input.trainingPriorities = draft.trainingPriorities;
   if (draft.equipmentAccess != null) input.equipmentAccess = draft.equipmentAccess;
+  if ((draft.homeEquipment ?? []).length > 0) input.homeEquipment = draft.homeEquipment;
   if (draft.trainingExclusions && draft.trainingExclusions.length > 0) {
     // Never one they prioritize (the database refuses it).
     input.trainingExclusions = draft.trainingExclusions.filter(
@@ -468,6 +480,7 @@ export function draftPreferences(draft: OnboardingDraft): ProgramPreferences {
     trainingPriorities: draft.trainingPriorities,
     equipmentAccess: draft.equipmentAccess,
     trainingExclusions: draft.trainingExclusions ?? [],
+    homeEquipment: draft.homeEquipment ?? [],
   });
 }
 

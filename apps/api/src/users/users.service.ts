@@ -69,6 +69,8 @@ export interface UserProfile {
   profileVisibility: 'private' | 'public';
   /** Whether a workout invite, and the answer to one they sent, is pushed to them. */
   notifyGroupInvites: boolean;
+  /** The equipment they have at home, for home programs; empty when not answered. */
+  homeEquipment: string[];
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
@@ -84,7 +86,7 @@ const PROFILE_COLUMNS =
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
   'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
   'phone_e164, findable_by_phone, training_priorities, equipment_access, training_exclusions, ' +
-  'profile_visibility, notify_group_invites';
+  'profile_visibility, notify_group_invites, home_equipment';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -134,6 +136,7 @@ function toProfile(data: any): UserProfile {
     showRank: data.show_rank,
     profileVisibility: data.profile_visibility,
     notifyGroupInvites: data.notify_group_invites,
+    homeEquipment: data.home_equipment,
   };
 }
 
@@ -246,6 +249,7 @@ export class UsersService {
     if (dto.notifyGroupInvites !== undefined) {
       updatePayload.notify_group_invites = dto.notifyGroupInvites;
     }
+    if (dto.homeEquipment !== undefined) updatePayload.home_equipment = dto.homeEquipment;
     if (dto.findableByEmail !== undefined) updatePayload.findable_by_email = dto.findableByEmail;
     if (dto.phoneNumber !== undefined) updatePayload.phone_e164 = dto.phoneNumber;
     if (dto.findableByPhone !== undefined) updatePayload.findable_by_phone = dto.findableByPhone;
@@ -286,6 +290,9 @@ export class UsersService {
         error.message.includes('users_training_preferences_agree_check')
       ) {
         throw new BadRequestException("You can't prioritize an area you've chosen to leave out");
+      }
+      if (error.code === CHECK_VIOLATION && error.message.includes('users_home_equipment_check')) {
+        throw new BadRequestException('No Equipment is an answer on its own');
       }
       throw new InternalServerErrorException('Failed to update profile');
     }

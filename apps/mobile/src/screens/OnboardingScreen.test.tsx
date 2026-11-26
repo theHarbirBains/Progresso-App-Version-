@@ -288,6 +288,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
         },
       }),
@@ -337,6 +338,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
@@ -381,6 +383,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
         },
       }),
@@ -470,6 +473,11 @@ describe('OnboardingScreen', () => {
     expect(screen.getByText('Where do you train?')).toBeTruthy();
     fireEvent.press(screen.getByTestId('onboarding-equipment-full_gym'));
 
+    // What they have at home: several, then Continue.
+    await screen.findByTestId('onboarding-step-home-equipment');
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-dumbbells'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
     // Glutes is a priority, so it can't be left out; Train Everything answers and moves on.
     await screen.findByTestId('onboarding-step-training-exclusions');
     expect(screen.getByTestId('onboarding-exclusion-glutes')).toBeDisabled();
@@ -556,6 +564,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes', 'back'],
           equipmentAccess: 'full_gym',
+          homeEquipment: ['dumbbells'],
           // 176 lb, typed.
           weightValue: expect.closeTo(79.83, 2),
           weightUnit: 'lb',
@@ -614,6 +623,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
@@ -705,6 +715,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
@@ -777,6 +788,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
         },
       }),
@@ -866,6 +878,7 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingPriorities: ['glutes'],
           equipmentAccess: 'full_gym',
+          homeEquipmentSkipped: true,
           trainingExclusions: [],
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
@@ -922,6 +935,7 @@ describe('OnboardingScreen', () => {
     averageWorkoutLength: '45_60',
     trainingPriorities: ['glutes'],
     equipmentAccess: 'full_gym',
+    homeEquipmentSkipped: true,
     trainingExclusions: [],
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
@@ -1000,6 +1014,7 @@ describe('OnboardingScreen -- notifications step', () => {
     averageWorkoutLength: '45_60',
     trainingPriorities: ['glutes'],
     equipmentAccess: 'full_gym',
+    homeEquipmentSkipped: true,
     trainingExclusions: [],
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
@@ -1095,6 +1110,7 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     averageWorkoutLength: '45_60',
     trainingPriorities: ['glutes'],
     equipmentAccess: 'full_gym',
+    homeEquipmentSkipped: true,
     trainingExclusions: [],
     membershipTier: 'workouts_nutrition',
     activityLevel: 'moderately_active',
@@ -1162,6 +1178,7 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
       selectedSplitPresetId: null,
       skippedSplit: false,
       equipmentAccess: 'bodyweight',
+      homeEquipmentSkipped: true,
     });
     await screen.findByTestId('onboarding-programs-open');
     expect(screen.queryByTestId('onboarding-recommended')).toBeNull();
@@ -1172,8 +1189,10 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     fireEvent.press(await screen.findByTestId('onboarding-skip-training-priorities'));
     await screen.findByTestId('onboarding-step-training-comfort');
 
-    await startAt('equipmentAccess', { equipmentAccess: null });
+    await startAt('equipmentAccess', { equipmentAccess: null, homeEquipmentSkipped: false });
     fireEvent.press(await screen.findByTestId('onboarding-skip-equipment-access'));
+    await screen.findByTestId('onboarding-step-home-equipment');
+    fireEvent.press(screen.getByTestId('onboarding-skip-home-equipment'));
     await screen.findByTestId('onboarding-step-training-exclusions');
     fireEvent.press(screen.getByTestId('onboarding-skip-training-exclusions'));
     await screen.findByTestId('onboarding-step-membership');
@@ -1182,9 +1201,39 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
       expect(stored.draft).toMatchObject({
         equipmentAccess: null,
         equipmentSkipped: true,
+        homeEquipment: [],
+        homeEquipmentSkipped: true,
         trainingExclusions: null,
         exclusionsSkipped: true,
       });
+    });
+  });
+
+  it('asks what equipment they have at home: several, or No Equipment on its own', async () => {
+    await startAt('homeEquipment', { homeEquipment: [], homeEquipmentSkipped: false });
+    await screen.findByTestId('onboarding-step-home-equipment');
+    expect(screen.getByTestId('onboarding-continue').props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
+
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-dumbbells'));
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-bench'));
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-bodyweight'));
+    // No Equipment replaces the rest; then something else replaces it.
+    expect(
+      screen.getByTestId('onboarding-home-equipment-dumbbells').props.accessibilityState,
+    ).toMatchObject({ selected: false });
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-adjustable_dumbbells'));
+    fireEvent.press(screen.getByTestId('onboarding-home-equipment-pull_up_bar'));
+    expect(
+      screen.getByTestId('onboarding-home-equipment-bodyweight').props.accessibilityState,
+    ).toMatchObject({ selected: false });
+
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    await screen.findByTestId('onboarding-step-training-exclusions');
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft.homeEquipment).toEqual(['adjustable_dumbbells', 'pull_up_bar']);
     });
   });
 
@@ -1432,6 +1481,7 @@ describe('OnboardingScreen -- finding your way', () => {
     averageWorkoutLength: '45_60',
     trainingPriorities: ['glutes'],
     equipmentAccess: 'full_gym',
+    homeEquipmentSkipped: true,
     trainingExclusions: [],
     membershipTier: 'workouts',
   };
@@ -1461,7 +1511,7 @@ describe('OnboardingScreen -- finding your way', () => {
   it('takes an answered question forward with Continue after going back to it', async () => {
     await startAt('trainingComfort', { trainingComfort: null });
     await screen.findByTestId('onboarding-step-training-comfort');
-    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('Your Training · 3 of 7');
+    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('Your Training · 3 of 8');
 
     fireEvent.press(screen.getByTestId('onboarding-back'));
     await screen.findByTestId('onboarding-step-training-priorities');

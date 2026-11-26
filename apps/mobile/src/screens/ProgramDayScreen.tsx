@@ -7,6 +7,7 @@ import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ProgramFigure } from '../programs/ProgramFigure';
+import { useProgramHost } from '../programs/programHost';
 import { ProgramExerciseList } from '../programs/ProgramParts';
 import { musclesText, programById, variationById } from '../programs/programs';
 import { withAlpha } from '../theme/accentColor';
@@ -20,6 +21,7 @@ type Props = RootStackScreenProps<'ProgramDay'>;
  */
 export function ProgramDayScreen({ navigation, route }: Props) {
   const { accent } = useAppTheme();
+  const host = useProgramHost();
   const { programId, variationId, dayIndex } = route.params;
   const program = programById(programId);
   const day = program ? variationById(program, variationId).days[dayIndex] : undefined;
@@ -64,6 +66,7 @@ export function ProgramDayScreen({ navigation, route }: Props) {
       <ProgramExerciseList
         testID="program-day-exercise"
         day={day}
+        owned={program.setting === 'home' ? host.preferences.homeEquipment : null}
         onOpen={(exerciseIndex) =>
           navigation.navigate('ProgramExercise', {
             slug: day.exercises[exerciseIndex]!.slug,

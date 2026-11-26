@@ -239,6 +239,90 @@ describe('WorkoutProgramsScreen -- the Split Library', () => {
   });
 });
 
+describe('Home workouts', () => {
+  const id = (rest: string) => `workout-programs-browser-${rest}`;
+  // A home program as if written: a dumbbell bench press and pull-ups, then push-ups.
+  const HOME_PROGRAM: WorkoutProgram = {
+    ...TEST_PROGRAM,
+    id: 'home-split',
+    name: 'Home Split',
+    setting: 'home',
+    variations: [
+      {
+        ...TEST_PROGRAM.variations[0]!,
+        id: 'home-3',
+        equipment: 'dumbbells',
+        days: [
+          {
+            name: 'Upper',
+            muscleGroups: ['chest', 'back'],
+            exercises: [
+              { slug: 'db-bench-press', sets: 3, reps: 10 },
+              { slug: 'bw-pull-up', sets: 3, reps: 8 },
+            ],
+          },
+          { name: 'Lower', muscleGroups: ['quads'], exercises: [{ slug: 'bw-push-up', sets: 3 }] },
+          { name: 'Full', muscleGroups: ['chest'], exercises: [{ slug: 'bw-push-up', sets: 3 }] },
+        ],
+      },
+    ],
+  };
+
+  it('keeps gym and home apart, home saying its programs are on their way', () => {
+    renderBrowser();
+    expect(screen.getByTestId(id('section-traditional'))).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId(id('setting-home')));
+    expect(screen.getByTestId(id('home-empty'))).toHaveTextContent(
+      /Home workouts are on their way/,
+    );
+    expect(screen.queryByTestId(id('section-traditional'))).toBeNull();
+
+    fireEvent.press(screen.getByTestId(id('setting-gym')));
+    expect(screen.getByTestId(id('section-traditional'))).toBeTruthy();
+  });
+
+  it('opens on Home for someone who trains with dumbbells or nothing', () => {
+    renderBrowser({ ...NO_PREFERENCES, equipment: 'dumbbells' });
+    expect(screen.getByTestId(id('home-empty'))).toBeTruthy();
+  });
+
+  it("says what a home program needs, what they haven't got, and marks those exercises", () => {
+    mockPrograms = [HOME_PROGRAM];
+    render(
+      <ProgramHostProvider
+        host={{
+          mode: 'app',
+          chosen: null,
+          preferences: { ...NO_PREFERENCES, homeEquipment: ['adjustable_dumbbells'] },
+          use: jest.fn(),
+        }}
+      >
+        <ProgramDetailScreen {...props({ programId: 'home-split' })} />
+      </ProgramHostProvider>,
+    );
+
+    expect(screen.getByTestId('program-detail-equipment')).toHaveTextContent(
+      /Equipment Needed.*Dumbbells or Adjustable Dumbbells, Bench, Pull-Up Bar/,
+    );
+    expect(screen.getByTestId('program-detail-equipment-missing')).toHaveTextContent(
+      /You Don't Have.*Bench, Pull-Up Bar/,
+    );
+
+    fireEvent.press(screen.getByTestId('program-detail-tabs-workouts'));
+    expect(screen.getByTestId('program-detail-exercise-0')).toHaveTextContent(/Needs Bench/);
+    expect(screen.getByTestId('program-detail-exercise-1')).toHaveTextContent(/Needs Pull-Up Bar/);
+  });
+
+  it("marks nothing for someone who hasn't said what they have", () => {
+    mockPrograms = [HOME_PROGRAM];
+    render(<ProgramDetailScreen {...props({ programId: 'home-split' })} />);
+
+    expect(screen.getByTestId('program-detail-equipment')).toHaveTextContent(/Equipment Needed/);
+    expect(screen.queryByTestId('program-detail-equipment-missing')).toBeNull();
+  });
+});
+
 describe('ProgramDetailScreen', () => {
   it('overviews the program: what it is, how often, who for, each day, and why', () => {
     render(<ProgramDetailScreen {...props({ programId: 'test-split' })} />);

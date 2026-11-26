@@ -146,6 +146,7 @@ describe('preferences from the answers given', () => {
         trainingPriorities: ['glutes'],
         equipmentAccess: 'dumbbells',
         trainingExclusions: ['chest'],
+        homeEquipment: ['dumbbells', 'bench'],
       }),
     ).toEqual({
       daysPerWeek: 4,
@@ -155,6 +156,7 @@ describe('preferences from the answers given', () => {
       equipment: 'dumbbells',
       exclusions: ['chest'],
       sessionMinutes: { min: 45, max: 60 },
+      homeEquipment: ['dumbbells', 'bench'],
     });
   });
 

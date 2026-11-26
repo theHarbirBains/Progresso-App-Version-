@@ -71,6 +71,7 @@ export function assemblePrograms(
     programs.push({
       id: program.id,
       name: program.name,
+      setting: program.setting ?? 'gym',
       description: words.description,
       tags: words.tags,
       badge: words.badge,

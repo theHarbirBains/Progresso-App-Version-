@@ -272,6 +272,28 @@ describe('SettingsWorkoutPreferencesScreen -- program recommendations', () => {
     expect(await screen.findByTestId('open-equipment-access')).toHaveTextContent(/Dumbbells Only/);
   });
 
+  it('saves what they have at home, with No Equipment an answer of its own', async () => {
+    mockUpdateMyProfile.mockResolvedValue({
+      ...baseProfile,
+      homeEquipment: ['adjustable_dumbbells', 'bench'],
+    });
+    renderScreen();
+    expect(await screen.findByTestId('open-home-equipment')).toHaveTextContent(/Not set/);
+
+    fireEvent.press(screen.getByTestId('open-home-equipment'));
+    fireEvent.press(screen.getByTestId('home-equipment-bodyweight'));
+    fireEvent.press(screen.getByTestId('home-equipment-adjustable_dumbbells'));
+    fireEvent.press(screen.getByTestId('home-equipment-bench'));
+    fireEvent.press(screen.getByTestId('home-equipment-save'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      homeEquipment: ['adjustable_dumbbells', 'bench'],
+    });
+    expect(await screen.findByTestId('open-home-equipment')).toHaveTextContent(
+      /Adjustable Dumbbells, Bench/,
+    );
+  });
+
   it('leaves out an area, but never one they prioritize', async () => {
     mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,

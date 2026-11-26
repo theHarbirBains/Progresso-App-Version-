@@ -20,6 +20,7 @@ import {
   styleLabel,
   variationMuscles,
 } from './programs';
+import { missingFor, needLabel, type HomeEquipment } from './homeEquipment';
 import type { ProgramDay, ProgramVariation, WorkoutProgram } from './programTypes';
 
 /**
@@ -109,14 +110,20 @@ export function ExerciseThumb({ slug, size = 48 }: { slug: string; size?: number
   );
 }
 
-/** A day's exercises, as planned: each its picture, name, sets and reps (and rest), and note. */
+/**
+ * A day's exercises, as planned: each its picture, name, sets and reps (and rest), and note --
+ * and, in a home program, "Needs a Bench" where it needs what they haven't said they have.
+ */
 export function ProgramExerciseList({
   day,
   onOpen,
+  owned = null,
   testID,
 }: {
   day: ProgramDay;
   onOpen: (exerciseIndex: number) => void;
+  /** What they have at home, in a home program; null elsewhere, or when they haven't said. */
+  owned?: readonly HomeEquipment[] | null;
   testID?: string;
 }) {
   return (
@@ -124,6 +131,11 @@ export function ProgramExerciseList({
       {day.exercises.map((exercise, i) => {
         const info = exerciseInfo(exercise.slug);
         const rest = exercise.restSeconds ? ` · ${restLabel(exercise.restSeconds)}` : '';
+        const missing = owned && owned.length > 0 ? missingFor(exercise, owned) : [];
+        const needs =
+          missing.length > 0
+            ? `Needs ${missing.map((need) => needLabel(need)).join(' and ')}`
+            : null;
         return (
           <ListRow
             key={`${exercise.slug}-${i}`}
@@ -131,7 +143,7 @@ export function ProgramExerciseList({
             leading={<ExerciseThumb slug={exercise.slug} />}
             title={info?.name ?? exercise.slug}
             subtitle={`${prescription(exercise)}${rest}`}
-            detail={exercise.note}
+            detail={[needs, exercise.note].filter(Boolean).join(' · ') || undefined}
             onPress={() => onOpen(i)}
             divider={i > 0}
           />

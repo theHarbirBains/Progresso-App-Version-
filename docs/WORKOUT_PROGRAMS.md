@@ -53,6 +53,24 @@ Legs is the Arnold Split, Upper Body & Glutes is Glutes & Upper Body, the Time-E
 "Three-Day ..." titles are their splits' own schedules; the full list is at the top of
 `programCatalog.ts`.
 
+## Home programs
+
+A program for home has `setting: 'home'` in the catalogue, and its titles go in `HOME_LIBRARY`
+(`programLibrary.ts`) as the gym ones go in `PROGRAM_LIBRARY`; the Split Library's Home switch
+shows them. Each exercise's equipment is worked out from the built-in exercise -- dumbbells,
+barbell, cable machine (or a home gym), home gym for a machine, bands, and a bench, pull-up bar or
+dip bars where its name says so -- and an exercise can say it outright instead:
+
+```ts
+{ slug: 'db-bench-press', sets: 3, reps: 10, equipment: [['dumbbells', 'adjustable_dumbbells'], ['bench']] },
+```
+
+Each inner list is one need, met by any one of its pieces: `bodyweight`, `dumbbells`,
+`adjustable_dumbbells`, `barbell`, `bench`, `resistance_bands`, `pull_up_bar`, `cable_machine`,
+`home_gym`, `other`. A program's page lists everything its variation needs; someone's home
+equipment (asked in onboarding, changed in Settings > Workout Preferences) decides what's
+recommended and which exercises are marked as needing something they don't have.
+
 ## The library
 
 Each section has an `id`, a `title`, a one-line `blurb`, a glyph and its `entries`; each entry

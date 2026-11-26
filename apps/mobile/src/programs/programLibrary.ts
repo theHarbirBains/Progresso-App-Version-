@@ -303,6 +303,13 @@ export const PROGRAM_LIBRARY: readonly LibrarySection[] = [
   },
 ];
 
+/**
+ * The home workout library (the Split Library's Home switch), as the gym one is: sections of
+ * titles, each pointing at a home program (`setting: 'home'`) and its variations. Empty until
+ * Harbir's home programs and their exercises come -- nothing here is ever made up.
+ */
+export const HOME_LIBRARY: readonly LibrarySection[] = [];
+
 /** The library's days-a-week choices, as the list gives them; All is beside them. */
 export const LIBRARY_FREQUENCIES: readonly number[] = [2, 3, 4, 5, 6, 7];
 
@@ -311,10 +318,18 @@ export const LIBRARY_SPLIT_COUNT = new Set(
   PROGRAM_LIBRARY.flatMap((section) => section.entries.map((entry) => entry.title)),
 ).size;
 
-/** How many of the library's different titles can be opened: one of their variations written. */
-export function readySplitCount(programs: readonly WorkoutProgram[]): number {
+/** How many different splits a library names: a title in two sections counts once. */
+export function splitCountOf(library: readonly LibrarySection[]): number {
+  return new Set(library.flatMap((section) => section.entries.map((entry) => entry.title))).size;
+}
+
+/** How many of a library's different titles can be opened: one of their variations written. */
+export function readySplitCount(
+  programs: readonly WorkoutProgram[],
+  library: readonly LibrarySection[] = PROGRAM_LIBRARY,
+): number {
   const ready = new Set<string>();
-  for (const section of PROGRAM_LIBRARY) {
+  for (const section of library) {
     for (const entry of section.entries) {
       if (entryChoice(entry, programs) !== null) ready.add(entry.title);
     }

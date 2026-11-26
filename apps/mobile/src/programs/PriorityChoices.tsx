@@ -14,6 +14,7 @@ import {
   togglePriority,
   TRAINING_EXCLUSIONS,
 } from './programs';
+import { HOME_EQUIPMENT_OPTIONS, toggleHomeEquipment, type HomeEquipment } from './homeEquipment';
 import type { PriorityArea, TrainingExclusion } from './programTypes';
 
 /** The anatomy figure with an area's muscles in gold, on a tile's well. */
@@ -118,6 +119,36 @@ export function ExclusionTiles({
         // The last one taken off is no answer yet, never Train Everything.
         onChange(next.length > 0 ? next : null, choice);
       }}
+    />
+  );
+}
+
+/**
+ * What someone has at home, as tiles two across -- each its glyph -- as many as they have, or No
+ * Equipment on its own (it replaces the rest, and any other replaces it).
+ */
+export function HomeEquipmentTiles({
+  value,
+  onChange,
+  testID,
+  tilePrefix,
+}: {
+  value: readonly HomeEquipment[];
+  onChange: (next: HomeEquipment[]) => void;
+  testID: string;
+  tilePrefix: string;
+}) {
+  return (
+    <OnboardingTiles<HomeEquipment>
+      testID={testID}
+      tilePrefix={tilePrefix}
+      options={HOME_EQUIPMENT_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+        icon: option.icon,
+      }))}
+      isSelected={(item) => value.includes(item)}
+      onPress={(item) => onChange(toggleHomeEquipment(value, item))}
     />
   );
 }

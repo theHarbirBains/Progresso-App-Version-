@@ -7826,6 +7826,39 @@ async function main() {
     );
   }
 
+  console.log('\nRunning home equipment tests...\n');
+  {
+    const person = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2)', [
+      person,
+      'home@test.local',
+    ]);
+    const kept = async () =>
+      (await admin.query('select home_equipment from public.users where id = $1', [person])).rows[0]
+        .home_equipment;
+    record('Home equipment starts unanswered', (await kept()).length === 0);
+    await admin.query(
+      "update public.users set home_equipment = array['adjustable_dumbbells', 'bench', 'pull_up_bar'] where id = $1",
+      [person],
+    );
+    record('Several pieces of home equipment are kept', (await kept()).length === 3);
+    await expectThrows(
+      admin.query(
+        "update public.users set home_equipment = array['bodyweight', 'dumbbells'] where id = $1",
+        [person],
+      ),
+      'No Equipment is an answer on its own',
+      /users_home_equipment_check/,
+    );
+    await expectThrows(
+      admin.query("update public.users set home_equipment = array['treadmill'] where id = $1", [
+        person,
+      ]),
+      'Only known home equipment is kept',
+      /users_home_equipment_check/,
+    );
+  }
+
   await admin.end();
 }
 

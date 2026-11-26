@@ -10,6 +10,7 @@ import {
   SPLIT_MUSCLE_GROUP_LABELS,
   type SplitMuscleGroup,
 } from '../workouts/splitMuscleGroups';
+import { HOME_EQUIPMENT_OPTIONS } from './homeEquipment';
 import { isReadyContent } from './programAssembly';
 import { WORKOUT_PROGRAMS } from './programCatalog';
 import type {
@@ -509,6 +510,14 @@ export function programProblems(program: WorkoutProgram): string[] {
             where(`${exAt}: alternative ${alternative} isn't an active built-in exercise`);
           }
           if (alternative === exercise.slug) where(`${exAt} lists itself as an alternative`);
+        }
+        for (const need of exercise.equipment ?? []) {
+          if (need.length === 0) where(`${exAt}: an equipment need names nothing`);
+          for (const item of need) {
+            if (!HOME_EQUIPMENT_OPTIONS.some((option) => option.value === item)) {
+              where(`${exAt}: "${item}" isn't home equipment`);
+            }
+          }
         }
       }
     });

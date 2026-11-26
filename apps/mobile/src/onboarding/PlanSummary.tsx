@@ -1,4 +1,5 @@
 import type { Feather } from '@expo/vector-icons';
+import { HOME_EQUIPMENT_LABELS } from '../programs/homeEquipment';
 import { StyleSheet, View } from 'react-native';
 import { ChoiceTile } from '../design/ChoiceTile';
 import { GlyphWell } from '../design/GlyphWell';
@@ -96,6 +97,15 @@ function itemsFor(draft: OnboardingDraft): Item[] {
       icon: 'map-pin',
       label: 'Where You Train',
       value: equipmentLabel(draft.equipmentAccess),
+    });
+  }
+  if ((draft.homeEquipment ?? []).length > 0) {
+    items.push({
+      step: 'homeEquipment',
+      icon: 'home',
+      label: 'At Home',
+      value: draft.homeEquipment.map((item) => HOME_EQUIPMENT_LABELS[item]).join(', '),
+      wide: true,
     });
   }
   if (draft.trainingExclusions) {

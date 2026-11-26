@@ -1,5 +1,6 @@
 import type { FitnessGoal } from '../lib/api';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
+import type { HomeEquipment } from './homeEquipment';
 
 // Workout programs: ready-made splits with every day's exercises planned, written by hand --
 // nothing here is generated. A program is a template, not stored user data: using one makes an
@@ -30,6 +31,9 @@ export type PriorityArea =
 
 /** Where someone trains -- and the least a program needs: a full gym, dumbbells, or nothing. */
 export type EquipmentAccess = 'full_gym' | 'dumbbells' | 'bodyweight';
+
+/** Whether a program's for a gym or for home (the library's Gym | Home switch). */
+export type ProgramSetting = 'gym' | 'home';
 
 /** What someone would rather not train directly, and a program leaves out. */
 export type TrainingExclusion = 'chest' | 'glutes';
@@ -66,6 +70,12 @@ export interface ProgramExercise {
   tips?: string[];
   /** Built-ins that can stand in for it (slugs), in the order offered. */
   alternatives?: string[];
+  /**
+   * What it needs at home, where the program says so: each need any one of its pieces
+   * ([['dumbbells', 'adjustable_dumbbells'], ['bench']]). Otherwise it's worked out from the
+   * built-in exercise (homeEquipment.ts).
+   */
+  equipment?: HomeEquipment[][];
 }
 
 /** One day of a program's week. */
@@ -128,6 +138,8 @@ export interface WorkoutProgram {
   /** Stable and unique ("push-pull-legs"): kept in drafts and links. */
   id: string;
   name: string;
+  /** For a gym (the default) or for home. */
+  setting?: ProgramSetting;
   /** The Overview's paragraph. */
   description?: string;
   /** Pills under the name ("Hypertrophy", "Strength"). */
@@ -166,6 +178,8 @@ export interface ResolvedVariation extends VariationProfile {
 export interface CatalogProgram {
   id: string;
   name: string;
+  /** For a gym (the default) or for home: the library's Gym | Home switch. */
+  setting?: ProgramSetting;
   profile: Pick<VariationProfile, 'categories' | 'style' | 'goals'> &
     Partial<Omit<VariationProfile, 'categories' | 'style' | 'goals'>>;
   variations: CatalogVariation[];

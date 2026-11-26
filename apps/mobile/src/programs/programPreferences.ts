@@ -5,6 +5,7 @@ import type {
   TrainingComfort,
   TrainingExperience,
 } from '../lib/api';
+import type { HomeEquipment } from './homeEquipment';
 import type { ProgramPreferences } from './recommendations';
 import type {
   EquipmentAccess,
@@ -41,6 +42,8 @@ export interface PreferenceAnswers {
   trainingPriorities: PriorityArea[];
   equipmentAccess: EquipmentAccess | null;
   trainingExclusions: TrainingExclusion[];
+  /** What they have at home; empty when they haven't said. */
+  homeEquipment?: HomeEquipment[];
 }
 
 export function preferencesFrom(answers: PreferenceAnswers): ProgramPreferences {
@@ -56,6 +59,7 @@ export function preferencesFrom(answers: PreferenceAnswers): ProgramPreferences 
     sessionMinutes: answers.averageWorkoutLength
       ? SESSION_MINUTES[answers.averageWorkoutLength]
       : null,
+    homeEquipment: answers.homeEquipment ?? [],
   };
 }
 
@@ -70,5 +74,6 @@ export function preferencesFromProfile(profile: ProfileResponse | null): Program
     trainingPriorities: profile?.trainingPriorities ?? [],
     equipmentAccess: profile?.equipmentAccess ?? null,
     trainingExclusions: profile?.trainingExclusions ?? [],
+    homeEquipment: (profile?.homeEquipment ?? []) as HomeEquipment[],
   });
 }
