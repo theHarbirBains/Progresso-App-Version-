@@ -7,6 +7,7 @@ import {
   fetchNextExerciseOrderIndex,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   updateSet,
   type SetRecord,
@@ -23,6 +24,7 @@ jest.mock('./workoutQueries', () => ({
   fetchNextExerciseOrderIndex: jest.fn(),
   fetchPreviousPerformance: jest.fn(async () => null),
   fetchWorkoutDetail: jest.fn(),
+  moveSets: jest.fn(async () => undefined),
   removeExerciseFromWorkout: jest.fn(async () => undefined),
   updateSet: jest.fn(),
 }));
@@ -147,7 +149,12 @@ beforeEach(async () => {
   mockCreateSet
     .mockReset()
     .mockImplementation(
-      async (workoutExerciseId: string, setIndex: number, side?: 'left' | 'right') => {
+      async (
+        workoutExerciseId: string,
+        setIndex: number,
+        side?: 'left' | 'right',
+        options?: { isDrop?: boolean },
+      ) => {
         const set: SetRecord = {
           id: `${workoutExerciseId}-set-${setIndex}${side ? `-${side}` : ''}`,
           setIndex,
@@ -155,6 +162,7 @@ beforeEach(async () => {
           weightKg: null,
           reps: null,
           completedAt: null,
+          ...(options?.isDrop ? { isDrop: true } : {}),
         };
         addedSets[workoutExerciseId] = [...(addedSets[workoutExerciseId] ?? []), set];
         return set;
@@ -163,7 +171,7 @@ beforeEach(async () => {
   mockFetchPrevious.mockReset().mockResolvedValue(null);
 });
 
-function renderEditor() {
+function renderEditor(options: { warmupsAndDrops?: boolean } = {}) {
   return render(
     <GroupWorkoutEditor
       members={members}
@@ -171,6 +179,7 @@ function renderEditor() {
       userId="me"
       accentColor="#3DDC97"
       onAccentColor="#000000"
+      warmupsAndDrops={options.warmupsAndDrops}
       testID="group-workout"
     />,
   );
@@ -525,5 +534,121 @@ describe('GroupWorkoutEditor -- removing a set, and muscle tabs', () => {
     expect(screen.queryByTestId('group-workout-exercise-squat')).toBeNull();
     fireEvent.press(screen.getByTestId('group-workout-muscle-tabs-all'));
     expect(screen.getByTestId('group-workout-exercise-squat')).toBeTruthy();
+  });
+});
+
+describe('GroupWorkoutEditor -- warm-ups and drop sets', () => {
+  beforeEach(() => {
+    jest
+      .mocked(updateSet)
+      .mockReset()
+      .mockImplementation(async (setId, updates) => ({
+        id: setId,
+        setIndex: 1,
+        side: null,
+        weightKg: 100,
+        reps: 5,
+        completedAt: null,
+        ...updates,
+      }));
+    jest.mocked(moveSets).mockClear();
+    jest.mocked(deleteSet).mockClear();
+  });
+
+  it("marks a set a warm-up from its number -- on anyone's tab, for that person's set", async () => {
+    renderEditor({ warmupsAndDrops: true });
+
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-set-1-number'),
+    );
+    expect(updateSet).toHaveBeenCalledWith('w-me-set-1', { isWarmup: true });
+    expect(
+      screen.getByTestId('group-workout-exercise-squat-set-w-me-set-1-number'),
+    ).toHaveTextContent('W');
+
+    // Sam's tab: Sam's own set.
+    fireEvent.press(screen.getByTestId('group-workout-tabs-sam'));
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-sam-set-1-number'),
+    );
+    expect(updateSet).toHaveBeenCalledWith('w-sam-set-1', { isWarmup: true });
+  });
+
+  it('puts the mark back when it does not save', async () => {
+    jest.mocked(updateSet).mockRejectedValueOnce(new Error('No connection'));
+    renderEditor({ warmupsAndDrops: true });
+
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-set-1-number'),
+    );
+
+    expect(await screen.findByTestId('group-workout-error')).toHaveTextContent('No connection');
+    expect(
+      screen.getByTestId('group-workout-exercise-squat-set-w-me-set-1-number'),
+    ).not.toHaveTextContent('W');
+  });
+
+  it('adds a drop set under the set filled in, for the person shown', async () => {
+    renderEditor({ warmupsAndDrops: true });
+
+    const dropSet = await screen.findByTestId('group-workout-exercise-squat-add-drop-set');
+    await act(async () => {
+      fireEvent.press(dropSet);
+    });
+
+    // Nothing waits below set 1, so nothing moves; the drop goes in at 2.
+    expect(moveSets).toHaveBeenCalledWith([]);
+    expect(mockCreateSet).toHaveBeenCalledWith('w-me-we-1', 2, undefined, { isDrop: true });
+    expect(mockCreateSet).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-we-1-set-2-drop'),
+    ).toBeTruthy();
+  });
+
+  it('removes a working set with its drop sets, asking first', async () => {
+    addedSets = {
+      'w-me-we-1': [
+        {
+          id: 'w-me-drop',
+          setIndex: 2,
+          side: null,
+          weightKg: 80,
+          reps: 4,
+          completedAt: '2026-10-06T09:10:00.000Z',
+          isDrop: true,
+        } as SetRecord,
+      ],
+    };
+    renderEditor({ warmupsAndDrops: true });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    fireEvent.press(
+      await screen.findByTestId('group-workout-exercise-squat-set-w-me-set-1-remove'),
+    );
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Remove set 1 and its drop sets?',
+      expect.stringMatching(/only set of Back Squat/),
+      expect.any(Array),
+    );
+    const buttons = alertSpy.mock.calls[0][2] ?? [];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Remove Set')?.onPress?.();
+    });
+    alertSpy.mockRestore();
+
+    expect(deleteSet).toHaveBeenCalledWith('w-me-set-1');
+    expect(deleteSet).toHaveBeenCalledWith('w-me-drop');
+  });
+
+  it("offers neither without warmupsAndDrops -- a trainer's live session", async () => {
+    renderEditor();
+    await screen.findByTestId('group-workout-exercise-squat');
+
+    expect(screen.queryByTestId('group-workout-exercise-squat-add-drop-set')).toBeNull();
+    // The set's number is only a number: nothing to tap.
+    expect(screen.queryByTestId('group-workout-exercise-squat-set-w-me-set-1-number')).toBeNull();
+    expect(screen.getByTestId('group-workout-exercise-squat-set-w-me-set-1')).toHaveTextContent(
+      /^1/,
+    );
   });
 });

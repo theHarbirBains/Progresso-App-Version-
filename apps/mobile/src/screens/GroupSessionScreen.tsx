@@ -255,6 +255,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             userId={userId}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
+            warmupsAndDrops
             testID="group-workout"
           />
         ) : null}

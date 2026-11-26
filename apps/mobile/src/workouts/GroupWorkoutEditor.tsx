@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
 import { FilterChips } from '../design/FilterChips';
@@ -31,9 +31,13 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
+  groupUnilateralSets,
   hasDraftInput,
+  isValidDraft,
   type SetInputDraft,
 } from './setInputDrafts';
+import { dropSetSlot, rowsRemovedWith, setLabels, type DropSetRow } from './dropSets';
+import { useWarmupHint } from './WarmupHint';
 import { LiveProgressionSheets, RepRangeRow, useLiveProgression } from './useLiveProgression';
 import { useSetInputDrafts } from './useSetInputDrafts';
 import { useSetAutosave, type LiveSet } from './useSetAutosave';
@@ -46,6 +50,7 @@ import {
   fetchNextExerciseOrderIndex,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   updateSet,
   type SetRecord,
@@ -83,6 +88,12 @@ interface Props {
   onAccentColor: string;
   /** The signed-in person's previous exercises, listed first in Add Exercise (usePreviousExercises). */
   previousExercises?: PreviousExercisesState;
+  /**
+   * Warm-ups and drop sets, as in Active Workout: a set's number tapped marks it a warm-up, and
+   * Drop Set adds a drop under the last set filled in -- on any person's tab, for that person's
+   * sets. A group workout offers them; a trainer's live session doesn't yet.
+   */
+  warmupsAndDrops?: boolean;
   testID?: string;
 }
 
@@ -93,6 +104,9 @@ interface Props {
  * with the weight lifted and reps done, and anyone in the group can enter them. When the
  * group finishes, each person keeps only the exercises they did (the API's GroupsService.finish
  * takes the rest off their workout).
+ *
+ * With `warmupsAndDrops` (a group workout), any person's sets can be marked warm-ups and have drop
+ * sets added, exactly as in Active Workout.
  *
  * The signed-in person's own tab also has everything Active Workout shows from their own
  * records and settings (useLiveProgression): their rep range under the stats, and each
@@ -108,6 +122,7 @@ export function GroupWorkoutEditor({
   accentColor,
   onAccentColor,
   previousExercises,
+  warmupsAndDrops = false,
   testID = 'group-workout',
 }: Props) {
   const { weightUnit } = useProgressTheme();
@@ -124,6 +139,15 @@ export function GroupWorkoutEditor({
   // The muscle tab showing: every exercise, or one primary muscle group's (as Active Workout).
   const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
   const progression = useLiveProgression({ userId, weightUnit, onError: setError });
+  // The latest workouts and typed values, for handlers an ExerciseCard may hold from an earlier
+  // render (its memo compares only whether they're given).
+  const detailsRef = useRef(details);
+  detailsRef.current = details;
+  const setInputsRef = useRef(setInputs);
+  setInputsRef.current = setInputs;
+  // The one-time tip on how to mark a warm-up, on the first exercise shown (WarmupHint.tsx).
+  const { show: showWarmupHint, dismiss: dismissWarmupHint } = useWarmupHint();
+  const warmupHint = useMemo(() => ({ onDismiss: dismissWarmupHint }), [dismissWarmupHint]);
 
   // Every person's sets save as they're typed, whoever types them -- see useSetAutosave.
   const liveSets: LiveSet[] = useMemo(
@@ -420,7 +444,17 @@ export function GroupWorkoutEditor({
     );
     const set = exercise?.sets.find((candidate) => candidate.id === setId);
     if (!exercise || !set) return;
-    const rows = exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex);
+    // The exercise's sets in order, a unilateral set's two sides together; a working set goes
+    // with the drop sets under it -- they're part of it.
+    const logical = Array.from(new Set(exercise.sets.map((row) => row.setIndex)))
+      .sort((a, b) => a - b)
+      .map((setIndex) => exercise.sets.filter((row) => row.setIndex === setIndex));
+    const position = logical.findIndex((group) => group.some((row) => row.id === setId));
+    const groups = rowsRemovedWith(
+      logical.map((group) => ({ rows: group, isDrop: group[0].isDrop })),
+      position,
+    );
+    const rows = groups.flatMap((group) => group.rows);
     const remove = () =>
       void removeSetRows(rows.map((row) => row.id)).catch((err: unknown) =>
         setError(err instanceof Error ? err.message : 'Failed to remove set'),
@@ -432,20 +466,109 @@ export function GroupWorkoutEditor({
       remove();
       return;
     }
-    const indexes = Array.from(new Set(exercise.sets.map((row) => row.setIndex))).sort(
-      (a, b) => a - b,
-    );
-    const number = indexes.indexOf(set.setIndex) + 1;
+    const label = setLabels(logical.map((group) => ({ isDrop: group[0].isDrop })))[position];
+    const workingSets = logical.filter((group) => !group[0].isDrop).length;
+    const withDrops = groups.length > 1;
     Alert.alert(
-      `Remove set ${number}?`,
-      indexes.length === 1
+      label.drop
+        ? 'Remove this drop set?'
+        : withDrops
+          ? `Remove set ${label.number} and its drop sets?`
+          : `Remove set ${label.number}?`,
+      !label.drop && workingSets === 1
         ? `It's the only set of ${exercise.exerciseName}. The exercise stays in the workout, so a set can be added again.`
-        : 'What was entered for it is removed from this workout.',
+        : `What was entered for ${withDrops ? 'them' : 'it'} is removed from this workout.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove Set', style: 'destructive', onPress: remove },
       ],
     );
+  }
+
+  /** The workout exercise a set belongs to, from the latest workouts, whoever's it is. */
+  function exerciseHolding(setId: string): WorkoutExerciseWithSets | undefined {
+    for (const detail of Object.values(detailsRef.current)) {
+      const exercise = detail.exercises.find((ex) => ex.sets.some((set) => set.id === setId));
+      if (exercise) return exercise;
+    }
+    return undefined;
+  }
+
+  /**
+   * Tapping a set's number marks it a warm-up (or a working set again): shown at once, saved
+   * straight away, put back if the save fails. A unilateral set's two sides go together.
+   */
+  function toggleWarmup(setId: string) {
+    // Marked once, the tip on how has done its job.
+    dismissWarmupHint();
+    const exercise = exerciseHolding(setId);
+    const set = exercise?.sets.find((candidate) => candidate.id === setId);
+    if (!exercise || !set) return;
+    const rows =
+      exercise.movementType === 'unilateral'
+        ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
+        : [set];
+    const ids = new Set(rows.map((row) => row.id));
+    const next = !set.isWarmup;
+    const mark = (value: boolean) =>
+      setDetails(
+        withSets((sets) =>
+          sets.map((candidate) =>
+            ids.has(candidate.id) ? { ...candidate, isWarmup: value } : candidate,
+          ),
+        ),
+      );
+    mark(next);
+    void Promise.all(rows.map((row) => updateSet(row.id, { isWarmup: next }))).catch(
+      (err: unknown) => {
+        mark(!next);
+        setError(err instanceof Error ? err.message : 'Failed to mark the warm-up');
+      },
+    );
+  }
+
+  /**
+   * Drop Set: a drop under the last set filled in (and any drops already under it) -- a
+   * unilateral exercise's two sides together. A set waiting below moves down one to make room,
+   * on the server first (moveSets, all at once); then everyone's workout is read again.
+   */
+  async function addDropSet(workoutExerciseId: string) {
+    const exercise = Object.values(detailsRef.current)
+      .flatMap((detail) => detail.exercises)
+      .find((ex) => ex.id === workoutExerciseId);
+    if (!exercise) return;
+    const type = measurementTypeOf(exercise);
+    const filled = (set: SetRecord) =>
+      set.completedAt !== null || isValidDraft(setInputsRef.current[set.id], type);
+    const rows: DropSetRow[] =
+      exercise.movementType === 'unilateral'
+        ? groupUnilateralSets(exercise.sets).map(({ setIndex, left, right }) => ({
+            setIndex,
+            ids: [left.id, right.id],
+            isWarmup: left.isWarmup,
+            isDrop: left.isDrop,
+            filled: filled(left) && filled(right),
+          }))
+        : [...exercise.sets]
+            .sort((a, b) => a.setIndex - b.setIndex)
+            .map((set) => ({
+              setIndex: set.setIndex,
+              ids: [set.id],
+              isWarmup: set.isWarmup,
+              isDrop: set.isDrop,
+              filled: filled(set),
+            }));
+    const slot = dropSetSlot(rows);
+    if (!slot) return;
+    await change(async () => {
+      await moveSets(slot.moves);
+      if (exercise.movementType === 'unilateral') {
+        await createSet(exercise.id, slot.setIndex, 'left', { isDrop: true });
+        await createSet(exercise.id, slot.setIndex, 'right', { isDrop: true });
+      } else {
+        await createSet(exercise.id, slot.setIndex, undefined, { isDrop: true });
+      }
+    });
   }
 
   function confirmRemove(exercise: WorkoutExerciseWithSets) {
@@ -477,6 +600,8 @@ export function GroupWorkoutEditor({
   const shownExercises = exercises.filter(
     (exercise) => activeMuscleTab === 'all' || exercise.muscleGroup === activeMuscleTab,
   );
+  // The warm-up tip sits on the first exercise on show, as in Active Workout.
+  const hintedExerciseId = shownExercises.find((shape) => rowFor(shape.exerciseId))?.exerciseId;
 
   const tabs = members.map((m) => ({
     key: m.userId,
@@ -580,6 +705,13 @@ export function GroupWorkoutEditor({
               onChangeReps={changeReps}
               onChangeDuration={changeDuration}
               onAddSet={() => void addSet(row)}
+              onAddDropSet={warmupsAndDrops ? () => void addDropSet(row.id) : undefined}
+              onToggleWarmup={warmupsAndDrops ? toggleWarmup : undefined}
+              warmupHint={
+                warmupsAndDrops && showWarmupHint && row.exerciseId === hintedExerciseId
+                  ? warmupHint
+                  : null
+              }
               onRemoveSet={removeSet}
               onRemoveExercise={() => confirmRemove(row)}
               accentColor={accentColor}
