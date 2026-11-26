@@ -15,6 +15,7 @@ import {
   type PhaseDirection,
 } from './exerciseArt';
 import { ART } from './palette';
+import type { MuscleRegion } from './muscles';
 import type { RenderedFrame, ViewBox } from './render';
 import type { Gradient } from './shading';
 
@@ -59,12 +60,20 @@ export function Frame({
   width,
   height,
   prefix,
+  onPressRegion,
+  outlined,
+  outlineColor,
 }: {
   frame: RenderedFrame;
   viewBox: ViewBox;
   width: number;
   height: number;
   prefix: string;
+  /** On the anatomy figure: a tap on a muscle says which (Muscle Activity). */
+  onPressRegion?: (region: MuscleRegion) => void;
+  /** Muscles drawn with an outline in `outlineColor` -- the ones chosen. */
+  outlined?: ReadonlySet<MuscleRegion>;
+  outlineColor?: string;
 }) {
   return (
     <Svg
@@ -86,20 +95,27 @@ export function Frame({
           ) : null,
         )}
       </Defs>
-      {frame.shapes.map((shape, i) => (
-        <Path
-          key={i}
-          d={shape.d}
-          fill={shape.gradient ? `url(#${prefix}g${i})` : shape.fill}
-          stroke={shape.stroke}
-          strokeWidth={shape.strokeWidth}
-          strokeLinejoin={shape.stroke ? 'round' : undefined}
-          strokeLinecap={shape.stroke ? 'round' : undefined}
-          strokeDasharray={shape.dash}
-          opacity={shape.opacity}
-          clipPath={shape.clipId ? `url(#${prefix}${shape.clipId})` : undefined}
-        />
-      ))}
+      {frame.shapes.map((shape, i) => {
+        const region = shape.region;
+        const chosen = region !== undefined && outlined?.has(region) === true;
+        return (
+          <Path
+            key={i}
+            d={shape.d}
+            fill={shape.gradient ? `url(#${prefix}g${i})` : shape.fill}
+            stroke={chosen ? outlineColor : shape.stroke}
+            strokeWidth={chosen ? 1.4 : shape.strokeWidth}
+            strokeLinejoin={shape.stroke ? 'round' : undefined}
+            strokeLinecap={shape.stroke ? 'round' : undefined}
+            strokeDasharray={shape.dash}
+            opacity={shape.opacity}
+            clipPath={shape.clipId ? `url(#${prefix}${shape.clipId})` : undefined}
+            onPress={
+              region !== undefined && onPressRegion ? () => onPressRegion(region) : undefined
+            }
+          />
+        );
+      })}
     </Svg>
   );
 }

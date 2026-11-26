@@ -208,12 +208,13 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('filters by muscle group in the list itself when a chip is pressed -- no new read', async () => {
+  it('filters by muscle group in the list itself when one is chosen -- no new read', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchAllExercises.mockClear();
 
-    fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
+    fireEvent.press(screen.getByTestId('exercise-library-filters-muscle'));
+    fireEvent.press(screen.getByTestId('exercise-library-filters-option-chest'));
 
     // Only the chest exercise is left; the biceps one is gone, and nothing was fetched again.
     await waitFor(() => expect(screen.queryByTestId('exercise-item-ex-mine')).toBeNull());
@@ -225,11 +226,11 @@ describe('ExerciseLibraryScreen', () => {
   // Regression guard: the muscle-group filter row was sitting flush against
   // the search input above and the source-filter row below (each only
   // contributes margin on one side), reading as vertically cramped.
-  it('gives the muscle-group filter row vertical breathing room above and below', async () => {
+  it('gives the filter row vertical breathing room above and below', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
-    const wrap = screen.getByTestId('exercise-library-muscle-group-wrap');
+    const wrap = screen.getByTestId('exercise-library-filters-wrap');
     expect(StyleSheet.flatten(wrap.props.style).marginVertical).toBeGreaterThan(0);
     await settle();
   });

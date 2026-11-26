@@ -142,12 +142,9 @@ export function ExercisePickerModal({
     tabTapped.current = true;
     setTab(next);
   };
-  // The source and equipment the rows on screen were read for: while either differs from what's
-  // chosen, the list fades softly (ExerciseBrowser's `updating`).
-  const [readFor, setReadFor] = useState<{ source: ExerciseSource; equipment: Equipment | null }>({
-    source: 'all',
-    equipment: null,
-  });
+  // The source the rows on screen were read for: while it differs from what's chosen, the list
+  // fades softly (ExerciseBrowser's `updating`).
+  const [readFor, setReadFor] = useState<{ source: ExerciseSource }>({ source: 'all' });
 
   useEffect(() => {
     if (!visible || !userId) return;
@@ -157,17 +154,17 @@ export function ExercisePickerModal({
     fetchAllExercises({
       userId,
       search,
-      // The muscle filter is applied in the list itself (ExerciseBrowser), from these rows.
+      // The muscle, equipment and movement filters are applied in the list itself
+      // (ExerciseBrowser), from these rows.
       muscleGroup: null,
       source,
       shared: sharedRows,
-      equipment,
     })
       .then((result) => {
         if (cancelled) return;
         const show = () => {
           setRows(result);
-          setReadFor({ source, equipment });
+          setReadFor({ source });
         };
         // A filter's new list renders in the background, so a tab or chip changes the moment it's
         // tapped; the first one lands at once, with the placeholders going.
@@ -186,7 +183,7 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, source, attempt, sharedRows, equipment]);
+  }, [visible, userId, search, source, attempt, sharedRows]);
 
   // The tab counts are independent of the search and filter, so they load once per opening.
   useEffect(() => {
@@ -342,7 +339,7 @@ export function ExercisePickerModal({
             sourceCounts={sourceCounts}
             rows={rows}
             loading={loading}
-            updating={readFor.source !== source || readFor.equipment !== equipment}
+            updating={readFor.source !== source}
             error={source === 'friends' ? (shared.error ?? error) : error}
             onRetry={() => {
               if (source === 'friends' && shared.error) shared.reload();

@@ -67,12 +67,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   // Once the list has shown, a change of filter keeps it on screen until the new rows are in (they
   // come from memory, at once) -- swapping it for placeholders would rebuild every row and picture.
   const listShown = useRef(false);
-  // The source and equipment the rows on screen were read for: while either differs from what's
-  // chosen, the list fades softly (ExerciseBrowser's `updating`). Only the newest read is kept.
-  const [readFor, setReadFor] = useState<{ source: ExerciseSource; equipment: Equipment | null }>({
-    source: 'all',
-    equipment: null,
-  });
+  // The source the rows on screen were read for: while it differs from what's chosen, the list
+  // fades softly (ExerciseBrowser's `updating`). Only the newest read is kept.
+  const [readFor, setReadFor] = useState<{ source: ExerciseSource }>({ source: 'all' });
   const readNumber = useRef(0);
   const [error, setError] = useState<string | null>(null);
   // Real, independent per-source totals for the "All / Built-in / Mine"
@@ -95,16 +92,16 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
       const result = await fetchAllExercises({
         userId,
         search,
-        // The muscle filter is applied in the list itself (ExerciseBrowser), from these rows.
+        // The muscle, equipment and movement filters are applied in the list itself
+        // (ExerciseBrowser), from these rows.
         muscleGroup: null,
         source,
         shared: sharedRows,
-        equipment,
       });
       if (thisRead !== readNumber.current) return;
       const show = () => {
         setRows(result);
-        setReadFor({ source, equipment });
+        setReadFor({ source });
       };
       // A filter's new list renders in the background, so a tab or chip changes the moment it's
       // tapped; the first one lands at once, with the placeholders going.
@@ -117,7 +114,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [userId, search, source, sharedRows, equipment]);
+  }, [userId, search, source, sharedRows]);
 
   useEffect(() => {
     void load();
@@ -221,7 +218,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         sourceCounts={sourceCounts}
         rows={rows}
         loading={loading}
-        updating={readFor.source !== source || readFor.equipment !== equipment}
+        updating={readFor.source !== source}
         // Friends is only what's shared, so a failure to read it is the tab's own.
         error={source === 'friends' ? (shared.error ?? error) : error}
         onRetry={source === 'friends' && shared.error ? shared.reload : load}
@@ -235,6 +232,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         }
         onDeleteMine={deleteMine}
         friends={friends}
+        browseByMuscle
         testID="exercise-library"
       />
     </Screen>

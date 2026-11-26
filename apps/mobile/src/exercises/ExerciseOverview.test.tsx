@@ -1,0 +1,104 @@
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { forgetBuiltinExtras, setBuiltinSources, type BuiltinExtras } from './builtinExtras';
+import { ExerciseOverview } from './ExerciseOverview';
+import type { ExerciseDetails } from './exerciseQueries';
+
+jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
+jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
+
+const rowDetails: ExerciseDetails = {
+  muscleGroup: 'back',
+  movementType: 'bilateral',
+  photoUrl: null,
+  gym: null,
+  equipment: 'cable',
+  grip: 'Neutral',
+  attachment: 'V-Handle',
+  loadType: null,
+  pulleyPosition: 'low',
+  pulley: null,
+};
+
+const extras = new Map<string, BuiltinExtras>([
+  [
+    'pulldown-id',
+    {
+      slug: 'cb-lat-pulldown-v-handle',
+      secondaryMuscleGroups: ['biceps', 'shoulders'],
+      searchAliases: [],
+      movementPattern: 'vertical_pull',
+      illustrationUrl: null,
+    },
+  ],
+]);
+
+beforeEach(async () => {
+  forgetBuiltinExtras();
+  setBuiltinSources({ extras: async () => extras, guide: async () => null });
+});
+
+afterAll(() => setBuiltinSources(null));
+
+async function settle() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+describe('ExerciseOverview', () => {
+  it("shows a built-in's movement large, its muscles on the figure, and how it's set up", async () => {
+    const onOpenGuide = jest.fn();
+    render(
+      <ExerciseOverview
+        details={rowDetails}
+        exerciseId="pulldown-id"
+        exerciseName="Lat Pulldown — V-Handle"
+        accentColor="#D99A50"
+        onOpenGuide={onOpenGuide}
+      />,
+    );
+    await settle();
+    expect(screen.getByTestId('exercise-overview-hero')).toBeTruthy();
+    expect(screen.getByTestId('exercise-overview-figure')).toBeTruthy();
+    expect(screen.getByTestId('exercise-overview-fact-equipment')).toHaveTextContent(/Cable/);
+    expect(screen.getByTestId('exercise-overview-fact-grip')).toHaveTextContent(/Neutral/);
+    expect(screen.getByTestId('exercise-overview-fact-attachment')).toHaveTextContent(/V-Handle/);
+    expect(screen.getByTestId('exercise-overview-fact-pulley')).toHaveTextContent(/Low pulley/);
+    expect(screen.getByTestId('exercise-overview-fact-movement')).toHaveTextContent(
+      /Vertical Pull · Pull/,
+    );
+    // The picture, and How to Do It, open the guide.
+    fireEvent.press(screen.getByTestId('exercise-overview-hero'));
+    fireEvent.press(screen.getByTestId('exercise-overview-how-to'));
+    expect(onOpenGuide).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a person's own exercise without a photo plainly: its initial, muscle and setup", async () => {
+    render(
+      <ExerciseOverview
+        details={{ ...rowDetails, gym: 'Kits Iron' }}
+        exerciseId="mine-id"
+        exerciseName="My Row"
+        accentColor="#D99A50"
+      />,
+    );
+    await settle();
+    expect(screen.queryByTestId('exercise-overview-hero')).toBeNull();
+    expect(screen.getByTestId('exercise-overview-muscles')).toHaveTextContent(/Back/);
+    expect(screen.getByTestId('exercise-overview-fact-gym')).toHaveTextContent(/Kits Iron/);
+    expect(screen.queryByTestId('exercise-overview-fact-movement')).toBeNull();
+    expect(screen.queryByTestId('exercise-overview-how-to')).toBeNull();
+  });
+
+  it('shows nothing until the details are read', () => {
+    render(
+      <ExerciseOverview
+        details={null}
+        exerciseId="pulldown-id"
+        exerciseName="Lat Pulldown"
+        accentColor="#D99A50"
+      />,
+    );
+    expect(screen.queryByTestId('exercise-overview')).toBeNull();
+  });
+});

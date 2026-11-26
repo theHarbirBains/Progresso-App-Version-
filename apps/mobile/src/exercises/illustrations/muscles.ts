@@ -112,4 +112,10 @@ export const REGION_NAMES: Record<MuscleRegion, string> = {
 export interface MuscleHighlight {
   primary: readonly MuscleRegion[];
   secondary: readonly MuscleRegion[];
+  /**
+   * A colour of its own for each muscle given one, drawn over the two tones -- the anatomy figure
+   * of a muscle group (the Exercise Library's Browse by Muscle) or of what's been trained lately
+   * (Muscle Activity). An exercise's highlight never has one.
+   */
+  colors?: Partial<Record<MuscleRegion, string>>;
 }

@@ -261,7 +261,7 @@ describe('ProgressExerciseDetailScreen background refresh on focus', () => {
 });
 
 describe('ProgressExerciseDetailScreen -- which machine', () => {
-  it('shows its photo, muscle, movement, gym, handle, loading and pulley at the top, as the library does', async () => {
+  it('shows its photo, muscle, gym, handle, loading and pulley at the top', async () => {
     jest.mocked(fetchExerciseDetails).mockResolvedValueOnce({
       muscleGroup: 'back',
       movementType: 'bilateral',
@@ -279,13 +279,27 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
       wrapper: ProfileProvider,
     });
 
-    expect(await screen.findByTestId('progress-exercise-detail-details-line')).toHaveTextContent(
-      'Back · Fit4Less Downtown · V-handle · Double stack · Lighter pulley',
+    expect(await screen.findByTestId('progress-exercise-detail-details-muscles')).toHaveTextContent(
+      /Back/,
+    );
+    expect(screen.getByTestId('progress-exercise-detail-details-fact-gym')).toHaveTextContent(
+      /Fit4Less Downtown/,
+    );
+    expect(
+      screen.getByTestId('progress-exercise-detail-details-fact-attachment'),
+    ).toHaveTextContent(/V-handle/);
+    expect(screen.getByTestId('progress-exercise-detail-details-fact-load')).toHaveTextContent(
+      /Double stack/,
+    );
+    expect(screen.getByTestId('progress-exercise-detail-details-fact-oldPulley')).toHaveTextContent(
+      /Lighter pulley/,
     );
     expect(fetchExerciseDetails).toHaveBeenCalledWith('user-1', 'ex-1');
-    // The photo opens full size.
-    fireEvent.press(screen.getByTestId('progress-exercise-detail-details-photo-zoom'));
-    expect(screen.getByTestId('progress-exercise-detail-details-photo-lightbox')).toBeTruthy();
+    // The photo is the picture at the top, and opens full size.
+    fireEvent.press(screen.getByTestId('progress-exercise-detail-details-photo'));
+    expect(screen.getByTestId('progress-exercise-detail-details-lightbox')).toBeTruthy();
+    // One of their own has no guide: no (i).
+    expect(screen.queryByTestId('progress-exercise-detail-info')).toBeNull();
   });
 
   it('names the machine when a top set is opened to fix', async () => {

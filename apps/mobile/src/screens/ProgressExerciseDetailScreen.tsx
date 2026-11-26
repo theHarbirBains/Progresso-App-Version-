@@ -20,7 +20,11 @@ import { summarizeProgress, topSetProgressionDetailed } from '../workouts/exerci
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { deriveMilestones } from '../workouts/progressMilestones';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
-import { ExerciseDetailsCard, useExerciseDetails } from '../exercises/ExerciseDetailsCard';
+import { useBuiltinExtras } from '../exercises/builtinExtras';
+import { useExerciseDetails } from '../exercises/ExerciseDetailsCard';
+import { ExerciseGuideSheet } from '../exercises/ExerciseGuideSheet';
+import { ExerciseOverview } from '../exercises/ExerciseOverview';
+import { hasIllustration } from '../exercises/illustrations/exerciseArt';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
@@ -30,16 +34,22 @@ const TOP_SETS_SHOWN = 10;
 
 // The shared "how has this one exercise progressed" destination, reached
 // from Overview's milestones, Top Sets, All Time, the live workout and the
-// Exercise Library -- one implementation for every entry point: the latest top
-// set and how far it has come, each recent workout's top set, the best
-// performances, and the progression journey. No line graph.
+// Exercise Library -- one implementation for every entry point: the exercise
+// itself (ExerciseOverview: its picture, muscles and setup, How to Do It also
+// behind the header's (i)), then the latest top set and how far it has come,
+// each recent workout's top set, the best performances, and the progression
+// journey. No line graph.
 export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  // Its photo, gym and handle at the top, as in the library: which machine these figures are for.
+  // Its picture, muscles and setup at the top: which exercise, and which machine, these figures
+  // are for. A built-in's How to Do It opens from the header's (i), its picture, or its button.
   const details = useExerciseDetails(exerciseId);
+  const extras = useBuiltinExtras(exerciseId);
+  const guided = hasIllustration(extras?.slug);
+  const [guideOpen, setGuideOpen] = useState(false);
   // A fixed top set changes Progress's shared history and PRs too.
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
@@ -119,6 +129,16 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
             accessibilityLabel: 'Back',
             testID: 'progress-exercise-detail-back',
           }}
+          rightAction={
+            guided
+              ? {
+                  icon: 'info',
+                  onPress: () => setGuideOpen(true),
+                  accessibilityLabel: `How to do ${exerciseName}`,
+                  testID: 'progress-exercise-detail-info',
+                }
+              : undefined
+          }
         />
       }
     >
@@ -128,11 +148,13 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
         </Text>
       ) : null}
 
-      <ExerciseDetailsCard
+      <ExerciseOverview
         details={details}
-        exerciseName={exerciseName}
-        testID="progress-exercise-detail-details"
         exerciseId={exerciseId}
+        exerciseName={exerciseName}
+        accentColor={theme.accent}
+        onOpenGuide={guided ? () => setGuideOpen(true) : undefined}
+        testID="progress-exercise-detail-details"
       />
 
       {allTimePoints.length === 0 ? (
@@ -244,6 +266,15 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
           ) : null}
         </>
       )}
+      {guided ? (
+        <ExerciseGuideSheet
+          testID="progress-exercise-detail-guide"
+          visible={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          exerciseId={exerciseId}
+          exerciseName={exerciseName}
+        />
+      ) : null}
       <EditTopSetSheet
         target={editing}
         weightUnit={weightUnit}

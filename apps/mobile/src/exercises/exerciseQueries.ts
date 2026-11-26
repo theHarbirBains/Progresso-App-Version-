@@ -9,6 +9,7 @@ import './exerciseGuide';
 import type { LoadType, Pulley, PulleyPosition } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { MOVEMENT_CATEGORY_LABELS, movementCategoryOf } from './movementCategories';
 
 // Reads go directly to Supabase (anon key + RLS), never through the
 // backend -- the existing exercises_select RLS policy already restricts
@@ -48,6 +49,8 @@ export interface ExerciseRow {
   secondaryMuscleGroups?: MuscleGroup[];
   /** Other names a built-in is found by ("Deadlift" for Barbell Deadlift). */
   searchAliases?: string[];
+  /** How a built-in moves (`exercises.movement_pattern`): its movement category comes from it. */
+  movementPattern?: string | null;
   /**
    * Someone else's exercise, shared with this person (lib/exercisesApi's fetchSharedExercises):
    * whose, how, and whether they already have their own by that name at that gym. Using it makes
@@ -258,7 +261,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   return rows;
 }
 
-/** Built-ins with their slug, the muscles they also work and their other names (when they could be read). */
+/** Built-ins with their slug, the muscles they also work, their other names and how they move (when they could be read). */
 function withBuiltinExtras(
   rows: ExerciseRow[],
   extras: Awaited<ReturnType<typeof loadBuiltinExtras>>,
@@ -272,6 +275,7 @@ function withBuiltinExtras(
           slug: extra.slug,
           secondaryMuscleGroups: extra.secondaryMuscleGroups,
           searchAliases: extra.searchAliases,
+          movementPattern: extra.movementPattern,
         }
       : row;
   });
@@ -297,14 +301,17 @@ const SHORTHAND: Record<string, string> = {
 
 /**
  * Whether an exercise matches what's typed: the text anywhere in its name (as always), or every
- * word typed starting a word of its name, one of its other names, its muscle group, its equipment
- * or what it's held by (its attachment and grip), in any order -- so "curl dumbbell" finds
- * Dumbbell Curl, "db row" finds Dumbbell Bent-Over Row, "v handle row" the V-handle
- * cable rows and "chest cable" every cable chest exercise.
+ * word typed starting a word of its name, one of its other names, its muscle group, its equipment,
+ * what it's held by (its attachment and grip) or its movement category (Push, Hinge, ...), in any
+ * order -- so "curl dumbbell" finds Dumbbell Curl, "db row" finds Dumbbell Bent-Over Row,
+ * "v handle row" the V-handle cable rows, "chest cable" every cable chest exercise and "hinge
+ * barbell" the barbell hinges.
  */
 export function matchesExerciseSearch(
   row: Pick<ExerciseRow, 'name' | 'searchAliases'> &
-    Partial<Pick<ExerciseRow, 'muscleGroup' | 'equipment' | 'attachment' | 'grip'>>,
+    Partial<
+      Pick<ExerciseRow, 'muscleGroup' | 'equipment' | 'attachment' | 'grip' | 'movementPattern'>
+    >,
   search: string,
 ): boolean {
   const query = normalize(search);
@@ -316,6 +323,7 @@ export function matchesExerciseSearch(
     row.equipment ? EQUIPMENT_LABELS[row.equipment] : null,
     row.attachment,
     row.grip,
+    categoryLabel(row.movementPattern),
   ]
     .filter((part): part is string => !!part)
     .map(normalize);
@@ -325,6 +333,11 @@ export function matchesExerciseSearch(
     for (const word of words) if (word.startsWith(wanted) || word.startsWith(token)) return true;
     return false;
   });
+}
+
+function categoryLabel(pattern: string | null | undefined): string | null {
+  const category = movementCategoryOf(pattern);
+  return category ? MOVEMENT_CATEGORY_LABELS[category] : null;
 }
 
 /**

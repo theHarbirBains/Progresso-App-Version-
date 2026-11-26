@@ -219,7 +219,9 @@ describe('ExercisePickerModal -- previous exercises', () => {
       /Barbell Bench Press.*3 sets · Top set 80 kg × 8 · Logged by your trainer/,
     );
     // On its own tab: the library is the other one, with nothing of Last Time's in it.
-    expect(screen.getByTestId('exercise-picker-tabs')).toHaveTextContent(/Last Time.*All Exercises/);
+    expect(screen.getByTestId('exercise-picker-tabs')).toHaveTextContent(
+      /Last Time.*All Exercises/,
+    );
     expect(hidden('exercise-picker-previous-card')).toBe(false);
     expect(hidden('exercise-library-list')).toBe(true);
     expect(
@@ -410,7 +412,7 @@ describe('ExercisePickerModal', () => {
   // the search input above and the "Create Custom Exercise" card below (each
   // only contributes margin on one side), reading as vertically cramped even
   // though the chips themselves have comfortable internal spacing.
-  it('gives the muscle-group filter row vertical breathing room above and below', () => {
+  it('gives the filter row vertical breathing room above and below', () => {
     render(
       <ExercisePickerModal
         visible={true}
@@ -422,7 +424,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    const wrap = screen.getByTestId('exercise-library-muscle-group-wrap');
+    const wrap = screen.getByTestId('exercise-library-filters-wrap');
     expect(StyleSheet.flatten(wrap.props.style).marginVertical).toBeGreaterThan(0);
   });
 
@@ -541,7 +543,7 @@ describe('ExercisePickerModal', () => {
     expect(onCreateCustom).toHaveBeenCalled();
   });
 
-  it('follows the given accentColor for the selected muscle-group chip', async () => {
+  it('follows the given accentColor for the muscle filter once it is set', async () => {
     render(
       <ExercisePickerModal
         visible={true}
@@ -556,9 +558,11 @@ describe('ExercisePickerModal', () => {
     );
     await screen.findByText('Barbell Bench Press');
 
-    fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
-    const chip = screen.getByTestId('muscle-group-chip-chest');
-    expect(StyleSheet.flatten(chip.props.style).backgroundColor).toBe('#8B5CF6');
+    fireEvent.press(screen.getByTestId('exercise-picker-filters-muscle'));
+    fireEvent.press(screen.getByTestId('exercise-picker-filters-option-chest'));
+    const pill = screen.getByTestId('exercise-picker-filters-muscle');
+    expect(StyleSheet.flatten(pill.props.style).borderColor).toBe('#8B5CF6');
+    expect(pill).toHaveTextContent(/Chest/);
   });
 
   it('paints the warm background itself -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {

@@ -31,11 +31,17 @@ import { RiseInStack } from '../design/RiseIn';
 import { exerciseLibraryStyles as styles } from '../screens/exerciseLibraryStyles';
 import { groupExercisesByLetter } from './exerciseLibraryGrouping';
 import type { Equipment } from './equipment';
-import { EquipmentChips } from './EquipmentChips';
+import {
+  ExerciseFilters,
+  type ExerciseFilterCounts,
+  type ExerciseFilterKey,
+  type ExerciseFilterValues,
+} from './ExerciseFilters';
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerciseQueries';
 import { FriendPicker } from './FriendPicker';
-import { MuscleGroupChips } from './MuscleGroupChips';
+import { matchesMovement, movementCategoryOf, type MovementCategory } from './movementCategories';
+import { MuscleBrowseStrip } from './MuscleBrowseStrip';
 import type { SharingFriend } from './sharingFriends';
 import { machineLine } from './machineDetails';
 import { sidesLabel } from './movementTypes';
@@ -59,9 +65,14 @@ interface Props {
   onSearchChange: (text: string) => void;
   muscleGroup: MuscleGroup | null;
   onMuscleGroupChange: (group: MuscleGroup | null) => void;
-  /** What it's done with; the equipment row only shows when the caller can change it. */
+  /**
+   * What it's done with; the equipment filter only shows when the caller can change it. Applied
+   * here, to the rows in hand, as the muscle filter is -- the caller's rows are every equipment's.
+   */
   equipment?: Equipment | null;
   onEquipmentChange?: (equipment: Equipment | null) => void;
+  /** The library's Browse by Muscle tiles above the list, while nothing's searched or chosen. */
+  browseByMuscle?: boolean;
   source: ExerciseSource;
   onSourceChange: (source: ExerciseSource) => void;
   sourceCounts: ExerciseSourceCounts | null;
@@ -109,10 +120,11 @@ interface Props {
 
 /**
  * The Exercise Library's browse layout, shared so every exercise picker looks the same:
- * a browse card (search, muscle filter, and All / Built-in / Mine with real counts), then
- * a list card with the count and the exercises A-Z under letter headings, each with its
- * photo, name, muscle and movement, and a Built-in or Mine marker. In Friends the count gives way
- * to a choice of friend (FriendPicker).
+ * a browse card (search; Muscle, Equipment and Movement filter pills, each opening its choices
+ * with their counts; and All / Built-in / Mine with real counts), then a list card with the count
+ * and the exercises A-Z under letter headings -- in the library, Browse by Muscle's tiles first --
+ * each with its photo, name, and muscle, equipment, grip and attachment, and a Built-in or Mine
+ * marker. In Friends the count gives way to a choice of friend (FriendPicker).
  */
 export function ExerciseBrowser({
   searchInput,
@@ -139,8 +151,11 @@ export function ExerciseBrowser({
   onDeleteMine,
   friends = [],
   listHeader,
+  browseByMuscle = false,
   testID = 'exercise-browser',
 }: Props) {
+  // The movement category chosen (the built-ins' own movement pattern), or null for every one.
+  const [movement, setMovement] = useState<MovementCategory | null>(null);
   // In Friends, the one friend whose exercises show, or null for everyone's.
   const [friendId, setFriendId] = useState<string | null>(null);
   // A friend who no longer shares anything (unfollowed, say) stops being the filter.
@@ -148,21 +163,37 @@ export function ExerciseBrowser({
     if (friendId !== null && !friends.some((friend) => friend.id === friendId)) setFriendId(null);
   }, [friends, friendId]);
   const inFriends = source === 'friends';
-  // The muscle filter is applied here, to the rows already in hand -- never a new read. The chip
-  // changes the moment it's tapped; the list (rows with a drawing each) follows as a deferred
-  // render that never holds up a tap. Any filter on its way -- a muscle, or the caller's rows for a
-  // source or equipment -- fades the list down a touch and lifts it back in as the new rows land.
-  const listedMuscle = useDeferredValue(muscleGroup);
-  const switching = listedMuscle !== muscleGroup || updating;
-  const shownRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          (!inFriends || friendId === null || row.shared?.ownerId === friendId) &&
-          (listedMuscle === null || row.muscleGroup === listedMuscle),
-      ),
-    [rows, inFriends, friendId, listedMuscle],
+  // The muscle, equipment and movement filters are applied here, to the rows already in hand --
+  // never a new read. A pill changes the moment its choice is tapped; the list (rows with a
+  // drawing each) follows as a deferred render that never holds up a tap. Any filter on its way --
+  // one of these, or the caller's rows for a source -- fades the list down a touch and lifts it
+  // back in as the new rows land.
+  const chosen: ExerciseFilterValues = useMemo(
+    () => ({ muscle: muscleGroup, equipment, movement }),
+    [muscleGroup, equipment, movement],
   );
+  const listed = useDeferredValue(chosen);
+  const switching = listed !== chosen || updating;
+  // The rows of this friend (in Friends), before the three filters.
+  const pool = useMemo(
+    () => rows.filter((row) => !inFriends || friendId === null || row.shared?.ownerId === friendId),
+    [rows, inFriends, friendId],
+  );
+  const shownRows = useMemo(() => pool.filter((row) => passes(row, listed, null)), [pool, listed]);
+  // How many each choice of a filter would show, the other two as they are.
+  const filterCounts = useMemo(() => countChoices(pool, chosen), [pool, chosen]);
+  const onFilterChange = useCallback(
+    <K extends ExerciseFilterKey>(key: K, value: ExerciseFilterValues[K]) => {
+      if (key === 'muscle') onMuscleGroupChange(value as MuscleGroup | null);
+      else if (key === 'equipment') onEquipmentChange?.(value as Equipment | null);
+      else setMovement(value as MovementCategory | null);
+    },
+    [onMuscleGroupChange, onEquipmentChange],
+  );
+  const filterKeys: ExerciseFilterKey[] = onEquipmentChange
+    ? ['muscle', 'equipment', 'movement']
+    : ['muscle', 'movement'];
+  const showBrowse = browseByMuscle && !inFriends && muscleGroup === null && !searchInput.trim();
   const fade = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.timing(fade, {
@@ -362,7 +393,7 @@ export function ExerciseBrowser({
         <View style={styles.searchWrap}>
           <TextInput
             testID="exercise-search"
-            placeholder="Search exercises..."
+            placeholder="Search name, muscle, equipment, grip..."
             accessibilityLabel="Search exercises"
             value={searchInput}
             onChangeText={onSearchChange}
@@ -371,26 +402,16 @@ export function ExerciseBrowser({
           />
         </View>
 
-        <View testID="exercise-library-muscle-group-wrap" style={styles.chipsWrap}>
-          <MuscleGroupChips
-            value={muscleGroup}
-            onChange={onMuscleGroupChange}
-            includeAll
+        <View testID="exercise-library-filters-wrap" style={styles.chipsWrap}>
+          <ExerciseFilters
+            testID={`${testID}-filters`}
+            values={chosen}
+            counts={filterCounts}
+            onChange={onFilterChange}
+            keys={filterKeys}
             accentColor={accent.color}
-            onAccentColor={accent.onColor}
           />
         </View>
-
-        {onEquipmentChange ? (
-          <View testID="exercise-library-equipment-wrap" style={styles.chipsWrap}>
-            <EquipmentChips
-              value={equipment}
-              onChange={onEquipmentChange}
-              accentColor={accent.color}
-              onAccentColor={accent.onColor}
-            />
-          </View>
-        ) : null}
 
         <View style={styles.sourceTabs}>
           {SOURCE_OPTIONS.map((option) => {
@@ -471,12 +492,27 @@ export function ExerciseBrowser({
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!rowSwiping}
               showsVerticalScrollIndicator={false}
-              ListHeaderComponent={listHeader ? <>{listHeader}</> : undefined}
+              ListHeaderComponent={
+                listHeader || showBrowse ? (
+                  <>
+                    {showBrowse ? (
+                      <MuscleBrowseStrip
+                        testID={`${testID}-muscle-browse`}
+                        counts={filterCounts.muscle}
+                        onChoose={onMuscleGroupChange}
+                        accentColor={accent.color}
+                      />
+                    ) : null}
+                    {listHeader}
+                  </>
+                ) : undefined
+              }
               ListEmptyComponent={
                 source === 'friends' &&
                 !searchInput.trim() &&
                 muscleGroup === null &&
-                equipment === null ? (
+                equipment === null &&
+                movement === null ? (
                   <EmptyState
                     testID="exercise-library-empty"
                     title="Nothing from friends yet"
@@ -494,4 +530,39 @@ export function ExerciseBrowser({
       </AppCard>
     </RiseInStack>
   );
+}
+
+/** Whether a row passes the filters -- all but `skip`, when counting that one's choices. */
+function passes(
+  row: ExerciseRow,
+  values: ExerciseFilterValues,
+  skip: ExerciseFilterKey | null,
+): boolean {
+  if (skip !== 'muscle' && values.muscle !== null && row.muscleGroup !== values.muscle) {
+    return false;
+  }
+  if (skip !== 'equipment' && values.equipment !== null && row.equipment !== values.equipment) {
+    return false;
+  }
+  if (skip !== 'movement' && !matchesMovement(row, values.movement)) return false;
+  return true;
+}
+
+/** How many rows each choice of each filter would show, with the other two as they are. */
+function countChoices(
+  rows: readonly ExerciseRow[],
+  values: ExerciseFilterValues,
+): ExerciseFilterCounts {
+  const counts: ExerciseFilterCounts = { muscle: {}, equipment: {}, movement: {} };
+  function bump<K extends string>(into: Partial<Record<K, number>>, key: K | null | undefined) {
+    if (key) into[key] = (into[key] ?? 0) + 1;
+  }
+  for (const row of rows) {
+    if (passes(row, values, 'muscle')) bump(counts.muscle, row.muscleGroup);
+    if (passes(row, values, 'equipment')) bump(counts.equipment, row.equipment);
+    if (passes(row, values, 'movement')) {
+      bump(counts.movement, movementCategoryOf(row.movementPattern));
+    }
+  }
+  return counts;
 }

@@ -1,5 +1,11 @@
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../muscleGroups';
-import { REGION_GROUP, REGION_NAMES, type MuscleHighlight, type MuscleRegion } from './muscles';
+import {
+  MUSCLE_REGIONS,
+  REGION_GROUP,
+  REGION_NAMES,
+  type MuscleHighlight,
+  type MuscleRegion,
+} from './muscles';
 import { hands, stance } from './poseKit';
 import { renderScene, type RenderedFrame, type ViewBox } from './render';
 import type { PoseSpec } from './rig';
@@ -25,14 +31,57 @@ export interface MuscleMapView {
  * side by side, so every worked muscle shows on one or the other.
  */
 export function renderMuscleMap(highlight: MuscleHighlight): MuscleMapView[] {
-  return (['front', 'back'] as const).map((side) => {
-    const drawn = renderScene(
-      { view: { yaw: side === 'front' ? -90 : 90, tilt: 0 }, frames: [{ pose: STANDING }] },
-      highlight,
-      { anatomy: true },
-    );
-    return { side, frame: drawn.frames[0], viewBox: drawn.viewBox };
-  });
+  return (['front', 'back'] as const).map((side) => renderAnatomySide(side, highlight));
+}
+
+/** The anatomy figure from one side, with these muscles coloured. */
+export function renderAnatomySide(
+  side: 'front' | 'back',
+  highlight: MuscleHighlight,
+): MuscleMapView {
+  const drawn = renderScene(
+    { view: { yaw: side === 'front' ? -90 : 90, tilt: 0 }, frames: [{ pose: STANDING }] },
+    highlight,
+    { anatomy: true },
+  );
+  return { side, frame: drawn.frames[0], viewBox: drawn.viewBox };
+}
+
+/** The anatomy figure's muscles that belong to each of the app's muscle groups. */
+export function regionsOf(group: MuscleGroup): MuscleRegion[] {
+  if (group === 'full_body') return [...MUSCLE_REGIONS];
+  return MUSCLE_REGIONS.filter((region) => REGION_GROUP[region] === group);
+}
+
+/** Groups seen best from behind; every other is seen from the front. */
+const SEEN_FROM_BEHIND: ReadonlySet<MuscleGroup> = new Set([
+  'back',
+  'triceps',
+  'glutes',
+  'hamstrings',
+  'calves',
+]);
+
+/** The side a muscle group shows on. */
+export function sideOf(group: MuscleGroup): 'front' | 'back' {
+  return SEEN_FROM_BEHIND.has(group) ? 'back' : 'front';
+}
+
+const groupFigures = new Map<MuscleGroup, MuscleMapView | null>();
+
+/**
+ * One muscle group on the anatomy figure, from the side that shows it, in the primary red -- the
+ * Exercise Library's Browse by Muscle. Null for Other, which is no muscle. Drawn once a session.
+ */
+export function groupFigure(group: MuscleGroup): MuscleMapView | null {
+  if (groupFigures.has(group)) return groupFigures.get(group) ?? null;
+  const regions = regionsOf(group);
+  const figure =
+    regions.length > 0
+      ? renderAnatomySide(sideOf(group), { primary: regions, secondary: [] })
+      : null;
+  groupFigures.set(group, figure);
+  return figure;
 }
 
 /** The muscle groups the key names: the primary ones, then the secondary ones not already named. */

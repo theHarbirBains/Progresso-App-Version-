@@ -5,13 +5,13 @@ import { AppCard } from '../design/AppCard';
 import { BottomSheet } from '../design/BottomSheet';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
+import { FilterPill } from '../design/FilterPill';
 import { GlyphWell } from '../design/GlyphWell';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { Text } from '../design/Text';
 import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
-import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
 import { WORKOUT_PROGRAMS } from './programCatalog';
 import type { ProgramChoice } from './programHost';
@@ -51,7 +51,6 @@ import { HOME_EQUIPMENT_LABELS } from './homeEquipment';
 import type { ProgramSetting, ResolvedVariation } from './programTypes';
 import { recommendPrograms, type ProgramPreferences } from './recommendations';
 
-const PILL_HEIGHT = minTouchTarget - 8;
 /** A section shows this many titles until Show All; one with a title more shows them all. */
 const COLLAPSED_ROWS = 4;
 
@@ -138,40 +137,6 @@ function choicesFor(key: FilterKey, variations: readonly ResolvedVariation[]): C
         value: exclusion,
       }));
   }
-}
-
-/** One filter: what it's set to (or its name), opening its choices. */
-function FilterPill({
-  label,
-  active,
-  onPress,
-  testID,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  testID: string;
-}) {
-  const { accent } = useAppTheme();
-  return (
-    <TouchableOpacity
-      testID={testID}
-      onPress={onPress}
-      // Drawn 36pt tall; its touch reaches the full 44pt.
-      hitSlop={{ top: 4, bottom: 4 }}
-      style={[
-        styles.pill,
-        active && { borderColor: accent.accent, backgroundColor: withAlpha(accent.accent, 0.14) },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}. Change`}
-    >
-      <Text style={[styles.pillText, active && { color: accent.accent }]} numberOfLines={1}>
-        {label}
-      </Text>
-      <Feather name="chevron-down" size={14} color={active ? accent.accent : colors.textMuted} />
-    </TouchableOpacity>
-  );
 }
 
 /** A title's days a week as small rings ("3", "6"), the one chosen above filled in the accent. */
@@ -664,20 +629,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: PILL_HEIGHT,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.glassBorderStrong,
-  },
-  pillText: {
-    ...typeScale.label,
-    color: colors.textSecondaryBright,
   },
   recommended: {
     gap: spacing.sm,

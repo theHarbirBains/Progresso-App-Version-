@@ -20,6 +20,7 @@ import {
   type BodyPartKey,
   type MuscleHighlight,
   type MusclePatch,
+  type MuscleRegion,
 } from './muscles';
 import { ART, MATERIALS, OUTLINE_WIDTH, type Material } from './palette';
 import { BODY, solvePose, type Limb, type PoseSpec, type Skeleton } from './rig';
@@ -59,6 +60,8 @@ export interface Shape {
   /** Clip to one of the frame's clip paths (a body part's outline). */
   clipId?: string;
   dash?: string;
+  /** On the anatomy figure, the muscle this shape is (so a tap on it can say which). */
+  region?: MuscleRegion;
 }
 
 export interface ClipDef {
@@ -517,14 +520,19 @@ const MUSCLE_COLORS = { primary: ART.primary, secondary: ART.secondary } as cons
 function musclesFor(
   part: BodyPartKey,
   muscles: MuscleHighlight,
-): { patch: MusclePatch; tone: keyof typeof MUSCLE_COLORS }[] {
-  const out: { patch: MusclePatch; tone: keyof typeof MUSCLE_COLORS }[] = [];
-  for (const tone of ['secondary', 'primary'] as const) {
-    for (const region of muscles[tone]) {
-      for (const patch of REGION_PATCHES[region]) {
-        if (patch.part === part) out.push({ patch, tone });
-      }
+): { patch: MusclePatch; color: string; region: MuscleRegion }[] {
+  const out: { patch: MusclePatch; color: string; region: MuscleRegion }[] = [];
+  const add = (region: MuscleRegion, color: string) => {
+    for (const patch of REGION_PATCHES[region]) {
+      if (patch.part === part) out.push({ patch, color, region });
     }
+  };
+  for (const tone of ['secondary', 'primary'] as const) {
+    for (const region of muscles[tone]) add(region, MUSCLE_COLORS[tone]);
+  }
+  // A colour of its own for each muscle (the Muscle Activity map), over the two tones.
+  for (const [region, color] of Object.entries(muscles.colors ?? {})) {
+    if (color) add(region as MuscleRegion, color);
   }
   return out;
 }
@@ -538,22 +546,18 @@ function muscleShapes(
   shade: { points: readonly P2[]; axis: [P2, P2] },
 ): Shape[] {
   const shapes: Shape[] = [];
-  for (const { patch, tone } of musclesFor(part, muscles)) {
+  for (const { patch, color, region } of musclesFor(part, muscles)) {
     const poly = patchPolygon(cam, surface, patch.t, patch.theta);
     if (poly) {
       // Shaded like the part it's on, in its own colour.
       shapes.push({
         d: smoothPath(poly),
-        fill: MUSCLE_COLORS[tone],
-        gradient: cylinderGradient(
-          shade.points,
-          shade.axis[0],
-          shade.axis[1],
-          materialOf(MUSCLE_COLORS[tone]),
-        ),
+        fill: color,
+        gradient: cylinderGradient(shade.points, shade.axis[0], shade.axis[1], materialOf(color)),
         stroke: ART.muscleEdge,
         strokeWidth: 0.35,
         clipId,
+        region,
       });
     }
   }
@@ -798,6 +802,7 @@ function definitionShapes(
         stroke: ART.muscleEdge,
         strokeWidth: 0.35,
         clipId,
+        region,
       });
     }
   }
