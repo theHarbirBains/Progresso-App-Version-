@@ -213,8 +213,7 @@ describe('ExerciseLibraryScreen', () => {
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchAllExercises.mockClear();
 
-    fireEvent.press(screen.getByTestId('exercise-library-filters-muscle'));
-    fireEvent.press(screen.getByTestId('exercise-library-filters-option-chest'));
+    fireEvent.press(screen.getByTestId('exercise-library-muscle-browse-chest'));
 
     // Only the chest exercise is left; the biceps one is gone, and nothing was fetched again.
     await waitFor(() => expect(screen.queryByTestId('exercise-item-ex-mine')).toBeNull());

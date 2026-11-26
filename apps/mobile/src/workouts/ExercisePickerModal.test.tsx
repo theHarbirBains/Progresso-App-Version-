@@ -560,11 +560,11 @@ describe('ExercisePickerModal', () => {
 
     // Browse by Muscle is here too, above the list.
     expect(screen.getByTestId('exercise-picker-muscle-browse')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('exercise-picker-filters-muscle'));
-    fireEvent.press(screen.getByTestId('exercise-picker-filters-option-chest'));
-    const pill = screen.getByTestId('exercise-picker-filters-muscle');
-    expect(StyleSheet.flatten(pill.props.style).borderColor).toBe('#8B5CF6');
-    expect(pill).toHaveTextContent(/Chest/);
+    // It's the muscle filter: no muscle pill as well.
+    expect(screen.queryByTestId('exercise-picker-filters-muscle')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-picker-muscle-browse-chest'));
+    const outline = await screen.findByTestId('exercise-picker-muscle-browse-chest-chosen');
+    expect(StyleSheet.flatten(outline.props.style).borderColor).toBe('#8B5CF6');
   });
 
   it('paints the warm background itself -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {

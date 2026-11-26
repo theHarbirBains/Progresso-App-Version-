@@ -1,6 +1,6 @@
 import { KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { BottomSheet } from './BottomSheet';
+import { BottomSheet, swipeDismisses } from './BottomSheet';
 
 describe('BottomSheet', () => {
   it('renders children when visible', () => {
@@ -74,5 +74,44 @@ describe('BottomSheet', () => {
 
     const content = screen.getByTestId('sheet-content');
     expect(StyleSheet.flatten(content.props.style).maxHeight).toBe('90%');
+  });
+});
+
+describe('BottomSheet -- swiped down to tuck away', () => {
+  it('has a grabber only where it can be swiped away', () => {
+    const { rerender } = render(
+      <BottomSheet visible onClose={jest.fn()} testID="sheet" swipeToDismiss>
+        <Text>Inside</Text>
+      </BottomSheet>,
+    );
+    expect(screen.getByTestId('sheet-grabber', { includeHiddenElements: true })).toBeTruthy();
+    rerender(
+      <BottomSheet visible onClose={jest.fn()} testID="sheet">
+        <Text>Inside</Text>
+      </BottomSheet>,
+    );
+    expect(screen.queryByTestId('sheet-grabber', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('still closes from its backdrop, and a tap on the sheet itself never does', () => {
+    const onClose = jest.fn();
+    render(
+      <BottomSheet visible onClose={onClose} testID="sheet" swipeToDismiss>
+        <Text>Inside</Text>
+      </BottomSheet>,
+    );
+    fireEvent.press(screen.getByText('Inside'));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('sheet-backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes when pulled a good way down or flicked, and springs back otherwise', () => {
+    expect(swipeDismisses(140, 0.1, 500)).toBe(true);
+    expect(swipeDismisses(40, 1.4, 500)).toBe(true);
+    expect(swipeDismisses(40, 0.2, 500)).toBe(false);
+    expect(swipeDismisses(10, 2, 500)).toBe(false);
+    // A short sheet needs less of a pull.
+    expect(swipeDismisses(70, 0, 200)).toBe(true);
   });
 });

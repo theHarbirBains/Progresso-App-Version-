@@ -40,8 +40,9 @@ import {
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerciseQueries';
 import { FriendPicker } from './FriendPicker';
+import { gripKindOf, handleTypeOf, type GripKind, type HandleType } from './gripAndHandle';
 import { matchesMovement, movementCategoryOf, type MovementCategory } from './movementCategories';
-import { MuscleBrowseStrip } from './MuscleBrowseStrip';
+import { MuscleBrowseSkeleton, MuscleBrowseStrip } from './MuscleBrowseStrip';
 import type { SharingFriend } from './sharingFriends';
 import { machineLine } from './machineDetails';
 import { sidesLabel } from './movementTypes';
@@ -120,7 +121,7 @@ interface Props {
 
 /**
  * The Exercise Library's browse layout, shared so every exercise picker looks the same:
- * a browse card (search; Muscle, Equipment and Movement filter pills, each opening its choices
+ * a browse card (search; Equipment, Grip, Handle and Movement filter pills, each opening its choices
  * with their counts; and All / Built-in / Mine with real counts), then a list card with the count
  * and the exercises A-Z under letter headings -- Browse by Muscle's tiles first --
  * each with its photo, name, and muscle, equipment, grip and attachment, and a Built-in or Mine
@@ -154,8 +155,11 @@ export function ExerciseBrowser({
   browseByMuscle = false,
   testID = 'exercise-browser',
 }: Props) {
-  // The movement category chosen (the built-ins' own movement pattern), or null for every one.
+  // The movement category chosen (the built-ins' own movement pattern), the grip and the handle --
+  // each null for every one.
   const [movement, setMovement] = useState<MovementCategory | null>(null);
+  const [grip, setGrip] = useState<GripKind | null>(null);
+  const [handle, setHandle] = useState<HandleType | null>(null);
   // In Friends, the one friend whose exercises show, or null for everyone's.
   const [friendId, setFriendId] = useState<string | null>(null);
   // A friend who no longer shares anything (unfollowed, say) stops being the filter.
@@ -169,8 +173,8 @@ export function ExerciseBrowser({
   // one of these, or the caller's rows for a source -- fades the list down a touch and lifts it
   // back in as the new rows land.
   const chosen: ExerciseFilterValues = useMemo(
-    () => ({ muscle: muscleGroup, equipment, movement }),
-    [muscleGroup, equipment, movement],
+    () => ({ muscle: muscleGroup, equipment, grip, handle, movement }),
+    [muscleGroup, equipment, grip, handle, movement],
   );
   const listed = useDeferredValue(chosen);
   const switching = listed !== chosen || updating;
@@ -186,14 +190,28 @@ export function ExerciseBrowser({
     <K extends ExerciseFilterKey>(key: K, value: ExerciseFilterValues[K]) => {
       if (key === 'muscle') onMuscleGroupChange(value as MuscleGroup | null);
       else if (key === 'equipment') onEquipmentChange?.(value as Equipment | null);
+      else if (key === 'grip') setGrip(value as GripKind | null);
+      else if (key === 'handle') setHandle(value as HandleType | null);
       else setMovement(value as MovementCategory | null);
     },
     [onMuscleGroupChange, onEquipmentChange],
   );
-  const filterKeys: ExerciseFilterKey[] = onEquipmentChange
-    ? ['muscle', 'equipment', 'movement']
-    : ['muscle', 'movement'];
-  const showBrowse = browseByMuscle && !inFriends && muscleGroup === null && !searchInput.trim();
+  // Browse by Muscle is the muscle filter where it's shown: no pill for it as well.
+  const filterKeys: ExerciseFilterKey[] = [
+    ...(browseByMuscle ? [] : (['muscle'] as const)),
+    ...(onEquipmentChange ? (['equipment'] as const) : []),
+    'grip',
+    'handle',
+    'movement',
+  ];
+  const anyFilter = Object.values(chosen).some((value) => value !== null);
+  const clearFilters = useCallback(() => {
+    onMuscleGroupChange(null);
+    onEquipmentChange?.(null);
+    setGrip(null);
+    setHandle(null);
+    setMovement(null);
+  }, [onMuscleGroupChange, onEquipmentChange]);
   const fade = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.timing(fade, {
@@ -410,6 +428,8 @@ export function ExerciseBrowser({
             onChange={onFilterChange}
             keys={filterKeys}
             accentColor={accent.color}
+            active={anyFilter}
+            onClear={clearFilters}
           />
         </View>
 
@@ -472,7 +492,12 @@ export function ExerciseBrowser({
         {error ? (
           <ErrorState testID="exercise-library-error" message={error} onRetry={onRetry} />
         ) : loading ? (
-          <SkeletonRows testID="exercise-library-loading" count={6} />
+          <View testID="exercise-library-loading">
+            {browseByMuscle ? (
+              <MuscleBrowseSkeleton testID={`${testID}-muscle-browse-loading`} />
+            ) : null}
+            <SkeletonRows count={6} />
+          </View>
         ) : (
           <Animated.View
             testID={`${testID}-results`}
@@ -493,12 +518,13 @@ export function ExerciseBrowser({
               scrollEnabled={!rowSwiping}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
-                listHeader || showBrowse ? (
+                listHeader || browseByMuscle ? (
                   <>
-                    {showBrowse ? (
+                    {browseByMuscle ? (
                       <MuscleBrowseStrip
                         testID={`${testID}-muscle-browse`}
                         counts={filterCounts.muscle}
+                        chosen={muscleGroup}
                         onChoose={onMuscleGroupChange}
                         accentColor={accent.color}
                       />
@@ -508,11 +534,7 @@ export function ExerciseBrowser({
                 ) : undefined
               }
               ListEmptyComponent={
-                source === 'friends' &&
-                !searchInput.trim() &&
-                muscleGroup === null &&
-                equipment === null &&
-                movement === null ? (
+                source === 'friends' && !searchInput.trim() && !anyFilter ? (
                   <EmptyState
                     testID="exercise-library-empty"
                     title="Nothing from friends yet"
@@ -544,22 +566,40 @@ function passes(
   if (skip !== 'equipment' && values.equipment !== null && row.equipment !== values.equipment) {
     return false;
   }
+  if (skip !== 'grip' && values.grip !== null && gripKindOf(row.grip) !== values.grip) {
+    return false;
+  }
+  if (
+    skip !== 'handle' &&
+    values.handle !== null &&
+    handleTypeOf(row.attachment) !== values.handle
+  ) {
+    return false;
+  }
   if (skip !== 'movement' && !matchesMovement(row, values.movement)) return false;
   return true;
 }
 
-/** How many rows each choice of each filter would show, with the other two as they are. */
+/** How many rows each choice of each filter would show, with the others as they are. */
 function countChoices(
   rows: readonly ExerciseRow[],
   values: ExerciseFilterValues,
 ): ExerciseFilterCounts {
-  const counts: ExerciseFilterCounts = { muscle: {}, equipment: {}, movement: {} };
+  const counts: ExerciseFilterCounts = {
+    muscle: {},
+    equipment: {},
+    grip: {},
+    handle: {},
+    movement: {},
+  };
   function bump<K extends string>(into: Partial<Record<K, number>>, key: K | null | undefined) {
     if (key) into[key] = (into[key] ?? 0) + 1;
   }
   for (const row of rows) {
     if (passes(row, values, 'muscle')) bump(counts.muscle, row.muscleGroup);
     if (passes(row, values, 'equipment')) bump(counts.equipment, row.equipment);
+    if (passes(row, values, 'grip')) bump(counts.grip, gripKindOf(row.grip));
+    if (passes(row, values, 'handle')) bump(counts.handle, handleTypeOf(row.attachment));
     if (passes(row, values, 'movement')) {
       bump(counts.movement, movementCategoryOf(row.movementPattern));
     }

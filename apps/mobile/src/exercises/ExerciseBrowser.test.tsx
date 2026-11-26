@@ -140,44 +140,86 @@ describe('ExerciseBrowser and the built-in library', () => {
     expect(onMuscleGroupChange).toHaveBeenCalledWith('triceps');
   });
 
-  it('puts Browse by Muscle away while searching or once a muscle is chosen, or when not asked for', () => {
-    const { rerender } = renderBrowser({ browseByMuscle: true, searchInput: 'curl' });
+  it('keeps Browse by Muscle with a muscle chosen -- that tile outlined, every other still there', () => {
+    const onMuscleGroupChange = jest.fn();
+    renderBrowser({ browseByMuscle: true, muscleGroup: 'triceps', onMuscleGroupChange });
+    expect(screen.getByTestId('exercise-browser-muscle-browse-triceps-chosen')).toBeTruthy();
+    expect(screen.getByTestId('exercise-browser-muscle-browse-chest')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-browser-muscle-browse-chest-chosen')).toBeNull();
+    // The list is that muscle's; a tap on its tile again shows every muscle.
+    expect(screen.queryByTestId('exercise-item-bench')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-browser-muscle-browse-triceps'));
+    expect(onMuscleGroupChange).toHaveBeenCalledWith(null);
+    fireEvent.press(screen.getByTestId('exercise-browser-muscle-browse-chest'));
+    expect(onMuscleGroupChange).toHaveBeenLastCalledWith('chest');
+  });
+
+  it('has no muscle pill where Browse by Muscle is the muscle filter, and one where it is not', () => {
+    const { unmount } = renderBrowser({ browseByMuscle: true });
+    expect(screen.queryByTestId('exercise-browser-filters-muscle')).toBeNull();
+    expect(screen.getByTestId('exercise-browser-muscle-browse')).toBeTruthy();
+    unmount();
+    renderBrowser();
+    expect(screen.getByTestId('exercise-browser-filters-muscle')).toBeTruthy();
     expect(screen.queryByTestId('exercise-browser-muscle-browse')).toBeNull();
-    rerender(
-      <ExerciseBrowser
-        searchInput=""
-        onSearchChange={jest.fn()}
-        muscleGroup="chest"
-        onMuscleGroupChange={jest.fn()}
-        source="all"
-        onSourceChange={jest.fn()}
-        sourceCounts={null}
-        rows={rows}
-        loading={false}
-        error={null}
-        onRetry={jest.fn()}
-        accent={{ color: '#D99A50', background: '#2A2018', onColor: '#12110F' }}
-        browseByMuscle
-      />,
-    );
-    expect(screen.queryByTestId('exercise-browser-muscle-browse')).toBeNull();
-    rerender(
-      <ExerciseBrowser
-        searchInput=""
-        onSearchChange={jest.fn()}
-        muscleGroup={null}
-        onMuscleGroupChange={jest.fn()}
-        source="all"
-        onSourceChange={jest.fn()}
-        sourceCounts={null}
-        rows={rows}
-        loading={false}
-        error={null}
-        onRetry={jest.fn()}
-        accent={{ color: '#D99A50', background: '#2A2018', onColor: '#12110F' }}
-      />,
-    );
-    expect(screen.queryByTestId('exercise-browser-muscle-browse')).toBeNull();
+  });
+
+  it('keeps Browse by Muscle while searching too', () => {
+    renderBrowser({ browseByMuscle: true, searchInput: 'press' });
+    expect(screen.getByTestId('exercise-browser-muscle-browse')).toBeTruthy();
+  });
+
+  it('shows placeholder tiles and rows while the exercises are read', () => {
+    renderBrowser({ browseByMuscle: true, loading: true });
+    expect(screen.getByTestId('exercise-library-loading')).toBeTruthy();
+    expect(screen.getByTestId('exercise-browser-muscle-browse-loading')).toBeTruthy();
+  });
+
+  it('filters by grip -- neutral, pronated, supinated -- from the grip each records', () => {
+    renderBrowser({
+      rows: [
+        row({ id: 'hammer', name: 'Seated Row', muscleGroup: 'back', grip: 'Close neutral' }),
+        row({ id: 'pull', name: 'Pulldown', muscleGroup: 'back', grip: 'Wide overhand' }),
+        row({ id: 'chin', name: 'Underhand Pulldown', muscleGroup: 'back', grip: 'Underhand' }),
+        row({ id: 'none', name: 'Back Extension', muscleGroup: 'back' }),
+      ],
+    });
+    fireEvent.press(screen.getByTestId('exercise-browser-filters-grip'));
+    expect(screen.getByTestId('exercise-browser-filters-option-neutral')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('exercise-browser-filters-option-pronated')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('exercise-browser-filters-option-supinated')).toHaveTextContent(/1/);
+    fireEvent.press(screen.getByTestId('exercise-browser-filters-option-pronated'));
+    expect(screen.getByTestId('exercise-item-pull')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-item-hammer')).toBeNull();
+    expect(screen.queryByTestId('exercise-item-none')).toBeNull();
+    expect(screen.getByTestId('exercise-browser-filters-grip')).toHaveTextContent(/Pronated/);
+  });
+
+  it('filters by handle, offering only the handles the exercises have', () => {
+    renderBrowser({
+      rows: [
+        row({ id: 'v', name: 'Row V', muscleGroup: 'back', attachment: 'V-handle' }),
+        row({ id: 'rope', name: 'Pushdown', muscleGroup: 'triceps', attachment: 'Rope' }),
+        row({ id: 'd', name: 'Fly', muscleGroup: 'chest', attachment: 'D-handles' }),
+        row({ id: 'ball', name: 'Twist', muscleGroup: 'core', attachment: 'Medicine ball' }),
+      ],
+    });
+    fireEvent.press(screen.getByTestId('exercise-browser-filters-handle'));
+    expect(screen.getByTestId('exercise-browser-filters-option-v_handle')).toBeTruthy();
+    expect(screen.getByTestId('exercise-browser-filters-option-rope')).toBeTruthy();
+    expect(screen.getByTestId('exercise-browser-filters-option-d_handle')).toBeTruthy();
+    // Not built into any of these: never offered.
+    expect(screen.queryByTestId('exercise-browser-filters-option-straight_bar')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-browser-filters-option-rope'));
+    expect(screen.getByTestId('exercise-item-rope')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-item-v')).toBeNull();
+  });
+
+  it('clears every filter at once, a muscle chosen from Browse by Muscle too', () => {
+    const onMuscleGroupChange = jest.fn();
+    renderBrowser({ browseByMuscle: true, muscleGroup: 'triceps', onMuscleGroupChange });
+    fireEvent.press(screen.getByTestId('exercise-browser-filters-clear'));
+    expect(onMuscleGroupChange).toHaveBeenCalledWith(null);
   });
 
   it('has no Also Works section: a muscle filter is the primary muscle group alone', () => {
