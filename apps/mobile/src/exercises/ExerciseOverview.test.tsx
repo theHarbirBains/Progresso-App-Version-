@@ -5,6 +5,14 @@ import type { ExerciseDetails } from './exerciseQueries';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
+// The video source as it will be once a provider's on: one exercise with a video.
+let mockVideoSlug: string | null = null;
+jest.mock('./videos/exerciseVideoSource', () => ({
+  exerciseVideoFor: (slug: string | null) =>
+    slug && slug === mockVideoSlug
+      ? { video: 'https://cdn.example.com/v.mp4', poster: 'https://cdn.example.com/v.jpg' }
+      : null,
+}));
 
 const rowDetails: ExerciseDetails = {
   muscleGroup: 'back',
@@ -104,5 +112,27 @@ describe('ExerciseOverview', () => {
       />,
     );
     expect(screen.queryByTestId('exercise-overview')).toBeNull();
+  });
+
+  it('shows a demonstration video in place of the picture where the exercise has one', async () => {
+    mockVideoSlug = 'cb-lat-pulldown-v-handle';
+    try {
+      render(
+        <ExerciseOverview
+          details={rowDetails}
+          exerciseId="pulldown-id"
+          exerciseName="Lat Pulldown — V-Handle"
+          accentColor="#D99A50"
+          onOpenGuide={jest.fn()}
+        />,
+      );
+      await settle();
+      expect(screen.getByTestId('exercise-overview-video')).toBeTruthy();
+      expect(screen.queryByTestId('exercise-overview-hero')).toBeNull();
+      // Its name and muscles stay under it, as ever.
+      expect(screen.getByTestId('exercise-overview-name')).toHaveTextContent(/Lat Pulldown/);
+    } finally {
+      mockVideoSlug = null;
+    }
   });
 });

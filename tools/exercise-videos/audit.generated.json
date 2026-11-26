@@ -1,0 +1,2520 @@
+{
+  "counts": {
+    "repository": 317,
+    "bothTakes": 276,
+    "maleOnly": 14,
+    "femaleOnly": 27,
+    "exactEntries": 29,
+    "builtinsWithVideo": 28,
+    "aliasOnly": 12,
+    "punctuationOnly": 3,
+    "unmatched": 273,
+    "repeated": 1
+  },
+  "exact": [
+    {
+      "id": "1435",
+      "name": "Barbell Back Squat",
+      "slug": "bb-back-squat",
+      "take": "male",
+      "file": "classic-barbell-squat",
+      "both": true
+    },
+    {
+      "id": "0025",
+      "name": "Barbell Bench Press",
+      "slug": "bb-bench-press",
+      "take": "male",
+      "file": "barbell-bench-press",
+      "both": true
+    },
+    {
+      "id": "0031",
+      "name": "Barbell Curl",
+      "slug": "bb-curl",
+      "take": "male",
+      "file": "barbell-curl",
+      "both": true
+    },
+    {
+      "id": "0038",
+      "name": "Barbell Drag Curl",
+      "slug": "bb-drag-curl",
+      "take": "male",
+      "file": "barbell-drag-curl",
+      "both": true
+    },
+    {
+      "id": "0041",
+      "name": "Barbell Front Raise",
+      "slug": "bb-front-raise",
+      "take": "male",
+      "file": "barbell-front-raise",
+      "both": true
+    },
+    {
+      "id": "0095",
+      "name": "Barbell Shrug",
+      "slug": "bb-shrug",
+      "take": "male",
+      "file": "barbell-shrug",
+      "both": true
+    },
+    {
+      "id": "1160",
+      "name": "Burpee",
+      "slug": "bw-burpee",
+      "take": "male",
+      "file": "burpee",
+      "both": true
+    },
+    {
+      "id": "0301",
+      "name": "Decline Dumbbell Bench Press",
+      "slug": "db-decline-bench-press",
+      "take": "male",
+      "file": "decline-dumbbell-bench-press-45-degree",
+      "both": true
+    },
+    {
+      "id": "0293",
+      "name": "Dumbbell Bent-Over Row",
+      "slug": "db-bent-over-row",
+      "take": "male",
+      "file": "dumbbell-bent-over-row",
+      "both": true
+    },
+    {
+      "id": "0296",
+      "name": "Dumbbell Close-Grip Press",
+      "slug": "db-close-grip-press",
+      "take": "male",
+      "file": "dumbbell-close-grip-press",
+      "both": true
+    },
+    {
+      "id": "0300",
+      "name": "Dumbbell Deadlift",
+      "slug": "db-deadlift",
+      "take": "male",
+      "file": "dumbbell-deadlift",
+      "both": true
+    },
+    {
+      "id": "0310",
+      "name": "Dumbbell Front Raise",
+      "slug": "db-front-raise",
+      "take": "male",
+      "file": "dumbbell-front-raise",
+      "both": true
+    },
+    {
+      "id": "1760",
+      "name": "Dumbbell Goblet Squat",
+      "slug": "db-goblet-squat",
+      "take": "male",
+      "file": "dumbbell-goblet-squat",
+      "both": true
+    },
+    {
+      "id": "0333",
+      "name": "Dumbbell Kickback",
+      "slug": "db-kickback",
+      "take": "male",
+      "file": "dumbbell-kickback",
+      "both": true
+    },
+    {
+      "id": "0334",
+      "name": "Dumbbell Lateral Raise",
+      "slug": "db-lateral-raise",
+      "take": "male",
+      "file": "dumbbell-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "0406",
+      "name": "Dumbbell Shrug",
+      "slug": "db-shrug",
+      "take": "male",
+      "file": "dumbbell-shrug",
+      "both": true
+    },
+    {
+      "id": "0407",
+      "name": "Dumbbell Side Bend",
+      "slug": "db-side-bend",
+      "take": "male",
+      "file": "dumbbell-side-bend",
+      "both": true
+    },
+    {
+      "id": "new-dumbbell-sumo-squat",
+      "name": "Dumbbell Sumo Squat",
+      "slug": "db-sumo-squat",
+      "take": "male",
+      "file": "dumbbell-bar-grip-sumo-squat",
+      "both": true
+    },
+    {
+      "id": "0437",
+      "name": "Dumbbell Upright Row",
+      "slug": "db-upright-row",
+      "take": "male",
+      "file": "dumbbell-upright-row",
+      "both": false
+    },
+    {
+      "id": "drv-hip-raise-bridge",
+      "name": "Glute Bridge",
+      "slug": "bw-glute-bridge",
+      "take": "female",
+      "file": "hip-raise-bridge",
+      "both": false
+    },
+    {
+      "id": "0493",
+      "name": "Incline Push-Up",
+      "slug": "bw-incline-push-up",
+      "take": "male",
+      "file": "incline-push-ups",
+      "both": true
+    },
+    {
+      "id": "drv-kettlebell-deadlift",
+      "name": "Kettlebell Deadlift",
+      "slug": "kb-deadlift",
+      "take": "male",
+      "file": "kettlebell-deadlift",
+      "both": true
+    },
+    {
+      "id": "0865",
+      "name": "Lying Leg Raise",
+      "slug": "bw-lying-leg-raise",
+      "take": "male",
+      "file": "lying-floor-leg-raise",
+      "both": true
+    },
+    {
+      "id": "drv-push-ups",
+      "name": "Push-Up",
+      "slug": "bw-push-up",
+      "take": "male",
+      "file": "push-ups",
+      "both": true
+    },
+    {
+      "id": "0289",
+      "name": "Seated Dumbbell Shoulder Press",
+      "slug": "db-seated-shoulder-press",
+      "take": "male",
+      "file": "dumbbell-bench-seated-press",
+      "both": true
+    },
+    {
+      "id": "0705",
+      "name": "Side Plank",
+      "slug": "bw-side-plank",
+      "take": "male",
+      "file": "side-bridge-side-plank",
+      "both": true
+    },
+    {
+      "id": "drv-sit-ups",
+      "name": "Sit-Up",
+      "slug": "bw-sit-up",
+      "take": "male",
+      "file": "sit-ups",
+      "both": true
+    },
+    {
+      "id": "drv-sit-up",
+      "name": "Sit-Up",
+      "slug": "bw-sit-up",
+      "take": "female",
+      "file": "sit-up",
+      "both": false
+    },
+    {
+      "id": "1393",
+      "name": "Smith Machine Calf Raise",
+      "slug": "sm-calf-raise",
+      "take": "male",
+      "file": "smith-calf-raise",
+      "both": true
+    }
+  ],
+  "aliasOnly": [
+    {
+      "id": "new-band-triceps-pushdown",
+      "name": "Band Triceps Pushdown",
+      "progresso": "Resistance Band Triceps Pushdown"
+    },
+    {
+      "id": "0042",
+      "name": "Barbell Front Squat",
+      "progresso": "Front Squat"
+    },
+    {
+      "id": "drv-bench-dips",
+      "name": "Bench Dips",
+      "progresso": "Bench Dip"
+    },
+    {
+      "id": "0178",
+      "name": "Cable Lateral Raise",
+      "progresso": "Single-Arm Cable Lateral Raise"
+    },
+    {
+      "id": "0302",
+      "name": "Decline Dumbbell Fly",
+      "progresso": "Decline Dumbbell Chest Fly"
+    },
+    {
+      "id": "0284",
+      "name": "Donkey Calf Raise",
+      "progresso": "Dumbbell Donkey Calf Raise"
+    },
+    {
+      "id": "0308",
+      "name": "Dumbbell Fly",
+      "progresso": "Dumbbell Chest Fly"
+    },
+    {
+      "id": "0336",
+      "name": "Dumbbell Lunge",
+      "progresso": "Dumbbell Forward Lunge"
+    },
+    {
+      "id": "0464",
+      "name": "Front Plank",
+      "progresso": "Plank"
+    },
+    {
+      "id": "0562",
+      "name": "Landmine 180",
+      "progresso": "Barbell Landmine Rotation"
+    },
+    {
+      "id": "0553",
+      "name": "Military Press",
+      "progresso": "Barbell Overhead Press"
+    },
+    {
+      "id": "drv-squat",
+      "name": "Squat",
+      "progresso": "Bodyweight Squat"
+    }
+  ],
+  "punctuationOnly": [
+    {
+      "id": "0970",
+      "name": "Band Assisted Pull-up",
+      "progresso": "Band-Assisted Pull-Up"
+    },
+    {
+      "id": "0411",
+      "name": "Dumbbell Single Leg Squat",
+      "progresso": "Dumbbell Single-Leg Squat"
+    },
+    {
+      "id": "0432",
+      "name": "Dumbbell Stiff Leg Deadlift",
+      "progresso": "Dumbbell Stiff-Leg Deadlift"
+    }
+  ],
+  "unmatched": [
+    {
+      "id": "0489",
+      "name": "45 Degree Hyperextension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "45-degree-hyperextension",
+      "both": true
+    },
+    {
+      "id": "drv-45-degree-bycicle-twisting-crunch",
+      "name": "45-Degree Bicycle Twisting Crunch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "45-degree-bycicle-twisting-crunch",
+      "both": true
+    },
+    {
+      "id": "drv-45-degree-bycicle-twisting-crunch-1",
+      "name": "45-Degree Bicycle Twisting Crunch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "45-degree-bycicle-twisting-crunch-1",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-all-fours-squad-stretch",
+      "name": "All Fours Groin Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-all-fours-squad-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-band-bent-over-rear-lateral-raise",
+      "name": "Band Bent-Over Rear Lateral Raise",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-bent-over-rear-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "3006",
+      "name": "Band Hip Abduction",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-hip-abduction",
+      "both": true
+    },
+    {
+      "id": "drv-band-hip-adduction",
+      "name": "Band Hip Adduction",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-hip-adduction",
+      "both": true
+    },
+    {
+      "id": "0983",
+      "name": "Band Kneeling One Arm Pulldown",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-kneeling-one-arm-pulldown",
+      "both": true
+    },
+    {
+      "id": "1017",
+      "name": "Band One Arm Front Raise",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-one-arm-forward-raise",
+      "both": true
+    },
+    {
+      "id": "drv-band-one-leg-kickback-bent-position",
+      "name": "Band One-Leg Kickback (Bent Position)",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-one-leg-kickback-bent-position",
+      "both": true
+    },
+    {
+      "id": "new-band-overhead-triceps-extension",
+      "name": "Band Overhead Triceps Extension",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-overhead-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0976",
+      "name": "Band Prone Leg Curl",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-leg-curl",
+      "both": true
+    },
+    {
+      "id": "0991",
+      "name": "Band Pull Through",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-pull-through",
+      "both": true
+    },
+    {
+      "id": "drv-band-decline-sit-ups",
+      "name": "Band Resisted Decline Sit-Up",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-decline-sit-ups",
+      "both": true
+    },
+    {
+      "id": "0980",
+      "name": "Band Seated Leg Extension",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-seated-leg-extension",
+      "both": true
+    },
+    {
+      "id": "0990",
+      "name": "Band Seated Row",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-seated-row",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-band-warm-up-shoulder-stretch",
+      "name": "Band Shoulder Warm-Up Stretch",
+      "equipment": "band",
+      "take": "male",
+      "file": "stretching-band-warm-up-shoulder-stretch",
+      "both": true
+    },
+    {
+      "id": "0002",
+      "name": "Band Side Bend",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-side-bend",
+      "both": true
+    },
+    {
+      "id": "0999",
+      "name": "Band Standing Calf Raise",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-standing-calf-raise",
+      "both": true
+    },
+    {
+      "id": "1005",
+      "name": "Band Standing Crunch",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-standing-crunch",
+      "both": true
+    },
+    {
+      "id": "0988",
+      "name": "Band Standing Leg Curl",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-standing-leg-curl",
+      "both": true
+    },
+    {
+      "id": "1408",
+      "name": "Band Standing Lift",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-standing-lift",
+      "both": true
+    },
+    {
+      "id": "1022",
+      "name": "Band Standing Rear Delt Row",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-standing-rear-delt-row",
+      "both": false
+    },
+    {
+      "id": "3144",
+      "name": "Band Straight-Back Seated Row",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-straight-back-seated-row",
+      "both": true
+    },
+    {
+      "id": "0028",
+      "name": "Barbell Clean And Press",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-clean-and-press",
+      "both": true
+    },
+    {
+      "id": "0030",
+      "name": "Barbell Close Grip Bench Press",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-close-grip-bench-press",
+      "both": false
+    },
+    {
+      "id": "0033",
+      "name": "Barbell Decline Bench Press",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-decline-bench-press",
+      "both": true
+    },
+    {
+      "id": "0047",
+      "name": "Barbell Incline Bench Press",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-incline-bench-press",
+      "both": true
+    },
+    {
+      "id": "0054",
+      "name": "Barbell Lunge",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-lunge",
+      "both": true
+    },
+    {
+      "id": "0072",
+      "name": "Barbell Prone Incline Curl",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-prone-incline-curl",
+      "both": false
+    },
+    {
+      "id": "0075",
+      "name": "Barbell Rear Delt Raise",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-rear-delt-raise",
+      "both": true
+    },
+    {
+      "id": "0082",
+      "name": "Barbell Reverse Wrist Curl",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-reverse-wrist-curl-over-grip",
+      "both": true
+    },
+    {
+      "id": "drv-barbell-seated-behind-head-military-press",
+      "name": "Barbell Seated Behind-The-Neck Press",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-seated-behind-head-military-press",
+      "both": true
+    },
+    {
+      "id": "0104",
+      "name": "Barbell Standing Back Wrist Curl",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-standing-back-wrist-curl",
+      "both": true
+    },
+    {
+      "id": "0116",
+      "name": "Barbell Straight Leg Deadlift",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-straight-leg-deadlift",
+      "both": true
+    },
+    {
+      "id": "0027",
+      "name": "Barbell Underhand Bent-Over Row",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-underhand-bent-over-row",
+      "both": true
+    },
+    {
+      "id": "0123",
+      "name": "Barbell Wide-Grip Upright Row",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "barbell-upright-row-wide-grip",
+      "both": true
+    },
+    {
+      "id": "0128",
+      "name": "Battling Ropes",
+      "equipment": "rope",
+      "take": "male",
+      "file": "battling-ropes",
+      "both": true
+    },
+    {
+      "id": "drv-crunch-on-bench",
+      "name": "Bench Crunch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "crunch-on-bench",
+      "both": true
+    },
+    {
+      "id": "0570",
+      "name": "Bench Pull-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "bench-pull-ups",
+      "both": true
+    },
+    {
+      "id": "3639",
+      "name": "Bent Knee Lying Twist on Stability Ball",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "bent-knee-lying-twist-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-bridge-pose-setu-bandhasana",
+      "name": "Bridge Pose (Setu Bandhasana)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-bridge-pose-setu-bandhasana",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-bridge-pose-setu-bandhasana-1",
+      "name": "Bridge Pose (Setu Bandhasana)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-bridge-pose-setu-bandhasana-1",
+      "both": false
+    },
+    {
+      "id": "1494",
+      "name": "Butterfly Yoga Pose",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-butterfly-yoga-pose",
+      "both": true
+    },
+    {
+      "id": "0974",
+      "name": "Cable Close Grip Lat Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-close-grip-front-lat-pulldown",
+      "both": true
+    },
+    {
+      "id": "0154",
+      "name": "Cable Crossover Reverse Fly",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-crossover-reverse-fly",
+      "both": true
+    },
+    {
+      "id": "0175",
+      "name": "Cable Kneeling Crunch",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-kneeling-crunch",
+      "both": true
+    },
+    {
+      "id": "0186",
+      "name": "Cable Lying Triceps Extension",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-lying-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0190",
+      "name": "Cable One Arm Curl",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-one-arm-curl",
+      "both": true
+    },
+    {
+      "id": "0162",
+      "name": "Cable One Arm Front Raise",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-one-arm-forward-raise",
+      "both": true
+    },
+    {
+      "id": "2616",
+      "name": "Cable One Arm Lateral Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-one-arm-lateral-pulldown",
+      "both": true
+    },
+    {
+      "id": "0192",
+      "name": "Cable One Arm Lateral Raise",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-one-arm-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "0861",
+      "name": "Cable One-Arm Twisting Seated Row",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-one-arm-twisting-seated-row",
+      "both": true
+    },
+    {
+      "id": "0198",
+      "name": "Cable Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-pulldown",
+      "both": true
+    },
+    {
+      "id": "0203",
+      "name": "Cable Rear Delt Row (with rope)",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-rear-delt-row-with-rope",
+      "both": true
+    },
+    {
+      "id": "0194",
+      "name": "Cable Rope Overhead Triceps Extension",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-rope-high-pulley-overhead-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0200",
+      "name": "Cable Rope Triceps Pushdown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-pushdown-rope-attachment",
+      "both": true
+    },
+    {
+      "id": "0213",
+      "name": "Cable Seated High Row (V-bar)",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-seated-high-row-v-bar",
+      "both": true
+    },
+    {
+      "id": "0226",
+      "name": "Cable Standing Crunch",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-standing-crunch",
+      "both": true
+    },
+    {
+      "id": "1269",
+      "name": "Cable Standing Fly",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-standing-fly-crossover-fly",
+      "both": true
+    },
+    {
+      "id": "0229",
+      "name": "Cable Standing Inner Curl",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-standing-inner-curl",
+      "both": true
+    },
+    {
+      "id": "0230",
+      "name": "Cable Standing Lift",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-standing-lift",
+      "both": true
+    },
+    {
+      "id": "0231",
+      "name": "Cable Standing One Arm Triceps Extension",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-standing-one-arm-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0238",
+      "name": "Cable Straight Arm Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-straight-arm-pulldown",
+      "both": true
+    },
+    {
+      "id": "1723",
+      "name": "Cable Triceps Pushdown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-triceps-pushdown",
+      "both": true
+    },
+    {
+      "id": "0862",
+      "name": "Cable Twist (up-down)",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-twist-up-down",
+      "both": true
+    },
+    {
+      "id": "1378",
+      "name": "Calf Stretch with Rope",
+      "equipment": "band",
+      "take": "male",
+      "file": "stretching-calf-stretch-with-rope",
+      "both": true
+    },
+    {
+      "id": "1599",
+      "name": "Calf Stretch with Strap",
+      "equipment": "band",
+      "take": "male",
+      "file": "stretching-calf-stretch-with-strap",
+      "both": true
+    },
+    {
+      "id": "0248",
+      "name": "Cambered Bar Lying Row",
+      "equipment": "barbell",
+      "take": "male",
+      "file": "cambered-bar-lying-row",
+      "both": true
+    },
+    {
+      "id": "drv-cardio-exercises",
+      "name": "Cardio Exercise",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "cardio-exercises",
+      "both": true
+    },
+    {
+      "id": "drv-cardio-exercises-machine",
+      "name": "Cardio Machine Exercise",
+      "equipment": "leverage machine",
+      "take": "female",
+      "file": "cardio-exercises-machine",
+      "both": false
+    },
+    {
+      "id": "drv-cardio-exercises-machines",
+      "name": "Cardio Machine Workouts",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "cardio-exercises-machines",
+      "both": false
+    },
+    {
+      "id": "drv-chest-dips",
+      "name": "Chest Dips",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "chest-dips",
+      "both": true
+    },
+    {
+      "id": "drv-chest-lift-with-rotation",
+      "name": "Chest Lift with Rotation",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "chest-lift-with-rotation",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-chin-to-chest-stretch",
+      "name": "Chin-to-Chest Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-chin-to-chest-stretch",
+      "both": true
+    },
+    {
+      "id": "0253",
+      "name": "Chin-ups (narrow parallel grip)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "chin-ups-narrow-parallel-grip",
+      "both": true
+    },
+    {
+      "id": "drv-close-feet-leg-press",
+      "name": "Close Feet Leg Press",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "close-feet-leg-press",
+      "both": true
+    },
+    {
+      "id": "2987",
+      "name": "Close Grip Chin-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "close-grip-chin-up",
+      "both": true
+    },
+    {
+      "id": "0259",
+      "name": "Close-Grip Push-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "close-grip-push-ups",
+      "both": true
+    },
+    {
+      "id": "drv-commando-pull-up",
+      "name": "Commando Pull-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "commando-pull-up",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-crossover-kneeling-hip-flexor-stretch",
+      "name": "Crossover Kneeling Hip Flexor Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-crossover-kneeling-hip-flexor-stretch",
+      "both": true
+    },
+    {
+      "id": "1274",
+      "name": "Deep Push-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "deep-push-ups",
+      "both": true
+    },
+    {
+      "id": "0361",
+      "name": "Dumbbell Alternating Shoulder Press",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-alternate-shoulder-press",
+      "both": true
+    },
+    {
+      "id": "2137",
+      "name": "Dumbbell Arnold Press",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-arnold-press",
+      "both": true
+    },
+    {
+      "id": "0364",
+      "name": "Dumbbell Behind-the-Back Wrist Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-behind-back-wrist-curl",
+      "both": true
+    },
+    {
+      "id": "0294",
+      "name": "Dumbbell Biceps Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-biceps-curl",
+      "both": true
+    },
+    {
+      "id": "0297",
+      "name": "Dumbbell Concentration Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-concentration-curl",
+      "both": true
+    },
+    {
+      "id": "0298",
+      "name": "Dumbbell Cross Body Hammer Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-cross-body-hammer-curl",
+      "both": true
+    },
+    {
+      "id": "1277",
+      "name": "Dumbbell Fly On Exercise Ball",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-fly-on-exercise-ball",
+      "both": true
+    },
+    {
+      "id": "1330",
+      "name": "Dumbbell Hammer Grip Incline Bench Row",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-hammer-grip-incline-bench-row",
+      "both": true
+    },
+    {
+      "id": "0314",
+      "name": "Dumbbell Incline Bench Press",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-bench-press",
+      "both": true
+    },
+    {
+      "id": "0322",
+      "name": "Dumbbell Incline Biceps Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-biceps-curl",
+      "both": true
+    },
+    {
+      "id": "0318",
+      "name": "Dumbbell Incline Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-curl",
+      "both": true
+    },
+    {
+      "id": "0319",
+      "name": "Dumbbell Incline Fly",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-fly",
+      "both": true
+    },
+    {
+      "id": "1278",
+      "name": "Dumbbell Incline Fly On Exercise Ball",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-fly-on-exercise-ball",
+      "both": true
+    },
+    {
+      "id": "0320",
+      "name": "Dumbbell Incline Hammer Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-hammer-curl",
+      "both": true
+    },
+    {
+      "id": "0321",
+      "name": "Dumbbell Incline Hammer Press",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-hammer-press",
+      "both": true
+    },
+    {
+      "id": "0326",
+      "name": "Dumbbell Incline Rear Lateral Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-rear-lateral-raise",
+      "both": false
+    },
+    {
+      "id": "0327",
+      "name": "Dumbbell Incline Row",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-row",
+      "both": true
+    },
+    {
+      "id": "0329",
+      "name": "Dumbbell Incline Shrug",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-shrug",
+      "both": true
+    },
+    {
+      "id": "0330",
+      "name": "Dumbbell Incline Triceps Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-incline-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0332",
+      "name": "Dumbbell Iron Cross",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-iron-cross",
+      "both": true
+    },
+    {
+      "id": "1729",
+      "name": "Dumbbell Lying Alternate Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-lying-alternate-extension",
+      "both": true
+    },
+    {
+      "id": "0340",
+      "name": "Dumbbell Lying Hammer Press",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-lying-hammer-press",
+      "both": true
+    },
+    {
+      "id": "0343",
+      "name": "Dumbbell Lying Leg Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-lying-femoral",
+      "both": true
+    },
+    {
+      "id": "1328",
+      "name": "Dumbbell Lying Rear Delt Row",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-lying-rear-delt-row",
+      "both": true
+    },
+    {
+      "id": "0351",
+      "name": "Dumbbell Lying Triceps Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-lying-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0355",
+      "name": "Dumbbell One Arm Lateral Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-one-arm-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "1672",
+      "name": "Dumbbell One Arm Zottman Preacher Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-one-arm-zottman-preacher-curl",
+      "both": true
+    },
+    {
+      "id": "0306",
+      "name": "Dumbbell One-Arm Triceps Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-one-arm-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0369",
+      "name": "Dumbbell Over Bench Wrist Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-over-bench-wrist-curl",
+      "both": true
+    },
+    {
+      "id": "1329",
+      "name": "Dumbbell Palm Rotational Bent Over Row",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-palm-rotational-bent-over-row",
+      "both": true
+    },
+    {
+      "id": "1673",
+      "name": "Dumbbell Preacher Curl Over Exercise Ball",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-preacher-curl-over-exercise-ball",
+      "both": true
+    },
+    {
+      "id": "0373",
+      "name": "Dumbbell Pronate-grip Triceps Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-pronate-grip-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0374",
+      "name": "Dumbbell Prone Incline Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-prone-incline-curl",
+      "both": true
+    },
+    {
+      "id": "0377",
+      "name": "Dumbbell Rear Delt Row",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-rear-delt-row",
+      "both": true
+    },
+    {
+      "id": "1379",
+      "name": "Dumbbell Seated Calf Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-calf-raise",
+      "both": true
+    },
+    {
+      "id": "0392",
+      "name": "Dumbbell Seated Front Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-front-raise",
+      "both": true
+    },
+    {
+      "id": "0394",
+      "name": "Dumbbell Seated Kickback",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-kickback",
+      "both": true
+    },
+    {
+      "id": "0396",
+      "name": "Dumbbell Seated Lateral Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "0397",
+      "name": "Dumbbell Seated Neutral Wrist Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-neutral-wrist-curl",
+      "both": true
+    },
+    {
+      "id": "0402",
+      "name": "Dumbbell Seated Preacher Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-preacher-curl",
+      "both": true
+    },
+    {
+      "id": "2188",
+      "name": "Dumbbell Seated Triceps Extension",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-seated-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0409",
+      "name": "Dumbbell Single Leg Calf Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-single-leg-calf-raise",
+      "both": true
+    },
+    {
+      "id": "0413",
+      "name": "Dumbbell Squat",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-squat",
+      "both": true
+    },
+    {
+      "id": "0417",
+      "name": "Dumbbell Standing Calf Raise",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-standing-calf-raise",
+      "both": true
+    },
+    {
+      "id": "1167",
+      "name": "Dynamic Chest Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-dynamic-chest-stretch",
+      "both": true
+    },
+    {
+      "id": "2141",
+      "name": "Elliptical Trainer",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "elliptical",
+      "both": true
+    },
+    {
+      "id": "1338",
+      "name": "Exercise Ball Sit-Up",
+      "equipment": "stability ball",
+      "take": "male",
+      "file": "sit-up-on-exercise-ball",
+      "both": true
+    },
+    {
+      "id": "1339",
+      "name": "Exercise Ball Spinal Stretch",
+      "equipment": "stability ball",
+      "take": "male",
+      "file": "stretching-spinal-stretch-on-exercise-ball",
+      "both": true
+    },
+    {
+      "id": "2407",
+      "name": "EZ Bar Biceps Curl",
+      "equipment": "ez barbell",
+      "take": "male",
+      "file": "ez-barbell-biceps-curl",
+      "both": true
+    },
+    {
+      "id": "0061",
+      "name": "EZ Bar Lying Triceps Extension",
+      "equipment": "ez barbell",
+      "take": "male",
+      "file": "ez-barbell-lying-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0445",
+      "name": "EZ Barbell Anti Gravity Press",
+      "equipment": "ez barbell",
+      "take": "male",
+      "file": "ez-barbell-anti-gravity-press",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-feet-and-ankles-rotation-stretch",
+      "name": "Feet and Ankles Rotation Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-feet-and-ankles-rotation-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-feet-and-ankles-stretch",
+      "name": "Feet and Ankles Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-feet-and-ankles-stretch",
+      "both": true
+    },
+    {
+      "id": "0620",
+      "name": "Flat Bench Cable Fly",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-lying-fly-flat-bench-cable-fly",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-flexion-leg-sit-up",
+      "name": "Flexion Leg Sit-Up Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-flexion-leg-sit-up",
+      "both": true
+    },
+    {
+      "id": "0274",
+      "name": "Floor Crunch",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "crunch-floor-female",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-front-toe-touch",
+      "name": "Front Toe Touch Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-front-toe-touch",
+      "both": true
+    },
+    {
+      "id": "1764",
+      "name": "Hanging Leg Hip Raise",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "hanging-leg-hip-raise",
+      "both": true
+    },
+    {
+      "id": "0474",
+      "name": "Hanging Straight Leg Raise",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "hanging-straight-leg-raise",
+      "both": true
+    },
+    {
+      "id": "0257",
+      "name": "Hip Circles Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-hip-circles-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-hip-extension-stretch",
+      "name": "Hip Extension Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-hip-extension-stretch",
+      "both": true
+    },
+    {
+      "id": "1564",
+      "name": "Hip Flexor and Quadriceps Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-hip-flexor-and-quad-stretch",
+      "both": true
+    },
+    {
+      "id": "0325",
+      "name": "Incline Leg Hip Raise",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "incline-leg-hip-raise",
+      "both": true
+    },
+    {
+      "id": "0499",
+      "name": "Inverted Row Between Chairs",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "inverted-row-between-chairs",
+      "both": true
+    },
+    {
+      "id": "0498",
+      "name": "Inverted Row With Straps",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "inverted-row-with-straps",
+      "both": true
+    },
+    {
+      "id": "1419",
+      "name": "Iron Cross Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-iron-cross-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-jackknife-pilates",
+      "name": "Jackknife",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "jackknife-pilates",
+      "both": false
+    },
+    {
+      "id": "0981",
+      "name": "Jackknife Floor",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "jack-knife-floor",
+      "both": false
+    },
+    {
+      "id": "drv-jack-split-crunches",
+      "name": "Jackknife Split Crunch",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "jack-split-crunches",
+      "both": false
+    },
+    {
+      "id": "2612",
+      "name": "Jump Rope",
+      "equipment": "rope",
+      "take": "male",
+      "file": "jump-rope",
+      "both": true
+    },
+    {
+      "id": "drv-jump-step-up",
+      "name": "Jump Step-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "jump-step-up",
+      "both": true
+    },
+    {
+      "id": "new-low-impact-jumping-jack",
+      "name": "Jumping Jack",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "jumping-jack",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-kneeling-back-rotation-stretch",
+      "name": "Kneeling Back Rotation Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-kneeling-back-rotation-stretch",
+      "both": true
+    },
+    {
+      "id": "1346",
+      "name": "Kneeling Lat Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-kneeling-lat-stretch",
+      "both": true
+    },
+    {
+      "id": "1771",
+      "name": "Kneeling Triceps Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-kneeling-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "0600",
+      "name": "Leg Raise Crunch",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "crunch-leg-raise",
+      "both": false
+    },
+    {
+      "id": "drv-leg-raise-hip-lift",
+      "name": "Leg Raise with Hip Lift",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "leg-raise-hip-lift",
+      "both": false
+    },
+    {
+      "id": "0573",
+      "name": "Lever Back Extension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-back-extension",
+      "both": true
+    },
+    {
+      "id": "0581",
+      "name": "Lever High Row",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-high-row",
+      "both": true
+    },
+    {
+      "id": "2611",
+      "name": "Lever Horizontal Leg Press",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-horizontal-leg-press",
+      "both": true
+    },
+    {
+      "id": "1299",
+      "name": "Lever Incline Hammer Chest Press",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-incline-hammer-chest-press",
+      "both": true
+    },
+    {
+      "id": "0582",
+      "name": "Lever Kneeling Leg Curl",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-kneeling-leg-curl",
+      "both": true
+    },
+    {
+      "id": "0584",
+      "name": "Lever Lateral Raise",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-lateral-raise",
+      "both": true
+    },
+    {
+      "id": "0585",
+      "name": "Lever Leg Extension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-leg-extension",
+      "both": true
+    },
+    {
+      "id": "0577",
+      "name": "Lever Lying Chest Press",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-lying-chest-press",
+      "both": true
+    },
+    {
+      "id": "0586",
+      "name": "Lever Lying Leg Curl",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-lying-leg-curl",
+      "both": true
+    },
+    {
+      "id": "0592",
+      "name": "Lever Preacher Curl",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-preacher-curl",
+      "both": true
+    },
+    {
+      "id": "0593",
+      "name": "Lever Reverse Hyperextension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-reverse-hyperextension",
+      "both": true
+    },
+    {
+      "id": "1349",
+      "name": "Lever Reverse T-Bar Row",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-reverse-t-bar-row",
+      "both": true
+    },
+    {
+      "id": "0594",
+      "name": "Lever Seated Calf Raise",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-calf-raise",
+      "both": true
+    },
+    {
+      "id": "1452",
+      "name": "Lever Seated Crunch",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-crunch-1",
+      "both": false
+    },
+    {
+      "id": "1451",
+      "name": "Lever Seated Dip",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-dips",
+      "both": true
+    },
+    {
+      "id": "0597",
+      "name": "Lever Seated Hip Abduction",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-hip-abduction",
+      "both": true
+    },
+    {
+      "id": "0598",
+      "name": "Lever Seated Hip Adduction",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-hip-adduction",
+      "both": true
+    },
+    {
+      "id": "0599",
+      "name": "Lever Seated Leg Curl",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-leg-curl",
+      "both": true
+    },
+    {
+      "id": "0602",
+      "name": "Lever Seated Reverse Fly",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-seated-reverse-fly",
+      "both": true
+    },
+    {
+      "id": "0604",
+      "name": "Lever Shrug",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-shrug",
+      "both": true
+    },
+    {
+      "id": "0605",
+      "name": "Lever Standing Calf Raise",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-standing-calf-raise",
+      "both": true
+    },
+    {
+      "id": "2286",
+      "name": "Lever Standing Hip Extension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-standing-hip-extension",
+      "both": true
+    },
+    {
+      "id": "drv-lever-standing-rear-kick",
+      "name": "Lever Standing Rear Kick",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-standing-rear-kick",
+      "both": true
+    },
+    {
+      "id": "drv-lever-t-bar-row",
+      "name": "Lever T-Bar Row",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-t-bar-row",
+      "both": true
+    },
+    {
+      "id": "0607",
+      "name": "Lever Triceps Extension",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-triceps-extension",
+      "both": true
+    },
+    {
+      "id": "drv-lying-hip-lift-on-stability-ball",
+      "name": "Lying Hip Lift on Stability Ball",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "lying-hip-lift-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-quadriceps-lying-stretch",
+      "name": "Lying Quadriceps Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-quadriceps-lying-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-lying-scissor-kick-female",
+      "name": "Lying Scissor Kick",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "lying-scissor-kick-female",
+      "both": false
+    },
+    {
+      "id": "1002",
+      "name": "Lying Straight Leg Raise",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "lying-straight-leg-raise",
+      "both": true
+    },
+    {
+      "id": "0640",
+      "name": "Medicine Ball Wall Sit-Up",
+      "equipment": "weighted",
+      "take": "female",
+      "file": "medicine-ball-sit-up-wall",
+      "both": false
+    },
+    {
+      "id": "1405",
+      "name": "Middle Back Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-middle-back-stretch-1",
+      "both": false
+    },
+    {
+      "id": "1403",
+      "name": "Neck Side Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-neck-side-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-old-school-reverse-extensions",
+      "name": "Old School Reverse Extensions",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "old-school-reverse-extensions",
+      "both": true
+    },
+    {
+      "id": "drv-otis-ups",
+      "name": "Otis-Up",
+      "equipment": "weighted",
+      "take": "male",
+      "file": "otis-ups",
+      "both": true
+    },
+    {
+      "id": "1259",
+      "name": "Overhead Chest Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-above-head-chest-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-lever-pec-deck-fly",
+      "name": "Pec Deck Fly",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "lever-pec-deck-fly",
+      "both": true
+    },
+    {
+      "id": "1388",
+      "name": "Peroneals Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-peroneals-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-corkscrew-pilates",
+      "name": "Pilates Corkscrew",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "corkscrew-pilates",
+      "both": false
+    },
+    {
+      "id": "drv-hundred-pilates",
+      "name": "Pilates Hundred",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "hundred-pilates",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-plyo-side-lunge-stretch",
+      "name": "Plyometric Side Lunge Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-plyo-side-lunge-stretch",
+      "both": true
+    },
+    {
+      "id": "1429",
+      "name": "Pull-Up (Wide Grip)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "pull-up-wide-front-grip",
+      "both": true
+    },
+    {
+      "id": "drv-chin-ups-pull-ups",
+      "name": "Pull-Up / Chin-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "chin-ups-pull-ups",
+      "both": true
+    },
+    {
+      "id": "0668",
+      "name": "Rear Decline Bridge",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "rear-decline-bridge",
+      "both": true
+    },
+    {
+      "id": "0669",
+      "name": "Rear Deltoid Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-rear-deltoid-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-hip-flexor-stretch-rear-foot-elevated",
+      "name": "Rear Foot Elevated Hip Flexor Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-hip-flexor-stretch-rear-foot-elevated",
+      "both": true
+    },
+    {
+      "id": "drv-band-high-fly",
+      "name": "Resistance Band High Fly",
+      "equipment": "band",
+      "take": "male",
+      "file": "band-high-fly",
+      "both": true
+    },
+    {
+      "id": "0872",
+      "name": "Reverse Crunch",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "reverse-crunch-female",
+      "both": false
+    },
+    {
+      "id": "0672",
+      "name": "Reverse Dip Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-reverse-dip",
+      "both": true
+    },
+    {
+      "id": "0673",
+      "name": "Reverse Grip Machine Lat Pulldown",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "reverse-grip-machine-lat-pulldown",
+      "both": true
+    },
+    {
+      "id": "2327",
+      "name": "Reverse Grip Pull-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "reverse-grip-pull-up",
+      "both": true
+    },
+    {
+      "id": "0207",
+      "name": "Reverse-Grip Cable Lat Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-bar-lateral-pulldown-reverse-grip",
+      "both": true
+    },
+    {
+      "id": "drv-ring-high-row",
+      "name": "Ring High Row",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "ring-high-row",
+      "both": true
+    },
+    {
+      "id": "drv-rotate-push-up-female",
+      "name": "Rotational Push-Up",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "rotate-push-up-female",
+      "both": false
+    },
+    {
+      "id": "1585",
+      "name": "Runner's Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-runners-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-running",
+      "name": "Running",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "running",
+      "both": true
+    },
+    {
+      "id": "0211",
+      "name": "Russian Twist on Stability Ball (Arms Straight)",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "russian-twist-on-stability-ball-arms-straight",
+      "both": false
+    },
+    {
+      "id": "3012",
+      "name": "Scapula Dips",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "scapula-dips",
+      "both": true
+    },
+    {
+      "id": "0285",
+      "name": "Seated Alternating Dumbbell Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "dumbbell-alternate-seated-biceps-curl",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-sitting-bent-over-back-stretch",
+      "name": "Seated Bent Over Back Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-sitting-bent-over-back-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-boat-stretch",
+      "name": "Seated Boat Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-boat-stretch",
+      "both": true
+    },
+    {
+      "id": "0208",
+      "name": "Seated Cable Row (V-Grip)",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-straight-back-seated-row-v-grip",
+      "both": true
+    },
+    {
+      "id": "0218",
+      "name": "Seated Cable Row (Wide-Grip)",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-seated-row-wide-grip",
+      "both": true
+    },
+    {
+      "id": "1390",
+      "name": "Seated Calf Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-seated-calf-stretch",
+      "both": true
+    },
+    {
+      "id": "0690",
+      "name": "Seated Lower Back Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-seated-lower-back-stretch",
+      "both": true
+    },
+    {
+      "id": "2203",
+      "name": "Seated Shoulder Flexor, Depressor, Retractor Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-seated-shoulder-flexor-depresor-retractor",
+      "both": true
+    },
+    {
+      "id": "1011",
+      "name": "Seated Straight Arm Twist",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "seated-twist-straight-arm",
+      "both": false
+    },
+    {
+      "id": "0849",
+      "name": "Seated Twist on Stability Ball",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "seated-twist-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-seated-twist-straight-arm",
+      "name": "Seated Twist Stretch (Straight Arm)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-seated-twist-straight-arm",
+      "both": true
+    },
+    {
+      "id": "1587",
+      "name": "Seated Wide Angle Pose Sequence",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-seated-wide-angle-pose-sequence",
+      "both": true
+    },
+    {
+      "id": "0651",
+      "name": "Shoulder-Width Pull-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "pull-up-shoulder-grip",
+      "both": true
+    },
+    {
+      "id": "0850",
+      "name": "Side Bend on Stability Ball",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "side-bend-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-slopes-towards-stretch",
+      "name": "Side Bend Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-slopes-towards-stretch",
+      "both": true
+    },
+    {
+      "id": "0721",
+      "name": "Side Wrist Pull Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-side-wrist-pull-stretch",
+      "both": true
+    },
+    {
+      "id": "1757",
+      "name": "Single Dumbbell Stiff-Leg Deadlift",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "single-dumbbell-stiff-leg-deadlift",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-single-leg-stretch-bent-knee",
+      "name": "Single Leg Stretch (Bent Knee)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-single-leg-stretch-bent-knee",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-single-straight-leg-stretch",
+      "name": "Single Straight Leg Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-single-straight-leg-stretch",
+      "both": true
+    },
+    {
+      "id": "0738",
+      "name": "Sled 45 Degree Calf Press",
+      "equipment": "sled machine",
+      "take": "male",
+      "file": "sled-45-degree-calf-press",
+      "both": true
+    },
+    {
+      "id": "0740",
+      "name": "Sled 45 Degree Wide Leg Press",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "sled-45-degree-leg-wide-press",
+      "both": true
+    },
+    {
+      "id": "0743",
+      "name": "Sled Hack Squat",
+      "equipment": "sled machine",
+      "take": "male",
+      "file": "sled-hack-squat",
+      "both": true
+    },
+    {
+      "id": "0750",
+      "name": "Smith Chair Squat",
+      "equipment": "smith machine",
+      "take": "male",
+      "file": "smith-chair-squat",
+      "both": true
+    },
+    {
+      "id": "0752",
+      "name": "Smith Machine Deadlift",
+      "equipment": "smith machine",
+      "take": "male",
+      "file": "smith-deadlift-deadlift-1",
+      "both": false
+    },
+    {
+      "id": "0748",
+      "name": "Smith Machine Leg Press",
+      "equipment": "smith machine",
+      "take": "male",
+      "file": "smith-leg-press",
+      "both": true
+    },
+    {
+      "id": "0765",
+      "name": "Smith Seated Shoulder Press",
+      "equipment": "smith machine",
+      "take": "male",
+      "file": "smith-seated-shoulder-press",
+      "both": true
+    },
+    {
+      "id": "0777",
+      "name": "Spell Caster",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "spell-caster",
+      "both": true
+    },
+    {
+      "id": "1363",
+      "name": "Spine Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-spine-stretch",
+      "both": true
+    },
+    {
+      "id": "0353",
+      "name": "Stability Ball Leg Curl",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "leg-curl-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "0271",
+      "name": "Stability Ball Leg Elevated Crunch",
+      "equipment": "stability ball",
+      "take": "female",
+      "file": "crunch-legs-on-stability-ball",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-stairs-calf-stretch",
+      "name": "Stairs Calf Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-stairs-calf-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-adductor-stretch",
+      "name": "Standing Adductor Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-adductor-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-standing-back-rotation-stretch",
+      "name": "Standing Back Rotation Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-back-rotation-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-standing-bench-calf-stretch",
+      "name": "Standing Bench Calf Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-bench-calf-stretch",
+      "both": true
+    },
+    {
+      "id": "1511",
+      "name": "Standing Hamstring Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-hamstring-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-ceiling-look-stretch",
+      "name": "Standing Hip Flexor and Abdominal Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-ceiling-look-stretch",
+      "both": true
+    },
+    {
+      "id": "0484",
+      "name": "Standing Knee Raise Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-knee-raise",
+      "both": true
+    },
+    {
+      "id": "0794",
+      "name": "Standing Lateral Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-lateral-stretch-1",
+      "both": false
+    },
+    {
+      "id": "drv-stretching-quadriceps-stretch",
+      "name": "Standing Quadriceps Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-quadriceps-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-standing-reach-up-back-rotation-stretch",
+      "name": "Standing Reach Up Back Rotation Stretch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-reach-up-back-rotation-stretch",
+      "both": true
+    },
+    {
+      "id": "drv-stretching-standing-side-bend-bent-arm",
+      "name": "Standing Side Bend Stretch (Bent Arm)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-side-bend-bent-arm",
+      "both": true
+    },
+    {
+      "id": "0796",
+      "name": "Standing Wheel Rollout",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-standing-wheel-rollout",
+      "both": true
+    },
+    {
+      "id": "2138",
+      "name": "Stationary Bike",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "stationary-bike",
+      "both": true
+    },
+    {
+      "id": "drv-crunch-straight-leg-up",
+      "name": "Straight-Leg Up Crunch",
+      "equipment": "body weight",
+      "take": "female",
+      "file": "crunch-straight-leg-up",
+      "both": false
+    },
+    {
+      "id": "0350",
+      "name": "Supine Dumbbell Biceps Curl",
+      "equipment": "dumbbell",
+      "take": "male",
+      "file": "lying-supine-dumbbell-curl",
+      "both": true
+    },
+    {
+      "id": "drv-treadmill-running",
+      "name": "Treadmill Running",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "treadmill-running",
+      "both": true
+    },
+    {
+      "id": "drv-triceps-dips",
+      "name": "Triceps Dips",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "triceps-dips",
+      "both": true
+    },
+    {
+      "id": "0985",
+      "name": "Twisting Crunch",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "twisting-crunch",
+      "both": true
+    },
+    {
+      "id": "drv-v-up",
+      "name": "V-Up",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "v-up",
+      "both": true
+    },
+    {
+      "id": "0826",
+      "name": "Vertical Leg Raise (on parallel bars)",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "vertical-leg-raise-on-parallel-bars",
+      "both": true
+    },
+    {
+      "id": "drv-walk-wave-machine",
+      "name": "Walk Wave Machine",
+      "equipment": "leverage machine",
+      "take": "male",
+      "file": "walk-wave-machine",
+      "both": true
+    },
+    {
+      "id": "0832",
+      "name": "Weighted Leg Extension Crunch",
+      "equipment": "weighted",
+      "take": "male",
+      "file": "weighted-leg-extension-crunch",
+      "both": true
+    },
+    {
+      "id": "0846",
+      "name": "Weighted Lying Twist",
+      "equipment": "weighted",
+      "take": "female",
+      "file": "weighted-lying-twist",
+      "both": false
+    },
+    {
+      "id": "0851",
+      "name": "Weighted Sissy Squat",
+      "equipment": "weighted",
+      "take": "male",
+      "file": "weighted-sissy-squat",
+      "both": true
+    },
+    {
+      "id": "0853",
+      "name": "Weighted Standing Curl",
+      "equipment": "weighted",
+      "take": "male",
+      "file": "weighted-standing-curl",
+      "both": false
+    },
+    {
+      "id": "drv-cable-bar-lateral-pulldown-wide-shoulder-grip",
+      "name": "Wide Grip Cable Lat Pulldown",
+      "equipment": "cable",
+      "take": "male",
+      "file": "cable-bar-lateral-pulldown-wide-shoulder-grip",
+      "both": true
+    },
+    {
+      "id": "1428",
+      "name": "Wrist Circles",
+      "equipment": "body weight",
+      "take": "male",
+      "file": "stretching-wrist-circles",
+      "both": true
+    }
+  ],
+  "repeated": [
+    {
+      "name": "Sit-Up",
+      "slug": "bw-sit-up",
+      "kept": "drv-sit-ups"
+    }
+  ]
+}

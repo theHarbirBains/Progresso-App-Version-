@@ -13,6 +13,8 @@ import type { ExerciseDetails } from './exerciseQueries';
 import { hasIllustration, illustrationFor } from './illustrations/exerciseArt';
 import { Frame, usePrefix } from './illustrations/ExerciseIllustration';
 import { EXERCISE_RENDERS } from './illustrations/renders.generated';
+import { ExerciseVideo } from './videos/ExerciseVideo';
+import { exerciseVideoFor } from './videos/exerciseVideoSource';
 import { LOAD_TYPE_LABELS, pulleyPositionText, pulleyText } from './machineLoad';
 import {
   MOVEMENT_CATEGORY_LABELS,
@@ -164,7 +166,9 @@ export function ExerciseOverview({
   const builtin = !!extras;
   const slug = extras?.slug ?? null;
   const photoUri = own ?? details.photoUrl ?? null;
-  const hasHero = !!photoUri || (!!slug && hasIllustration(slug));
+  // A built-in's demonstration video, where it has one and a provider's on (exerciseVideoSource).
+  const video = exerciseVideoFor(slug);
+  const hasHero = !!video || !!photoUri || (!!slug && hasIllustration(slug));
   const secondary = (extras?.secondaryMuscleGroups ?? []).filter(
     (group) => group !== details.muscleGroup,
   );
@@ -210,7 +214,16 @@ export function ExerciseOverview({
         style={styles.body}
         onLayout={(event) => setCardWidth(Math.round(event.nativeEvent.layout.width))}
       >
-        {hasHero ? (
+        {video ? (
+          <ExerciseVideo
+            testID={`${testID}-video`}
+            urls={video}
+            width={cardWidth}
+            height={Math.min(Math.round(cardWidth * 0.8), 300)}
+            accentColor={accentColor}
+            exerciseName={exerciseName}
+          />
+        ) : hasHero ? (
           <Hero
             slug={slug}
             photoUri={photoUri}
