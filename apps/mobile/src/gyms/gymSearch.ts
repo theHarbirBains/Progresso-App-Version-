@@ -62,10 +62,13 @@ export function toGymPlace(value: unknown): GymPlace | null {
   };
 }
 
-/** How far around the phone "near you" looks. */
-export const NEARBY_RADIUS_METERS = 5000;
+/** How far around the phone "near you" looks: Apple Maps' gyms within it (and half as far again). */
+export const NEARBY_RADIUS_METERS = 8000;
 
-/** Gyms near a point, nearest first. Throws when Apple Maps can't be reached. */
+/**
+ * Every gym near a point, nearest first -- Apple Maps' fitness centres and what it finds for "gym"
+ * and "fitness" around it, each once (modules/gym-search). Throws when Apple Maps can't be reached.
+ */
 export async function nearbyGyms(at: Coordinates): Promise<GymPlace[]> {
   const search = native();
   if (!search) return [];

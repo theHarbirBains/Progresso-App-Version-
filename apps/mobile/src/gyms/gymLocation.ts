@@ -1,10 +1,11 @@
 import { hasLocationNative } from '../lib/nativeModules';
 import type { Coordinates } from './gymSearch';
 
-// Where the phone is, for gyms near it -- asked for only when someone taps Find Gyms Near Me,
-// while the app is in use (never Always, never in the background), and used there and then to
-// search Apple Maps. Never kept or sent to Progresso. expo-location is loaded the first time it's
-// needed, not when the app starts.
+// Where the phone is, for the gyms near it -- read as Choose Your Gym opens where location is
+// already allowed (never asking), and asked for only when someone taps Find Gyms Near Me; while
+// the app is in use (never Always, never in the background), and used there and then to search
+// Apple Maps. Never kept or sent to Progresso. expo-location is loaded the first time it's needed,
+// not when the app starts.
 
 type ExpoLocation = typeof import('expo-location');
 let location: ExpoLocation | null = null;
@@ -38,18 +39,33 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-/** The phone's position now, asking once where it hasn't been asked. */
-export async function phonePosition(): Promise<PhonePosition> {
+/** Whether location is allowed already -- never asking. */
+export async function locationAllowed(): Promise<boolean> {
+  if (!hasLocationNative()) return false;
+  try {
+    return (await loadLocation().getForegroundPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The phone's position now, asking once where it hasn't been asked (unless `ask` is false). As
+ * precise as the phone will give -- the gyms around the corner, not just the area.
+ */
+export async function phonePosition({
+  ask = true,
+}: { ask?: boolean } = {}): Promise<PhonePosition> {
   if (!hasLocationNative()) return { status: 'unavailable' };
   try {
     const Location = loadLocation();
     let permission = await Location.getForegroundPermissionsAsync();
-    if (!permission.granted && permission.canAskAgain) {
+    if (ask && !permission.granted && permission.canAskAgain) {
       permission = await Location.requestForegroundPermissionsAsync();
     }
     if (!permission.granted) return { status: 'denied' };
     const position = await withTimeout(
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
       POSITION_TIMEOUT_MS,
     );
     if (!position) return { status: 'unavailable' };

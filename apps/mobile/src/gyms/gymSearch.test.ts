@@ -1,6 +1,7 @@
 import { requireOptionalNativeModule } from 'expo';
 import { Platform } from 'react-native';
 import {
+  NEARBY_RADIUS_METERS,
   formatDistance,
   gymSearchAvailable,
   nearbyGyms,
@@ -56,7 +57,8 @@ describe('searching Apple Maps for gyms', () => {
         placeId: 'I123',
       },
     ]);
-    expect(native.nearby).toHaveBeenCalledWith(49.27, -123.1, 5000);
+    expect(native.nearby).toHaveBeenCalledWith(49.27, -123.1, NEARBY_RADIUS_METERS);
+    expect(NEARBY_RADIUS_METERS).toBe(8000);
   });
 
   it('searches by name, near the phone when it knows where that is -- never for a letter', async () => {

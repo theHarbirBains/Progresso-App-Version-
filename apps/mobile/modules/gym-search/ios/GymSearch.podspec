@@ -7,6 +7,9 @@ Pod::Spec.new do |s|
   s.homepage       = 'https://progresso.app'
   s.license        = { :type => 'Proprietary' }
   s.platforms      = { :ios => '15.1' }
+  # Swift 5 language mode: its searches gather their answers into one list under a lock, which
+  # Swift 6's strict concurrency checking would refuse without restructuring.
+  s.swift_version  = '5.9'
   s.source         = { :git => '' }
   s.static_framework = true
 

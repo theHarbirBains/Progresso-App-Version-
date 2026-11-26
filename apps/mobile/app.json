@@ -123,7 +123,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Progresso uses your location while you use it: once as you sign up, to put your country first, and when you look for gyms near you, to find them on Apple Maps. Your location is never sent to Progresso or kept; only the gym you choose is saved.",
+          "locationWhenInUsePermission": "Progresso uses your location while you use it: once as you sign up, to put your country first, and when you choose your gym, to find the gyms near you on Apple Maps. Your location is never sent to Progresso or kept; only the gym you choose is saved.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
           "motionUsagePermission": false,

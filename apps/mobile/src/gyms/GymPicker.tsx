@@ -18,7 +18,7 @@ import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
-import { phonePosition } from './gymLocation';
+import { locationAllowed, phonePosition } from './gymLocation';
 import {
   formatDistance,
   gymSearchAvailable,
@@ -90,11 +90,42 @@ function GymRow({
   );
 }
 
+/** How many gyms the map pins at most: the nearest, as listed. */
+const MAP_PINS = 30;
+
+/**
+ * The map's view: round every gym listed (and the phone, once it's known), with a little room at
+ * the edges -- never closer in than a few streets. Null with nothing to show.
+ */
+export function mapRegion(
+  gyms: readonly GymPlace[],
+  here: Coordinates | null,
+): { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null {
+  const points = [
+    ...gyms
+      .filter((gym) => gym.latitude !== null && gym.longitude !== null)
+      .map((gym) => ({ latitude: gym.latitude!, longitude: gym.longitude! })),
+    ...(here ? [here] : []),
+  ];
+  if (points.length === 0) return null;
+  const lats = points.map((point) => point.latitude);
+  const lons = points.map((point) => point.longitude);
+  const [south, north] = [Math.min(...lats), Math.max(...lats)];
+  const [west, east] = [Math.min(...lons), Math.max(...lons)];
+  return {
+    latitude: (south + north) / 2,
+    longitude: (west + east) / 2,
+    latitudeDelta: Math.max(0.012, (north - south) * 1.3),
+    longitudeDelta: Math.max(0.012, (east - west) * 1.3),
+  };
+}
+
 /**
  * Choosing the gym a workout is at, as a page of its own (an iPhone page sheet): a search field
- * -- by name or area, on Apple Maps, as it's typed -- Find Gyms Near Me (asking for the phone's
- * location only then), a map of what's found with the one chosen picked out, the gyms trained at
- * lately, and the results, each its name, address and distance. Nothing is ever chosen for them:
+ * -- by name or area, on Apple Maps, as it's typed -- every gym near the phone, nearest first
+ * (found as it opens where location is allowed already; otherwise Find Gyms Near Me, which asks
+ * for it only then), a map fitted round all of them with the one chosen picked out, the gyms
+ * trained at lately, and the results, each its name, address and distance, a tap choosing it. Nothing is ever chosen for them:
  * a gym is tapped, then Confirm Gym. Where Apple Maps can't be searched (off iPhone) or finds
  * nothing, what's typed can be used as the gym's name. Remove Gym takes one off.
  */
@@ -177,20 +208,42 @@ export function GymPicker({
     return () => clearTimeout(timer);
   }, [query, here, searchable]);
 
-  async function findNearby() {
+  // The latest nearby search: one that's been overtaken (or the picker closed) is dropped.
+  const nearbyTicket = useRef(0);
+  async function findNearby(ask = true) {
+    const ticket = ++nearbyTicket.current;
     setNearby({ status: 'locating' });
-    const position = await phonePosition();
+    const position = await phonePosition({ ask });
+    if (ticket !== nearbyTicket.current) return;
     if (position.status !== 'found') {
       setNearby({ status: position.status });
       return;
     }
     setHere(position.coordinates);
     try {
-      setNearby({ status: 'found', gyms: await nearbyGyms(position.coordinates) });
+      const gyms = await nearbyGyms(position.coordinates);
+      if (ticket === nearbyTicket.current) setNearby({ status: 'found', gyms });
     } catch {
-      setNearby({ status: 'failed' });
+      if (ticket === nearbyTicket.current) setNearby({ status: 'failed' });
     }
   }
+
+  // Where location is allowed already, the gyms near you are there as it opens -- never asking.
+  useEffect(() => {
+    if (!visible) {
+      nearbyTicket.current += 1;
+      return;
+    }
+    setNearby({ status: 'idle' });
+    if (!searchable) return;
+    let live = true;
+    void locationAllowed().then((allowed) => {
+      if (live && allowed) void findNearby(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [visible, searchable]);
 
   const typed = query.trim();
   const shown: { title: string; key: string; gyms: GymPlace[] }[] = [];
@@ -198,16 +251,25 @@ export function GymPicker({
     shown.push({ title: 'Results', key: 'results', gyms: results });
   } else {
     if (nearby.status === 'found' && nearby.gyms.length > 0) {
-      shown.push({ title: 'Near You', key: 'nearby', gyms: nearby.gyms });
+      shown.push({
+        title: `Near You · ${nearby.gyms.length} ${nearby.gyms.length === 1 ? 'gym' : 'gyms'}`,
+        key: 'nearby',
+        gyms: nearby.gyms,
+      });
     }
     if (recent.length > 0) shown.push({ title: 'Recent', key: 'recent', gyms: recent });
   }
-  // What's listed, on the map too: a dozen at most.
+  // What's listed, on the map too -- the nearest MAP_PINS of it.
   const onMap = shown
     .flatMap((group) => group.gyms)
     .filter((gym) => gym.latitude !== null && gym.longitude !== null)
-    .slice(0, 12);
-  const focus = chosen && chosen.latitude !== null ? chosen : (onMap[0] ?? null);
+    .slice(0, MAP_PINS);
+  const region = mapRegion(
+    chosen && chosen.latitude !== null && !onMap.some((gym) => sameGym(gym, chosen))
+      ? [...onMap, chosen]
+      : onMap,
+    here,
+  );
   // What's typed, as the gym's own name: where Apple Maps isn't there, or has nothing for it.
   const typedGym: GymPlace | null =
     typed.length >= 2 && (!searchable || (results !== null && results.length === 0))
@@ -293,21 +355,16 @@ export function GymPicker({
             </Text>
           ) : null}
 
-          {onMap.length > 0 && focus && focus.latitude !== null && focus.longitude !== null ? (
+          {onMap.length > 0 && region ? (
             <View style={styles.mapWrap}>
               <MapView
                 testID={`${testID}-map`}
                 style={styles.map}
-                region={{
-                  latitude: focus.latitude,
-                  longitude: focus.longitude,
-                  latitudeDelta: 0.04,
-                  longitudeDelta: 0.04,
-                }}
+                region={region}
                 showsUserLocation={here !== null}
                 pitchEnabled={false}
                 rotateEnabled={false}
-                accessibilityLabel="Map of the gyms found"
+                accessibilityLabel={`Map of the ${onMap.length} gyms found`}
               >
                 {onMap.map((gym, index) => (
                   <Marker
@@ -326,7 +383,7 @@ export function GymPicker({
           {searching ? <ActivityIndicator style={styles.spinner} color={accentColor} /> : null}
 
           {shown.map((group) => (
-            <View key={group.key} style={styles.group} testID={`${testID}-${group.key}`}>
+            <View key={group.key} style={styles.group} testID={`${testID}-${group.key}-list`}>
               <SectionHeader label={group.title} />
               <AppCard style={styles.list}>
                 {group.gyms.map((gym, index) => (

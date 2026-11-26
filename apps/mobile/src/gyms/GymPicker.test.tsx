@@ -1,10 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { phonePosition } from './gymLocation';
-import { GymPicker } from './GymPicker';
+import { locationAllowed, phonePosition } from './gymLocation';
+import { GymPicker, mapRegion } from './GymPicker';
 import { gymSearchAvailable, nearbyGyms, searchGyms } from './gymSearch';
 import { fetchRecentGyms } from './workoutGyms';
 
-jest.mock('./gymLocation', () => ({ phonePosition: jest.fn() }));
+jest.mock('./gymLocation', () => ({
+  phonePosition: jest.fn(),
+  locationAllowed: jest.fn(async () => false),
+}));
 jest.mock('./gymSearch', () => ({
   ...jest.requireActual('./gymSearch'),
   gymSearchAvailable: jest.fn(() => true),
@@ -13,6 +16,7 @@ jest.mock('./gymSearch', () => ({
 }));
 
 const mockPosition = phonePosition as jest.Mock;
+const mockAllowed = locationAllowed as jest.Mock;
 const mockNearby = nearbyGyms as jest.Mock;
 const mockSearch = searchGyms as jest.Mock;
 const mockAvailable = gymSearchAvailable as jest.Mock;
@@ -56,6 +60,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockAvailable.mockReturnValue(true);
   mockPosition.mockReset();
+  mockAllowed.mockReset().mockResolvedValue(false);
   mockNearby.mockReset();
   mockSearch.mockReset();
   mockRecent.mockReset().mockResolvedValue([]);
@@ -83,6 +88,8 @@ describe('GymPicker', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('gym-picker-nearby'));
     });
+    // Asked for location, as the button was tapped.
+    expect(mockPosition).toHaveBeenCalledWith({ ask: true });
 
     expect(screen.getByTestId('gym-picker-map')).toBeTruthy();
     expect(screen.getByTestId('gym-picker-nearby-0')).toHaveTextContent(
@@ -172,5 +179,44 @@ describe('GymPicker', () => {
       'No gyms found for "Basement Barbell".',
     );
     expect(screen.getByTestId('gym-picker-typed')).toHaveTextContent(/Use "Basement Barbell"/);
+  });
+
+  it('lists every gym near you as it opens where location is allowed already -- never asking', async () => {
+    mockAllowed.mockResolvedValue(true);
+    mockPosition.mockResolvedValue({
+      status: 'found',
+      coordinates: { latitude: 49.27, longitude: -123.1 },
+    });
+    mockNearby.mockResolvedValue([downtown, kits]);
+    renderPicker();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPosition).toHaveBeenCalledWith({ ask: false });
+    expect(screen.queryByTestId('gym-picker-nearby')).toBeNull();
+    expect(screen.getByTestId('gym-picker-nearby-list')).toBeTruthy();
+    expect(screen.getByText(/Near You · 2 gyms/i)).toBeTruthy();
+    expect(screen.getByTestId('gym-picker-map')).toBeTruthy();
+    // One tap chooses one; Confirm saves it.
+    fireEvent.press(screen.getByTestId('gym-picker-nearby-0'));
+    fireEvent.press(screen.getByTestId('gym-picker-confirm'));
+    expect(onConfirm).toHaveBeenCalledWith(downtown);
+  });
+});
+
+describe('mapRegion', () => {
+  it('fits every gym and the phone, with room at the edges', () => {
+    const region = mapRegion([downtown, kits], { latitude: 49.26, longitude: -123.1 })!;
+    expect(region.latitude).toBeCloseTo(49.27, 2);
+    expect(region.latitudeDelta).toBeCloseTo(0.026, 3);
+    expect(region.longitudeDelta).toBeCloseTo(0.078, 3);
+  });
+
+  it('never zooms in closer than a few streets, and is nothing with nothing to show', () => {
+    expect(mapRegion([downtown], null)!.latitudeDelta).toBe(0.012);
+    expect(mapRegion([], null)).toBeNull();
   });
 });
