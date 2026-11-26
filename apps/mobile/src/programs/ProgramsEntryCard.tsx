@@ -1,18 +1,20 @@
 import { Feather } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
+import { Badge } from '../design/Badge';
 import { GlyphWell } from '../design/GlyphWell';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useAppTheme } from '../theme/appThemeContext';
 import { WORKOUT_PROGRAMS } from './programCatalog';
 import { LIBRARY_SPLIT_COUNT, PROGRAM_LIBRARY, readySplitCount } from './programLibrary';
+import { PROGRAMS_OPEN } from './programsAvailability';
 
 /**
  * The way into the Split Library, as one widget: a `book-open` glyph, "Split Library", how many
  * splits it has and how many are ready to use (or that their workouts are coming) -- or, once
- * one's chosen in onboarding, which. On Workout Splits' My Splits, and on onboarding's split
- * question.
+ * one's chosen in onboarding, which. On onboarding's split question. While programs are closed
+ * (PROGRAMS_OPEN), it says Coming Soon and opens nothing.
  */
 export function ProgramsEntryCard({
   onPress,
@@ -29,6 +31,25 @@ export function ProgramsEntryCard({
   testID?: string;
 }) {
   const accent = useAppTheme().accent.accent;
+  if (!PROGRAMS_OPEN) {
+    return (
+      <AppCard hero={hero} testID={testID} accessibilityLabel="Workout Programs. Coming soon">
+        <View style={styles.row}>
+          <GlyphWell icon="book-open" accentColor={colors.textMuted} size={44} />
+          <View style={styles.text}>
+            <Text style={styles.title}>Workout Programs</Text>
+            <Text style={styles.line}>Hand-written programs are on their way.</Text>
+          </View>
+          <Badge
+            testID={testID ? `${testID}-coming-soon` : undefined}
+            label="Coming Soon"
+            color={colors.textMuted}
+            backgroundColor={colors.surfaceRaised}
+          />
+        </View>
+      </AppCard>
+    );
+  }
   const ready = readySplitCount(WORKOUT_PROGRAMS);
   const library = `${LIBRARY_SPLIT_COUNT} splits in ${PROGRAM_LIBRARY.length} categories`;
   const line = chosen

@@ -69,6 +69,7 @@ import { OnboardingTiles } from '../onboarding/OnboardingTiles';
 import { PlanSummary } from '../onboarding/PlanSummary';
 import { OnboardingPrograms } from '../programs/OnboardingPrograms';
 import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
+import { PROGRAMS_OPEN } from '../programs/programsAvailability';
 import { WORKOUT_PROGRAMS } from '../programs/programCatalog';
 import type { ProgramChoice } from '../programs/programHost';
 import { ProgramCard } from '../programs/ProgramParts';
@@ -463,8 +464,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   // What the programs are recommended from, and the best few, for the split question.
   const preferences = draftPreferences(draft);
+  // None while programs are Coming Soon (PROGRAMS_OPEN).
   const recommended =
-    step === 'workoutSplit' ? recommendPrograms(WORKOUT_PROGRAMS, preferences) : [];
+    step === 'workoutSplit' && PROGRAMS_OPEN
+      ? recommendPrograms(WORKOUT_PROGRAMS, preferences)
+      : [];
 
   // Shown under the birthday wheels as they turn.
   const age = draft.birthday ? ageFromBirthday(draft.birthday) : null;

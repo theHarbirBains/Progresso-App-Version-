@@ -21,6 +21,7 @@ import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { ProgramBrowser } from '../programs/ProgramBrowser';
 import { ProgramsEntryCard } from '../programs/ProgramsEntryCard';
+import { PROGRAMS_OPEN } from '../programs/programsAvailability';
 import { preferencesFromProfile } from '../programs/programPreferences';
 import {
   deleteWorkoutSplit,
@@ -201,7 +202,11 @@ export function WorkoutSplitsScreen({ navigation, route }: Props) {
         onAccentColor={theme.onAccent}
       />
 
-      {tab === 'programs' ? (
+      {tab === 'programs' && !PROGRAMS_OPEN ? (
+        <View style={styles.libraryTab}>
+          <ProgramsEntryCard testID="workout-splits-programs-coming-soon" onPress={() => {}} />
+        </View>
+      ) : tab === 'programs' ? (
         <View style={styles.libraryTab}>
           <ProgramBrowser
             testID="workout-splits-programs"

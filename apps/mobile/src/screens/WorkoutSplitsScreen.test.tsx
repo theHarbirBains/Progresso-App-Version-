@@ -30,6 +30,14 @@ jest.mock('../profile/profileQueries', () => ({
 
 // The catalogue is empty until the programs are written; a test stands one in.
 let mockPrograms: WorkoutProgram[] = [];
+// The Split Library open, as it will be once Harbir's programs are in; a test can close it.
+let mockProgramsOpen = true;
+jest.mock('../programs/programsAvailability', () => ({
+  get PROGRAMS_OPEN() {
+    return mockProgramsOpen;
+  },
+}));
+
 jest.mock('../programs/programCatalog', () => ({
   PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   get WORKOUT_PROGRAMS() {
@@ -111,6 +119,7 @@ const baseProfile = {
 };
 
 beforeEach(() => {
+  mockProgramsOpen = true;
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
@@ -470,5 +479,30 @@ describe('WorkoutSplitsScreen -- Split Library', () => {
       programId: 'test-split',
       variationId: 'six',
     });
+  });
+});
+
+describe('WorkoutSplitsScreen -- programs Coming Soon', () => {
+  beforeEach(() => {
+    mockProgramsOpen = false;
+    route = {} as never;
+  });
+
+  it('says Coming Soon in the Split Library tab, with no library or recommendations', async () => {
+    route = { params: { tab: 'programs' } } as never;
+    renderScreen();
+    expect(await screen.findByTestId('workout-splits-programs-coming-soon')).toHaveTextContent(
+      /Workout Programs.*Coming Soon/,
+    );
+    expect(screen.queryByTestId('workout-splits-programs-intro')).toBeNull();
+    expect(screen.queryByTestId('workout-splits-preferences')).toBeNull();
+  });
+
+  it("says Coming Soon on My Splits' widget too, which opens nothing", async () => {
+    renderScreen();
+    const widget = await screen.findByTestId('workout-splits-library');
+    expect(widget).toHaveTextContent(/Coming Soon/);
+    // Not a button: nothing to open.
+    expect(screen.queryByRole('button', { name: /Workout Programs/ })).toBeNull();
   });
 });

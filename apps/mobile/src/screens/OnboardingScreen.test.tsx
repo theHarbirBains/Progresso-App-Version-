@@ -52,6 +52,14 @@ jest.mock('../lib/legalLinks', () => ({ openLegalPage: jest.fn() }));
 // programs/programActivation.test.ts).
 jest.mock('../programs/programActivation', () => ({ activateProgram: jest.fn() }));
 // A made-up program in place of the catalogue, which is empty until the programs are written.
+// The Split Library open, as it will be once Harbir's programs are in; a test can close it.
+let mockProgramsOpen = true;
+jest.mock('../programs/programsAvailability', () => ({
+  get PROGRAMS_OPEN() {
+    return mockProgramsOpen;
+  },
+}));
+
 jest.mock('../programs/programCatalog', () => ({
   PROGRAM_CATALOG: jest.requireActual('../programs/programCatalog').PROGRAM_CATALOG,
   WORKOUT_PROGRAMS: [jest.requireActual('../programs/__fixtures__/programs').TEST_PROGRAM],
@@ -93,6 +101,7 @@ const mockMaterialize = materializeWorkoutSplitPreset as jest.Mock;
 const mockSwitchToSignIn = jest.fn();
 
 beforeEach(async () => {
+  mockProgramsOpen = true;
   await AsyncStorage.clear();
   jest.mocked(socialSignInEnabled).mockReset().mockReturnValue(true);
   mockUseAuth.mockReturnValue({
@@ -1155,6 +1164,16 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
         selectedSplitPresetId: null,
       });
     });
+  });
+
+  it('shows Workout Programs as Coming Soon on the split question, recommending nothing', async () => {
+    mockProgramsOpen = false;
+    await startAt('workoutSplit', { selectedSplitPresetId: null, skippedSplit: false });
+    const widget = await screen.findByTestId('onboarding-programs-open');
+    expect(widget).toHaveTextContent(/Workout Programs.*Coming Soon/);
+    expect(screen.queryByTestId('onboarding-recommended')).toBeNull();
+    // Not a button: nothing to open.
+    expect(screen.queryByRole('button', { name: /Workout Programs/ })).toBeNull();
   });
 
   it('recommends programs from their answers on the split question, each opening its page', async () => {
