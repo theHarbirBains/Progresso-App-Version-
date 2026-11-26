@@ -1297,12 +1297,15 @@ describe('FeedScreen -- the home-screen widgets', () => {
 });
 
 describe('FeedScreen -- Daily Steps', () => {
-  // The 7 days before today, then today: an average of 9,000.
-  const week = (today: number) =>
-    [...Array.from({ length: 7 }, () => 9000), today].map((quantity, i) => ({
-      startDate: new Date(2026, 10, 18 + i),
+  // The 7 days before today, then today: an average of 9,000. Counted back from the real today,
+  // so it reads the same whatever day the tests run.
+  const week = (today: number) => {
+    const now = new Date();
+    return [...Array.from({ length: 7 }, () => 9000), today].map((quantity, i) => ({
+      startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7 + i),
       sumQuantity: { unit: 'count', quantity },
     }));
+  };
 
   beforeEach(() => {
     jest.mocked(stepsWidget.updateTimeline).mockClear();
