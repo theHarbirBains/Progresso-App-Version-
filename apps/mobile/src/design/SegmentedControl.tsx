@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from './Text';
 import { GlassBackground } from './GlassBackground';
@@ -9,6 +10,8 @@ interface Option<T extends string> {
   value: T;
   /** Read by assistive tech instead of `label` -- for an abbreviated visible label ("4W"). */
   accessibilityLabel?: string;
+  /** A small glyph before the label, drawn in the label's colour (selected or not). */
+  icon?: (color: string) => ReactNode;
 }
 
 interface Props<T extends string> {
@@ -67,7 +70,18 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected, disabled: Boolean(disabled) }}
             accessibilityLabel={option.accessibilityLabel ?? option.label}
           >
-            <Text style={[styles.label, selected && { color: onAccentColor }]}>{option.label}</Text>
+            {option.icon ? (
+              <View style={styles.withIcon}>
+                {option.icon(selected ? onAccentColor : colors.textSecondary)}
+                <Text style={[styles.label, selected && { color: onAccentColor }]}>
+                  {option.label}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.label, selected && { color: onAccentColor }]}>
+                {option.label}
+              </Text>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -76,6 +90,12 @@ export function SegmentedControl<T extends string>({
 }
 
 const styles = StyleSheet.create({
+  withIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
   track: {
     flexDirection: 'row',
     alignSelf: 'flex-start',

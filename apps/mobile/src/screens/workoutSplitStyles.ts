@@ -18,49 +18,6 @@ export const workoutSplitStyles = StyleSheet.create({
   listContent: {
     gap: widgetGap,
   },
-  // Edit / Duplicate / Delete, beneath a split's row inside its widget -- an
-  // even 3-up row of icon+label buttons (Strava-style quiet actions, not
-  // text links), separated from the name/toggle row above by a hairline so
-  // the card reads as two clear bands rather than one run-on stack.
-  splitActions: {
-    flexDirection: 'row',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  splitAction: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    minHeight: minTouchTarget,
-  },
-  splitActionLabel: {
-    ...typeScale.secondary,
-    fontFamily: typeScale.label.fontFamily,
-    color: colors.textSecondary,
-  },
-  splitActionDestructive: {
-    color: colors.destructive,
-  },
-  // The "this is your active split" marker. Uppercase caption, in the mode
-  // accent (colour supplied per render).
-  activeLabel: {
-    ...typeScale.caption,
-    letterSpacing: 1,
-  },
-  activeToggleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  // "Browse Splits" sits directly on the screen, not inside a card -- same
-  // explicit 6px gutter call as NotificationsScreen's own section headers.
-  presetsSectionWrap: {
-    paddingHorizontal: 6,
-  },
   // A heading after a widget: more room above it than between widgets, so each part of the page
   // (the active split, the rest, finding one) reads as its own.
   sectionGap: {
@@ -70,9 +27,18 @@ export const workoutSplitStyles = StyleSheet.create({
   createWrap: {
     marginTop: spacing.sm,
   },
-  // The Split Library tab starts a little below the tabs, as My Splits' first heading does.
+  // The Browse Splits tab starts a little below the tabs, as My Splits' first heading does.
   libraryTab: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
+    gap: widgetGap,
+  },
+  // My Splits' first heading, a little below the tabs.
+  firstHeading: {
+    marginTop: spacing.md,
+  },
+  // A section's cards, widgetGap apart.
+  cardStack: {
+    gap: widgetGap,
   },
 
   // ---- Split view (read-only) ----------------------------------------------

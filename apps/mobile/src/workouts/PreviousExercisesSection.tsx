@@ -1,5 +1,4 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
@@ -10,10 +9,8 @@ import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/t
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { machineLine } from '../exercises/machineDetails';
-import { figureSexFor } from '../exercises/MuscleBrowseStrip';
+import { MuscleFigure } from '../exercises/MuscleFigure';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import { MUSCLE_TILES } from '../exercises/muscleTiles.generated';
-import { useProfileIfAny } from '../profile/profileContext';
 import { formatRecentDate } from './workoutFormat';
 import {
   muscleGroupList,
@@ -68,33 +65,6 @@ function availableIn(section: PreviousSection, library: Map<string, ExerciseRow>
     const exercise = library.get(done.exerciseId);
     return exercise ? [{ done, exercise }] : [];
   });
-}
-
-/**
- * The session's muscles, Harbir's figure of its first muscle group (a man's or a woman's, by the
- * person's sex) in two layers: the body in grey on a clear background, and its muscles tinted in
- * the accent over it -- so it's the theme's colour, with every muscle's shading kept.
- */
-function SessionFigure({ group, accentColor }: { group: MuscleGroup; accentColor: string }) {
-  const sex = figureSexFor(useProfileIfAny()?.gender);
-  const tile = MUSCLE_TILES[sex][group];
-  if (!tile) return null;
-  return (
-    <View
-      style={styles.figure}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <Image source={tile.figure} style={styles.figureLayer} contentFit="contain" />
-      <Image
-        source={tile.muscle}
-        style={styles.figureLayer}
-        contentFit="contain"
-        tintColor={accentColor}
-      />
-    </View>
-  );
 }
 
 /** One of the session card's figures: its glyph in the accent, the number, and what it counts. */
@@ -215,7 +185,16 @@ export function PreviousExercisesSection({
   return (
     <View testID={testID} style={styles.stack}>
       <AppCard hero testID={`${testID}-session`}>
-        <SessionFigure group={figureGroup} accentColor={accentColor} />
+        {/* The session's first muscle group on Harbir's figure, its muscles in the accent. */}
+        <View style={styles.figure} pointerEvents="none">
+          <MuscleFigure
+            group={figureGroup}
+            accentColor={accentColor}
+            width={FIGURE_WIDTH}
+            height={FIGURE_WIDTH / 0.88}
+            style={styles.figureLayer}
+          />
+        </View>
         <View style={styles.sessionWords}>
           <Text style={styles.kicker}>
             {plan.mode === 'day' ? 'YOUR PREVIOUS SESSION' : 'YOUR PREVIOUS SESSIONS'}
@@ -380,11 +359,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii.xl,
   },
   figureLayer: {
-    position: 'absolute',
-    top: -spacing.sm,
-    left: 0,
-    width: FIGURE_WIDTH,
-    height: FIGURE_WIDTH / 0.88,
+    marginTop: -spacing.sm,
   },
   sessionWords: {
     paddingRight: FIGURE_WIDTH - spacing.xl,

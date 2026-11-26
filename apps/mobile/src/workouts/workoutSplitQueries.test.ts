@@ -69,10 +69,19 @@ beforeEach(() => {
 });
 
 describe('fetchWorkoutSplits', () => {
-  it('returns the list of splits', async () => {
-    mockTable({ data: [{ id: 's1', name: 'PPL' }], error: null });
+  it('returns the list of splits, each with how many days it has', async () => {
+    mockTable({
+      data: [
+        { id: 's1', name: 'PPL', workout_split_days: [{ count: 6 }] },
+        { id: 's2', name: 'Old', workout_split_days: null },
+      ],
+      error: null,
+    });
 
-    await expect(fetchWorkoutSplits('user-1')).resolves.toEqual([{ id: 's1', name: 'PPL' }]);
+    await expect(fetchWorkoutSplits('user-1')).resolves.toEqual([
+      { id: 's1', name: 'PPL', dayCount: 6 },
+      { id: 's2', name: 'Old' },
+    ]);
   });
 
   it('throws on a query error', async () => {

@@ -7,6 +7,7 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import {
+  materializeWorkoutSplitPreset,
   deleteWorkoutSplit,
   duplicateWorkoutSplit,
   fetchWorkoutSplits,
@@ -49,27 +50,8 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   fetchWorkoutSplits: jest.fn(),
   duplicateWorkoutSplit: jest.fn(),
   deleteWorkoutSplit: jest.fn(),
+  materializeWorkoutSplitPreset: jest.fn(),
 }));
-
-// Isolates this screen's own split-list logic from the preset picker's own
-// (separately tested) rendering/materialize behavior. babel-plugin-jest-
-// hoist forbids referencing outer-scope variables inside jest.mock()
-// factories, so react-native/react are require()'d inside it instead of
-// relying on the file's top-level import.
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
-jest.mock('../workouts/WorkoutSplitPresetPicker', () => {
-  const react = require('react');
-  const { Text, TouchableOpacity } = require('react-native');
-  return {
-    WorkoutSplitPresetPicker: (props: any) =>
-      react.createElement(
-        TouchableOpacity,
-        { testID: props.testID, onPress: () => props.onPresetActivated('split-preset-new') },
-        react.createElement(Text, null, 'presets'),
-      ),
-  };
-});
-/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
@@ -153,8 +135,26 @@ describe('WorkoutSplitsScreen', () => {
   it('lists every split and marks the active one', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('workout-split-split-1')).toHaveTextContent(/ACTIVE/);
-    expect(screen.getByTestId('workout-split-split-2')).not.toHaveTextContent(/ACTIVE/);
+    expect(await screen.findByTestId('workout-split-split-1')).toHaveTextContent(/Active/);
+    expect(screen.getByTestId('workout-split-split-2')).not.toHaveTextContent(/Active/);
+  });
+
+  it('names each split in capitals with how many days it has, and counts them on My Splits', async () => {
+    mockFetchWorkoutSplits.mockResolvedValue([
+      { id: 'split-1', name: 'Arnold x PPL', dayCount: 6 },
+      { id: 'split-2', name: 'Upper/Lower' },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('workout-split-view-split-1')).toHaveTextContent(
+      /ARNOLD X PPL.*6 days \/ week/,
+    );
+    expect(screen.queryByTestId('workout-split-days-split-2')).toBeNull();
+    expect(screen.getByTestId('workout-splits-tabs-splits')).toHaveTextContent(/My Splits \(2\)/);
+    expect(screen.getByTestId('workout-splits-tabs-programs')).toHaveTextContent(/Browse Splits/);
+    expect(screen.getByTestId('workout-splits-header')).toHaveTextContent(
+      /Manage your workout plans or discover new splits\./,
+    );
   });
 
   it('navigates to the edit form when Edit is pressed', async () => {
@@ -190,7 +190,7 @@ describe('WorkoutSplitsScreen', () => {
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
       activeWorkoutSplitId: 'split-2',
     });
-    expect(await screen.findByTestId('workout-split-split-2')).toHaveTextContent(/ACTIVE/);
+    expect(await screen.findByTestId('workout-split-split-2')).toHaveTextContent(/Active/);
     alertSpy.mockRestore();
   });
 
@@ -226,11 +226,24 @@ describe('WorkoutSplitsScreen', () => {
   });
 
   it('shows Browse Splits below the create button, and activates a preset once materialized', async () => {
+    jest.mocked(materializeWorkoutSplitPreset).mockResolvedValue({
+      id: 'split-preset-new',
+      name: 'Push / Pull / Legs',
+    } as never);
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
     const callsBeforePress = mockFetchWorkoutSplits.mock.calls.length;
 
-    fireEvent.press(screen.getByTestId('workout-splits-presets'));
+    // The first three ready-made splits, each its days as chips; View All has every one.
+    expect(screen.getByTestId('workout-splits-presets-preset-ppl')).toHaveTextContent(
+      /Push \/ Pull \/ Legs.*Push.*Pull.*Legs/,
+    );
+    expect(screen.queryByTestId('workout-splits-presets-preset-bro-split')).toBeNull();
+    fireEvent.press(screen.getByTestId('workout-splits-presets-preset-ppl'));
+    expect(materializeWorkoutSplitPreset).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ id: 'ppl' }),
+    );
 
     await waitFor(() =>
       expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
@@ -318,7 +331,7 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     // One widget per split.
     expect(splitCards()).toHaveLength(2);
     const block = within(screen.getByTestId('workout-split-split-1'));
-    expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - Hypertrophy/);
+    expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - HYPERTROPHY/);
     for (const action of ['edit', 'duplicate', 'delete']) {
       expect(block.getByTestId(`workout-split-${action}-split-1`)).toBeTruthy();
     }
@@ -331,19 +344,21 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
     expect(splitCards().map((c) => Boolean(c.props.hero))).toEqual([true, false]);
   });
 
-  it('bands only the active split in the Workout accent, never the others', async () => {
+  it('outlines only the active split in the Workout accent, never the others', async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    expect(screen.getByTestId('workout-split-split-1-top-accent')).toBeTruthy();
-    expect(screen.queryByTestId('workout-split-split-2-top-accent')).toBeNull();
+    const borders = splitCards().map(
+      (card) => StyleSheet.flatten(card.props.style)?.borderColor ?? null,
+    );
+    expect(borders).toEqual([DEFAULT_WORKOUT_THEME.accent, null]);
   });
 
-  it('marks the active split with a quiet ACTIVE label in the mode accent, not a badge', async () => {
+  it('marks the active split with a quiet Active label in the mode accent, not a badge', async () => {
     renderScreen();
     const block = within(await screen.findByTestId('workout-split-split-1'));
 
-    const label = block.getByText('ACTIVE');
+    const label = block.getByText('Active');
     expect(StyleSheet.flatten(label.props.style).color).toBe(DEFAULT_WORKOUT_THEME.accent);
     expect(StyleSheet.flatten(label.props.style).backgroundColor).toBeUndefined();
   });
@@ -380,7 +395,7 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
 
     const style = StyleSheet.flatten(create.props.style);
     expect(style.backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
-    expect(create).toHaveTextContent('Create Workout Split');
+    expect(create).toHaveTextContent(/Create Workout Split/);
   });
 
   it('keeps the primary action available on the empty state too', async () => {
@@ -403,25 +418,24 @@ describe('WorkoutSplitsScreen -- the page, top to bottom', () => {
         'workout-split-split-1',
       ]),
     );
-    expect(screen.getByTestId('workout-splits-heading-active')).toHaveTextContent('Active Split');
-    expect(screen.getByTestId('workout-splits-heading-others')).toHaveTextContent(
-      'Your Other Splits',
+    expect(screen.getByTestId('workout-splits-heading-mine')).toHaveTextContent(
+      /My Workout Splits/i,
     );
     expect(screen.getByTestId('workout-splits-library')).toHaveTextContent(
-      /Split Library.*133 splits in 9 categories\. Workouts coming soon\./,
+      /Workout Programs.*Ready-made, structured programs for your goals\./,
     );
+    expect(screen.getByTestId('workout-splits-browse-heading')).toHaveTextContent(/Browse Splits/i);
     expect(screen.getByTestId('workout-splits-presets')).toBeTruthy();
   });
 
-  it('calls them Your Splits while none is active', async () => {
-    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+  it("goes to every ready-made split from Browse Splits' View All", async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
+    fireEvent.press(screen.getByTestId('workout-splits-browse-all'));
 
-    expect(screen.queryByTestId('workout-splits-heading-active')).toBeNull();
-    await waitFor(() =>
-      expect(screen.getByTestId('workout-splits-heading-others')).toHaveTextContent('Your Splits'),
-    );
+    expect(screen.queryByTestId('workout-split-split-1')).toBeNull();
+    expect(screen.getByTestId('workout-splits-presets-preset-bro-split')).toBeTruthy();
+    expect(screen.getByTestId('workout-splits-presets-preset-ppl-upper-lower')).toBeTruthy();
   });
 });
 
@@ -488,12 +502,14 @@ describe('WorkoutSplitsScreen -- programs Coming Soon', () => {
     route = {} as never;
   });
 
-  it('says Coming Soon in the Split Library tab, with no library or recommendations', async () => {
+  it('says Coming Soon in the Browse Splits tab, with no library or recommendations', async () => {
     route = { params: { tab: 'programs' } } as never;
     renderScreen();
-    expect(await screen.findByTestId('workout-splits-programs-coming-soon')).toHaveTextContent(
+    expect(await screen.findByTestId('workout-splits-library')).toHaveTextContent(
       /Workout Programs.*Coming Soon/,
     );
+    // Every ready-made split is still there to start from.
+    expect(screen.getByTestId('workout-splits-presets-preset-arnold')).toBeTruthy();
     expect(screen.queryByTestId('workout-splits-programs-intro')).toBeNull();
     expect(screen.queryByTestId('workout-splits-preferences')).toBeNull();
   });
@@ -502,7 +518,8 @@ describe('WorkoutSplitsScreen -- programs Coming Soon', () => {
     renderScreen();
     const widget = await screen.findByTestId('workout-splits-library');
     expect(widget).toHaveTextContent(/Coming Soon/);
-    // Not a button: nothing to open.
+    // Not a button: nothing to open -- and no View All beside its heading.
     expect(screen.queryByRole('button', { name: /Workout Programs/ })).toBeNull();
+    expect(screen.queryByTestId('workout-splits-programs-all')).toBeNull();
   });
 });

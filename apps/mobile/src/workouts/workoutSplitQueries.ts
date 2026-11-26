@@ -13,6 +13,8 @@ import type { WorkoutSplitPreset } from './workoutSplitPresets';
 export interface WorkoutSplitSummary {
   id: string;
   name: string;
+  /** How many days it has -- the split list says it ("6 days / week"); absent where not read. */
+  dayCount?: number;
 }
 
 export interface WorkoutSplitDay {
@@ -26,15 +28,23 @@ export interface WorkoutSplitDetail extends WorkoutSplitSummary {
   days: WorkoutSplitDay[];
 }
 
-/** Every workout split this user has created, in creation order. */
+/** Every workout split this user has created, in creation order, with how many days each has. */
 export async function fetchWorkoutSplits(userId: string): Promise<WorkoutSplitSummary[]> {
   const { data, error } = await supabase
     .from('workout_splits')
-    .select('id, name')
+    .select('id, name, workout_split_days(count)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  type Row = { id: string; name: string; workout_split_days?: { count: number }[] | null };
+  return ((data ?? []) as Row[]).map((row) => {
+    const counted = row.workout_split_days?.[0]?.count;
+    return {
+      id: row.id,
+      name: row.name,
+      ...(typeof counted === 'number' ? { dayCount: counted } : {}),
+    };
+  });
 }
 
 /** One split with its ordered days and each day's muscle groups. */
