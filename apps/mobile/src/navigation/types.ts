@@ -129,6 +129,8 @@ export type RootStackParamList = {
   /** Progress, on a section (Feed's Daily Steps widget opens Steps); Overview when absent. */
   ProgressOverview: { section?: ProgressSection } | undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
+  /** Which muscle groups have been trained lately, from the sets logged (Progress > Overview). */
+  MuscleActivity: undefined;
   /** Workout Splits, on its My Splits or Programs tab (My Splits when absent). */
   WorkoutSplits: { tab?: 'splits' | 'programs' } | undefined;
   WorkoutSplitView: { splitId: string };

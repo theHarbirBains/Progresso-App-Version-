@@ -44,6 +44,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   ExerciseProgress: 'progress',
   ProgressOverview: 'progress',
   ProgressExerciseDetail: 'progress',
+  MuscleActivity: 'progress',
   AccountSettings: 'you',
   SettingsPersonalInfo: 'you',
   ProfileMontage: 'you',

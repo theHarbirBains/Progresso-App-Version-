@@ -191,6 +191,7 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
                   setAllTimeView('workouts');
                   setActiveSection('AllTime');
                 }}
+                onOpenMuscleActivity={() => navigation.navigate('MuscleActivity')}
                 top={
                   <>
                     <WeeklySummaryBlock

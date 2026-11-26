@@ -38,6 +38,8 @@ interface Props {
   onViewAllMilestones: () => void;
   /** Shown first, above everything else -- the Weekly Summary. */
   top?: ReactNode;
+  /** Opens Muscle Activity; absent (no card) in a trainer's view of a client. */
+  onOpenMuscleActivity?: () => void;
 }
 
 function OverviewStat({
@@ -84,6 +86,7 @@ export function OverviewSection({
   navigation,
   onViewAllMilestones,
   top,
+  onOpenMuscleActivity,
 }: Props) {
   const recentMilestones = useMemo(
     () => mergeAndSortPRs(repPRs, oneRepMaxes, exerciseRecords).slice(0, RECENT_MILESTONES_LIMIT),
@@ -161,6 +164,25 @@ export function OverviewSection({
           />
         </View>
       </View>
+
+      {onOpenMuscleActivity ? (
+        <TouchableOpacity
+          testID="progress-overview-muscle-activity"
+          style={styles.overviewCard}
+          onPress={onOpenMuscleActivity}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Muscle Activity. See which muscles you've trained lately"
+        >
+          <ProgressCardHeader
+            title="Muscle Activity"
+            subtitle="See which muscles you've trained in the last 7, 30 or 90 days."
+            icon="activity"
+            accentColor={accentColor}
+            action={<Feather name="chevron-right" size={18} color={accentColor} />}
+          />
+        </TouchableOpacity>
+      ) : null}
 
       {recentMilestones.length > 0 ? (
         <View style={styles.overviewCard}>
