@@ -19,6 +19,9 @@ import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkou
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 import { startPlannedWorkout } from '../workouts/startPlannedWorkout';
+import { GymPicker } from '../gyms/GymPicker';
+import type { GymPlace } from '../gyms/gymSearch';
+import { setWorkoutGym } from '../gyms/workoutGyms';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -53,6 +56,10 @@ export function NewWorkoutScreen({ navigation }: Props) {
   const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
 
   const [loading, setLoading] = useState(true);
+  // Where they're training today, if they say: saved to the workout as it starts. Never chosen
+  // for them -- it's picked in the gym picker and confirmed.
+  const [gym, setGym] = useState<GymPlace | null>(null);
+  const [gymPickerOpen, setGymPickerOpen] = useState(false);
   const [hasActiveSplitId, setHasActiveSplitId] = useState(false);
   const [activeSplit, setActiveSplit] = useState<WorkoutSplitDetail | null>(null);
   const [nextPlan, setNextPlan] = useState<NextWorkoutPlan | null>(null);
@@ -133,6 +140,9 @@ export function NewWorkoutScreen({ navigation }: Props) {
           return;
         }
         setCustomSheetOpen(false);
+        // The gym, on the workout just started. A failure never stops the workout: it can be
+        // added from the workout's page.
+        if (gym) await setWorkoutGym(userId, result.params.workoutId, gym).catch(() => undefined);
         navigation.replace('ActiveWorkout', result.params);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to start workout');
@@ -140,7 +150,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
         setBusyKey(null);
       }
     },
-    [userId, busyKey, navigation],
+    [userId, busyKey, navigation, gym],
   );
 
   const trimmedCustomName = customName.trim();
@@ -299,6 +309,18 @@ export function NewWorkoutScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
+        {/* Where they're training -- optional, and theirs alone to see -- saved to the workout
+            they start. */}
+        <Section title="Where You're Training">
+          <ListRow
+            testID="start-workout-gym-row"
+            title={gym ? gym.name : 'Add Your Gym'}
+            subtitle={gym ? gym.address || 'Saved with the workout you start' : 'Optional'}
+            onPress={() => setGymPickerOpen(true)}
+            accessibilityLabel={gym ? `Gym: ${gym.name}. Change it` : 'Add your gym, optional'}
+          />
+        </Section>
+
         <Section title="More Ways to Train">
           <ListRow
             testID="start-workout-group"
@@ -360,6 +382,22 @@ export function NewWorkoutScreen({ navigation }: Props) {
           />
         </View>
       </BottomSheet>
+      <GymPicker
+        visible={gymPickerOpen}
+        userId={userId}
+        current={gym}
+        onClose={() => setGymPickerOpen(false)}
+        onConfirm={(picked) => {
+          setGym(picked);
+          setGymPickerOpen(false);
+        }}
+        onRemove={() => {
+          setGym(null);
+          setGymPickerOpen(false);
+        }}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+      />
     </>
   );
 }

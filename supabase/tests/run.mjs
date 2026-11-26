@@ -7859,6 +7859,93 @@ async function main() {
     );
   }
 
+  console.log('\nRunning workout gym tests...\n');
+  {
+    const [lifter, coach, mate] = [randomUUID(), randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6)', [
+      lifter,
+      'gym-lifter@test.local',
+      coach,
+      'gym-coach@test.local',
+      mate,
+      'gym-mate@test.local',
+    ]);
+    // A trainer of the lifter, and someone in a group workout with them: both can read the
+    // lifter's workout itself.
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status, source) values ($1, $2, 'active', 'managed')",
+      [coach, lifter],
+    );
+    const group = (
+      await admin.query(
+        "insert into public.workout_groups (host_id, name) values ($1, 'Gym group') returning id",
+        [lifter],
+      )
+    ).rows[0].id;
+    await admin.query(
+      "insert into public.workout_group_members (group_id, user_id, role, status, added_by) values ($1, $2, 'host', 'joined', $2), ($1, $3, 'member', 'joined', $2)",
+      [group, lifter, mate],
+    );
+    const workout = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Legs', now(), $2) returning id",
+        [lifter, group],
+      )
+    ).rows[0].id;
+
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "insert into public.workout_gyms (workout_id, user_id, name, address, latitude, longitude) values ($1, $2, 'Fit4Less Downtown', '123 Main St', 49.28, -123.12)",
+        [workout, lifter],
+      ),
+    );
+    const sees = async (userId) =>
+      (
+        await asUser(userId, (c) =>
+          c.query('select name from public.workout_gyms where workout_id = $1', [workout]),
+        )
+      ).rows.length;
+    record("A workout's gym is its owner's to see", (await sees(lifter)) === 1);
+    record(
+      'Nobody else sees where someone trained -- not their trainer, nor anyone in the group',
+      (await sees(coach)) === 0 && (await sees(mate)) === 0,
+    );
+    await expectThrows(
+      asUser(coach, (c) =>
+        c.query(
+          "insert into public.workout_gyms (workout_id, user_id, name) values ($1, $2, 'Elsewhere')",
+          [workout, coach],
+        ),
+      ),
+      "Nobody puts a gym on someone else's workout",
+      /row-level security/,
+    );
+    await expectThrows(
+      asUser(lifter, (c) =>
+        c.query('update public.workout_gyms set latitude = null where workout_id = $1', [workout]),
+      ),
+      "A gym's coordinates are both there or neither",
+      /workout_gyms_coordinates_together/,
+    );
+    // Changing it later rewrites only that workout's gym.
+    const second = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Push', now(), now()) returning id",
+        [lifter],
+      )
+    ).rows[0].id;
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "insert into public.workout_gyms (workout_id, user_id, name) values ($1, $2, 'Kits Iron')",
+        [second, lifter],
+      ),
+    );
+    const first = (
+      await admin.query('select name from public.workout_gyms where workout_id = $1', [workout])
+    ).rows[0].name;
+    record("Another workout's gym never changes an earlier one's", first === 'Fit4Less Downtown');
+  }
+
   await admin.end();
 }
 

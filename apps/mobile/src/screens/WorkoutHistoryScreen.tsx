@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { fetchGymsForWorkouts } from '../gyms/workoutGyms';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
@@ -69,13 +70,15 @@ export interface WorkoutRowProps {
   /** A hairline above the row -- every row but the first in a list. */
   divider?: boolean;
   onPress: () => void;
+  /** Where it was done, when they said. */
+  gymName?: string;
 }
 
 // One completed workout as a row (sat inside a widget): the split day (or the workout's own
 // name), the muscles trained, and one muted line of date, duration and sets -- with cardio, its
 // total time (the strength training and the cardio together) and its activities (cardio alone has
 // no sets to count).
-export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
+export function WorkoutRow({ workout, divider, onPress, gymName }: WorkoutRowProps) {
   const muscles = musclesLabel(workout);
   const cardio = workout.cardio ?? [];
   const minutes = cardio.length > 0 ? (workout.totalMinutes ?? null) : workout.durationMinutes;
@@ -86,6 +89,8 @@ export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
       subtitle={muscles || undefined}
       detail={[
         formatCardDate(workout.performedAt),
+        // Where it was done, when they said (theirs alone to see).
+        ...(gymName ? [gymName] : []),
         // Logged with no duration: none shown.
         ...(minutes !== null ? [formatCardDuration(minutes)] : []),
         ...(cardio.length === 0 || workout.completedSetCount > 0
@@ -139,6 +144,20 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const [recentLoading, setRecentLoading] = useState(!shown.recent);
   const [recentLoadingMore, setRecentLoadingMore] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
+  // Each listed workout's gym, by workout -- read with the list, never in its way.
+  const [gyms, setGyms] = useState<ReadonlyMap<string, string>>(new Map());
+  const loadGyms = useCallback(async (ids: string[]) => {
+    try {
+      const found = await fetchGymsForWorkouts(ids);
+      setGyms((current) => {
+        const next = new Map(current);
+        for (const [id, gym] of found) next.set(id, gym.name);
+        return next;
+      });
+    } catch {
+      // No gyms shown: the list stands without them.
+    }
+  }, []);
 
   // The next workout of the active split -- worked out exactly as Feed's (computeNextWorkout:
   // the day after the last one done; a missed workout never moves it on). Undefined until known.
@@ -266,6 +285,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       try {
         const history = await fetchWorkoutHistory(userId, 0, RECENT_PAGE_SIZE);
         const rows = await enrichWorkoutSummaries(history.rows);
+        void loadGyms(rows.map((row) => row.id));
         setRecentWorkouts(rows);
         setRecentHasMore(history.hasMore);
         setRecentPage(0);
@@ -276,7 +296,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         setRecentLoading(false);
       }
     },
-    [userId],
+    [userId, loadGyms],
   );
 
   // Only the very first focus should replace the calendar/list with
@@ -309,6 +329,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       const next = recentPage + 1;
       const history = await fetchWorkoutHistory(userId, next, RECENT_PAGE_SIZE);
       const enriched = await enrichWorkoutSummaries(history.rows);
+      void loadGyms(enriched.map((row) => row.id));
       setRecentWorkouts((prev) => [...prev, ...enriched]);
       setRecentHasMore(history.hasMore);
       setRecentPage(next);
@@ -553,6 +574,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
               workout={workout}
               divider={index > 0}
               onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+              gymName={gyms.get(workout.id)}
             />
           ))
         )}

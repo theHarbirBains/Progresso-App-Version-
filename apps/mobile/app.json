@@ -123,12 +123,12 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Progresso uses your location once, while you sign up, to put the country you're in at the top of the list. It's never sent to Progresso or kept.",
+          "locationWhenInUsePermission": "Progresso uses your location while you use it: once as you sign up, to put your country first, and when you look for gyms near you, to find them on Apple Maps. Your location is never sent to Progresso or kept; only the gym you choose is saved.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
           "motionUsagePermission": false,
           "locationFullAccuracyPermission": false,
-          "isIosReducedAccuracyByDefault": true,
+          "isIosReducedAccuracyByDefault": false,
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false

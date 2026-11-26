@@ -284,6 +284,27 @@ jest.mock('expo-file-system', () => ({
 }));
 jest.mock('expo-asset', () => ({ Asset: { fromModule: jest.fn() } }));
 
+// The gym a workout was done at is read from Supabase (gyms/workoutGyms.ts); a screen's test that
+// cares says what's there -- by default no workout has one and none were used lately.
+jest.mock('./src/gyms/workoutGyms', () => ({
+  fetchWorkoutGym: jest.fn().mockResolvedValue(null),
+  fetchGymsForWorkouts: jest.fn().mockResolvedValue(new Map()),
+  setWorkoutGym: jest.fn(),
+  removeWorkoutGym: jest.fn().mockResolvedValue(undefined),
+  fetchRecentGyms: jest.fn().mockResolvedValue([]),
+}));
+
+// The gym picker's map (react-native-maps) is native: a plain view in its place, its markers
+// plain views carrying what they were given, so a test can find and press them.
+jest.mock('react-native-maps', () => {
+  const react = require('react');
+  const { View } = require('react-native');
+  const MapView = (props) => react.createElement(View, props, props.children);
+  const Marker = (props) =>
+    react.createElement(View, { ...props, testID: props.testID ?? 'map-marker' });
+  return { __esModule: true, default: MapView, Marker };
+});
+
 // Tests stand for a real build, which has the widgets', Apple Health's and location's native
 // sides (Expo Go has neither of the first two); lib/nativeModules.test.ts and the tests that cover
 // going without them say so.

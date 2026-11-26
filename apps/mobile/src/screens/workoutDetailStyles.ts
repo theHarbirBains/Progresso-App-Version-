@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, fonts, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // WorkoutDetailScreen -- a completed workout as a stack of widgets: one summary
 // card, then one card per exercise. Token-only. Widgets are separated by exactly
@@ -88,6 +88,29 @@ export const workoutDetailStyles = StyleSheet.create({
   setValue: {
     ...typeScale.statSmall,
     color: colors.textPrimary,
+    flex: 1,
+  },
+  // Where it was done, at the foot of the summary: a pin in the accent, the gym, its address --
+  // a 44pt tap opening the gym picker. Your own workouts only.
+  gymLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: 44,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  gymName: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  gymAddress: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
     flex: 1,
   },
 });

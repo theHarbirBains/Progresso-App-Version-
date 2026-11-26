@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { fetchWorkoutGym, removeWorkoutGym } from '../gyms/workoutGyms';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { fonts, widgetGap } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
@@ -1173,6 +1174,47 @@ describe("WorkoutDetailScreen -- a friend's workout", () => {
 
     fireEvent.press(await screen.findByTestId('workout-detail-people-hidden:pat'));
     expect(screen.getByTestId('workout-detail-hidden')).toHaveTextContent(/Pat Doe/);
+  });
+
+  it("says where your own workout was done, to change or take off -- never on a friend's", async () => {
+    const gym = {
+      workoutId: 'w1',
+      name: 'Fit4Less Downtown',
+      address: '123 Main St, Vancouver, BC',
+      latitude: 49.28,
+      longitude: -123.12,
+    };
+    jest.mocked(fetchWorkoutGym).mockResolvedValueOnce(gym);
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('workout-detail-gym-row')).toHaveTextContent(
+      /Fit4Less Downtown.*123 Main St/,
+    );
+    fireEvent.press(screen.getByTestId('workout-detail-gym-row'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('gym-picker-remove'));
+    });
+    expect(removeWorkoutGym).toHaveBeenCalledWith('w1');
+    expect(screen.getByTestId('workout-detail-gym-row')).toHaveTextContent(/Add Gym/);
+  });
+
+  it("never shows a friend's gym", async () => {
+    const { getFriendWorkout } = jest.requireMock('../lib/api') as { getFriendWorkout: jest.Mock };
+    getFriendWorkout.mockResolvedValue(theirs);
+    jest.mocked(fetchWorkoutGym).mockClear();
+    render(
+      <WorkoutDetailScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'fw1', authorId: 'sam' } } as never}
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    await screen.findByTestId('workout-detail-author');
+    expect(screen.queryByTestId('workout-detail-gym-row')).toBeNull();
+    expect(fetchWorkoutGym).not.toHaveBeenCalled();
   });
 
   it('has likes and comments on your own finished workout too', async () => {

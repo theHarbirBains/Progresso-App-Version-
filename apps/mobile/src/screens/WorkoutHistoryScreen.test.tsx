@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { fetchGymsForWorkouts } from '../gyms/workoutGyms';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Feather } from '@expo/vector-icons';
 import { Card } from '../design/Card';
@@ -311,6 +312,33 @@ describe('WorkoutHistoryScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('workout-item-w1')).toHaveTextContent(/Push Day/);
+    await settle();
+  });
+
+  it('says where each workout was done, when they said', async () => {
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: [enrichedFixture({})], hasMore: false });
+    jest.mocked(fetchGymsForWorkouts).mockResolvedValueOnce(
+      new Map([
+        [
+          'w1',
+          {
+            workoutId: 'w1',
+            ...{
+              name: 'Fit4Less Downtown',
+              address: '123 Main St, Vancouver, BC',
+              latitude: 49.28,
+              longitude: -123.12,
+            },
+          },
+        ],
+      ]),
+    );
+
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('workout-item-w1')).toHaveTextContent(/Fit4Less Downtown/),
+    );
     await settle();
   });
 

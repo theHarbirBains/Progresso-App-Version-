@@ -19,6 +19,13 @@ import { getFriendWorkout, type FollowUser } from '../lib/api';
 import { listTrainerClients } from '../lib/trainerApi';
 import { friendWorkoutDetail } from '../social/friendWorkout';
 import { HiddenWorkoutCard } from '../social/HiddenWorkoutCard';
+import { GymPicker } from '../gyms/GymPicker';
+import {
+  fetchWorkoutGym,
+  removeWorkoutGym,
+  setWorkoutGym,
+  type WorkoutGym,
+} from '../gyms/workoutGyms';
 import { personLabel } from '../social/PeopleList';
 import { WorkoutComments } from '../social/WorkoutComments';
 import { formatWeightKg } from '../lib/units';
@@ -153,6 +160,10 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // A friend's group workout: everyone in it in the group's order, each theirs to read or, where
   // you may not see it (a private profile you don't follow), only who they are.
   const [friendGroup, setFriendGroup] = useState<FriendGroupEntry[] | null>(null);
+  // Where this workout was done -- your own only: nobody else is ever shown it.
+  const [gym, setGym] = useState<WorkoutGym | null>(null);
+  const [gymPickerOpen, setGymPickerOpen] = useState(false);
+  const [gymError, setGymError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState(workoutId);
   // Which muscle group's exercises show, as in the live workout -- or its cardio alone; All to
   // start.
@@ -187,6 +198,14 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         const detail = await fetchWorkoutDetail(workoutId);
         if (cancelled) return;
         setWorkout(detail);
+        // Its gym, for your own workout (a trainer's view of a client's has none).
+        if (!clientId) {
+          void fetchWorkoutGym(workoutId)
+            .then((found) => {
+              if (!cancelled) setGym(found);
+            })
+            .catch(() => undefined);
+        }
         if (detail.groupId) {
           // The rest of the group follows; the page shows this workout meanwhile.
           void fetchGroupWorkouts(accessToken, detail.groupId, detail).then((group) => {
@@ -245,7 +264,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, ownerId, accessToken, userId, friend]);
+  }, [workoutId, ownerId, accessToken, userId, friend, clientId]);
 
   if (loading || !workout) {
     return (
@@ -570,6 +589,32 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 {lastStat}
               </View>
             )}
+            {isOwn && !clientId && shown.id === workoutId ? (
+              <TouchableOpacity
+                testID="workout-detail-gym-row"
+                style={styles.gymLine}
+                onPress={() => setGymPickerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  gym ? `Gym: ${gym.name}. Change or remove it` : 'Add the gym you trained at'
+                }
+              >
+                <Feather name="map-pin" size={14} color={theme.accent} />
+                <Text style={styles.gymName} numberOfLines={1}>
+                  {gym ? gym.name : 'Add Gym'}
+                </Text>
+                {gym?.address ? (
+                  <Text style={styles.gymAddress} numberOfLines={1}>
+                    {gym.address}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
+            ) : null}
+            {gymError ? (
+              <Text testID="workout-detail-gym-error" style={styles.errorText}>
+                {gymError}
+              </Text>
+            ) : null}
           </AppCard>
 
           {/* Opened at its comments (a feed card's bubble, a like or comment in the bell): they
@@ -728,6 +773,30 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           ) : null}
         </>
       )}
+      {isOwn && !clientId ? (
+        <GymPicker
+          visible={gymPickerOpen}
+          userId={userId}
+          current={gym}
+          onClose={() => setGymPickerOpen(false)}
+          onConfirm={(picked) => {
+            setGymPickerOpen(false);
+            setGymError(null);
+            setWorkoutGym(userId, workoutId, picked)
+              .then(setGym)
+              .catch(() => setGymError("Couldn't save the gym. Try again."));
+          }}
+          onRemove={() => {
+            setGymPickerOpen(false);
+            setGymError(null);
+            removeWorkoutGym(workoutId)
+              .then(() => setGym(null))
+              .catch(() => setGymError("Couldn't remove the gym. Try again."));
+          }}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
+      ) : null}
     </Screen>
   );
 }

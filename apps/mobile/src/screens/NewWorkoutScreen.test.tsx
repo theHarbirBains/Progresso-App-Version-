@@ -1,4 +1,5 @@
 import { ActivityIndicator, StyleSheet } from 'react-native';
+import { fetchRecentGyms, setWorkoutGym } from '../gyms/workoutGyms';
 import { Feather } from '@expo/vector-icons';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
@@ -135,6 +136,53 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     expect(await screen.findByTestId('start-workout-day-day-3')).toBeTruthy();
     expect(screen.getByText('Recovery')).toBeTruthy();
     expect(screen.getByText('Conditioning')).toBeTruthy();
+  });
+
+  it('saves the gym chosen to the workout it starts -- none chosen, none saved', async () => {
+    const recent = jest.mocked(fetchRecentGyms);
+    recent.mockResolvedValue([
+      {
+        name: 'Fit4Less Downtown',
+        address: '123 Main St, Vancouver, BC',
+        latitude: 49.28,
+        longitude: -123.12,
+      },
+    ]);
+    jest
+      .mocked(setWorkoutGym)
+      .mockReset()
+      .mockResolvedValue({
+        workoutId: 'w1',
+        ...{
+          name: 'Fit4Less Downtown',
+          address: '123 Main St, Vancouver, BC',
+          latitude: 49.28,
+          longitude: -123.12,
+        },
+      });
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('start-workout-gym-row')).toHaveTextContent(
+      /Add Your Gym.*Optional/,
+    );
+    fireEvent.press(screen.getByTestId('start-workout-gym-row'));
+    fireEvent.press(await screen.findByTestId('gym-picker-recent-0'));
+    fireEvent.press(screen.getByTestId('gym-picker-confirm'));
+    expect(screen.getByTestId('start-workout-gym-row')).toHaveTextContent(/Fit4Less Downtown/);
+
+    fireEvent.press(screen.getByTestId('start-workout-next'));
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'w1' }),
+    );
+    expect(setWorkoutGym).toHaveBeenCalledWith('user-1', 'w1', {
+      name: 'Fit4Less Downtown',
+      address: '123 Main St, Vancouver, BC',
+      latitude: 49.28,
+      longitude: -123.12,
+    });
+    recent.mockResolvedValue([]);
   });
 
   it('starting the next workout creates it tagged with that day and enters ActiveWorkout', async () => {
