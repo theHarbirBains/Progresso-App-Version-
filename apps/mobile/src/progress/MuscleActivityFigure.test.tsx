@@ -21,11 +21,17 @@ const activity = muscleActivity(
   () => [],
 );
 
+/** A drawn node as the test renderer has it: its props. */
+type Node = { props: Record<string, unknown> };
+
 /** Every drawn shape that answers a tap, with the muscle it is. */
 function tappableMuscles(): { region: MuscleRegion; press: () => void }[] {
   return screen.UNSAFE_root.findAll(
-    (node) => typeof node.props.onPress === 'function' && typeof node.props.d === 'string',
-  ).map((node) => ({ region: node.props.region ?? null, press: node.props.onPress }));
+    (node: Node) => typeof node.props.onPress === 'function' && typeof node.props.d === 'string',
+  ).map((node: Node) => ({
+    region: node.props.region as MuscleRegion,
+    press: node.props.onPress as () => void,
+  }));
 }
 
 describe('MuscleActivityFigure', () => {

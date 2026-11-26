@@ -34,8 +34,9 @@ jest.mock('../exercises/builtinExtras', () => ({
 }));
 
 let focus: (() => void) | null = null;
+const mockNavigate = jest.fn();
 const navigation = {
-  navigate: jest.fn(),
+  navigate: mockNavigate,
   goBack: jest.fn(),
   addListener: jest.fn((_event: string, listener: () => void) => {
     focus = listener;
@@ -120,7 +121,7 @@ describe('MuscleActivityScreen', () => {
     expect(screen.getByTestId('muscle-activity-group-volume')).toHaveTextContent(/1,000 kg/);
     expect(screen.getByTestId('muscle-activity-group-last')).toHaveTextContent(/Today|Yesterday/);
     fireEvent.press(screen.getByTestId('muscle-activity-exercise-bench'));
-    expect(navigation.navigate).toHaveBeenCalledWith('ProgressExerciseDetail', {
+    expect(mockNavigate).toHaveBeenCalledWith('ProgressExerciseDetail', {
       exerciseId: 'bench',
       exerciseName: 'Bench Press',
     });

@@ -17,8 +17,10 @@ function daysAgo(days: number, hour = 10): string {
 }
 
 let workout = 0;
-function entry(over: Partial<ActivityEntry> & { daysAgo: number; sets?: number }): ActivityEntry {
-  const count = over.sets ?? 3;
+function entry(
+  over: Partial<Omit<ActivityEntry, 'sets'>> & { daysAgo: number; setCount?: number },
+): ActivityEntry {
+  const count = over.setCount ?? 3;
   workout += 1;
   return {
     workoutId: over.workoutId ?? `w${workout}`,
@@ -54,7 +56,7 @@ describe('muscleActivity', () => {
     const activity = muscleActivity(
       [
         entry({ daysAgo: 3, workoutId: 'a' }),
-        entry({ daysAgo: 10, workoutId: 'b', sets: 4 }),
+        entry({ daysAgo: 10, workoutId: 'b', setCount: 4 }),
         // A drop adds its volume, never a set of its own.
         {
           ...entry({ daysAgo: 10, workoutId: 'b', exerciseId: 'fly', exerciseName: 'Fly' }),
@@ -154,7 +156,7 @@ describe('muscleActivity', () => {
     expect(trendBuckets(90, NOW)).toHaveLength(13);
     expect(trendBuckets(30, NOW)[0]).toEqual(periodStart(30, NOW));
     const activity = muscleActivity(
-      [entry({ daysAgo: 0, sets: 2 }), entry({ daysAgo: 8, sets: 5 })],
+      [entry({ daysAgo: 0, setCount: 2 }), entry({ daysAgo: 8, setCount: 5 })],
       30,
       NOW,
       secondaryOf,
@@ -168,7 +170,7 @@ describe('lessTrained', () => {
   it('points out the main groups trained least, fewest sets first -- never adductors', () => {
     const activity = muscleActivity(
       [
-        entry({ daysAgo: 3, muscleGroup: 'back', exerciseId: 'row', sets: 2 }),
+        entry({ daysAgo: 3, muscleGroup: 'back', exerciseId: 'row', setCount: 2 }),
         ...Array.from({ length: 10 }, (_, i) => entry({ daysAgo: 1 + i })),
       ],
       30,
