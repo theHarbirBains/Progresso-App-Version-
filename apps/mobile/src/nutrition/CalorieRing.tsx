@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Skeleton } from '../design/Skeleton';
@@ -21,6 +21,10 @@ interface Props {
   strokeWidth?: number;
   /** Read out after the figure: "logged today" (the default), or "a day on average". */
   spokenPeriod?: string;
+  /** A small glyph over the figure (the Nutrition screen's flame). */
+  glyph?: ReactNode;
+  /** "of 2,500 cal" (the default) or "/ 2,500 cal". */
+  goalJoin?: 'of' | '/';
   testID?: string;
 }
 
@@ -44,6 +48,8 @@ export function CalorieRing({
   size = DEFAULT_SIZE,
   strokeWidth = DEFAULT_STROKE_WIDTH,
   spokenPeriod = 'logged today',
+  glyph,
+  goalJoin = 'of',
   testID,
 }: Props) {
   const radius = (size - strokeWidth) / 2;
@@ -113,11 +119,14 @@ export function CalorieRing({
         <Skeleton width={size} height={size} radius={size / 2} />
       )}
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
-        <View style={styles.center}>
+        <View style={[styles.center, glyph ? styles.centerTight : null]}>
+          {glyph}
           <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>
             {wholeFigure(consumed)}
           </Text>
-          <Text style={styles.unit}>{goal !== null ? `of ${wholeFigure(goal)} cal` : 'cal'}</Text>
+          <Text style={styles.unit}>
+            {goal !== null ? `${goalJoin} ${wholeFigure(goal)} cal` : 'cal'}
+          </Text>
         </View>
       </View>
     </View>
@@ -130,6 +139,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+  },
+  centerTight: {
+    gap: 0,
   },
   value: {
     ...typeScale.statLarge,

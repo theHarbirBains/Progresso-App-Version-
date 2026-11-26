@@ -1,27 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   InputAccessoryView,
   Keyboard,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
+import { BottomSheet } from '../design/BottomSheet';
 import { RiseIn, RiseInStack } from '../design/RiseIn';
-import { EmptyState } from '../design/EmptyState';
 import { Screen } from '../design/Screen';
-import { Section } from '../design/Section';
 import { SkeletonCards } from '../design/Skeleton';
-import { StatBlock } from '../design/StatBlock';
-import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -74,29 +75,26 @@ const AMOUNT_DONE_ID = 'food-log-amount-done';
 // Logging from another day logs to it -- the day goes with each way to log as a route param
 // -- and every day shows its week's calorie budget; only today shows Copy Yesterday.
 //
-// Layout: the shared Screen with a hamburger menu, the day bar, then five
-// widgets `widgetGap` apart, rising in like every other page's:
-// - **Today** (the hero): the calorie ring and what's left on the left; on the
-//   right, protein / carbs / fat, each with its glyph, what's been eaten against
-//   the target and a thin bar of the way there.
-// - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to
-//   Saturday -- against what's been eaten so far, as a bar, with what's left and the days
-//   left to spread it over (WeeklyCalorieBudget).
-// - **Micronutrients**: one quiet row to the vitamins and minerals for the day shown
-//   (MicronutrientsWidget) -- no figures of its own here.
-// - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
-//   Food outlined side by side under it, and AI Food Search ("Describe a Food")
-//   outlined under those -- every way into the same LogFoodStep-backed logging
-//   flow.
-// - **Today's Foods**, with View All (Nutrition History): each food as a row --
-//   its picture, its name, the values snapshotted when it was logged, an
-//   editable quantity and a quiet Delete -- or, with none yet, a quiet empty
-//   state offering to log the first. Under them, two quiet actions: Copy
-//   Yesterday (when yesterday has foods -- a sheet of them, all ticked, logged
-//   again now) and Save as Meal (when today has some -- a sheet to name them
-//   and keep them as a saved meal in the Food Library).
-// - **Daily Targets**, with Edit Targets (Nutrition Goals): the four targets as
-//   stat blocks, "—" for one not set.
+// Layout (Harbir's one-page design): all of it fits one iPhone 15-sized screen with nothing to
+// scroll -- a smaller phone still scrolls the page. The shared Screen with a hamburger menu, the
+// day on one line (DayBar compact: an arrow either side, the date between, tapped for the
+// calendar), then five widgets `widgetGap` apart, rising in like every other page's:
+// - **Today** (the hero): the calorie ring and what's left on the left; on the right, protein /
+//   carbs / fat (MacroRows compact), then one quiet row to the vitamins and minerals for the day
+//   shown (MicronutrientsWidget) -- no figures of its own here.
+// - **Log Food**: four outlined tiles -- Scan Barcode, Search Food, Describe Food (AI) and Quick
+//   Entry -- with the Food Library as the card's link: every way into the same logging flow.
+// - **Today's Foods**, with View All (Nutrition History), taking the room that's left: each food
+//   as a row -- its picture, its name, the values snapshotted when it was logged, an editable
+//   quantity and a quiet Delete -- scrolling inside the card, or, with none yet, an empty state
+//   with the page's one filled button, Log Your First Meal. Under them, two quiet actions: Copy
+//   Yesterday (when yesterday has foods -- a sheet of them, all ticked, logged again now) and
+//   Save as Meal (when today has some -- a sheet to name them and keep them as a saved meal).
+// - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to Saturday --
+//   as a slim card: a bar, what's been eaten against it and what's left (WeeklyCalorieBudget
+//   summary); a tap opens the rest in a sheet.
+// - **Daily Targets**, with Edit Targets (Nutrition Goals): the four targets as tiles, "—" for
+//   one not set.
 /** A day key worth showing: a real day, not ahead of today; today otherwise. */
 function shownDayFrom(key: string | undefined): string {
   if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return todayKey();
@@ -191,6 +189,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const [weekLogs, setWeekLogs] = useState<{ start: number; rows: FoodLogRow[] } | null>(null);
   const [weekFailed, setWeekFailed] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  // The week in full -- its unlogged days, how it sits with the goal, the estimate -- in a sheet.
+  const [weekOpen, setWeekOpen] = useState(false);
   const [saveMealOpen, setSaveMealOpen] = useState(false);
 
   // Yesterday's foods, for Copy Yesterday. Read each time Today opens -- it's opened fresh on
@@ -370,6 +370,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         onChooseDay={() => navigation.navigate('NutritionHistory', { date: day })}
         onAdjust={(direction) => dayTurn.turnTo(direction)}
         accentColor={nutritionTheme.accent}
+        compact
       />
     </View>
   );
@@ -377,7 +378,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   if (goalsLoading || (isToday && logsLoading) || !showPage) {
     return (
       <Screen header={header} contentContainerStyle={styles.content}>
-        <SkeletonCards testID="nutrition-today-loading" heights={[216, 132, 176]} />
+        <SkeletonCards testID="nutrition-today-loading" heights={[44, 168, 104, 140, 80, 96]} />
       </Screen>
     );
   }
@@ -395,6 +396,172 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     { key: 'fat', label: 'Fat', value: goals.fatG, unit: 'g' },
   ];
 
+  // The day's foods: each a row with its picture, its figures and its amount to change, swiped to
+  // delete; then Copy Yesterday and Save as Meal. In the foods card's own scroll.
+  const foodRows = (
+    <View {...dayTurn.rowSwipeZone}>
+      {logs.map((log, index) => (
+        <SwipeToDelete
+          key={log.id}
+          testID={`food-log-swipe-${log.id}`}
+          style={index > 0 && styles.divider}
+          name={log.foodNameSnapshot}
+          open={swipeOpenId === log.id}
+          onOpenChange={(open) => setSwipeOpenId(open ? log.id : null)}
+          onSwipingChange={setRowSwiping}
+          onDelete={() => void handleDelete(log.id)}
+        >
+          <View testID={`food-log-row-${log.id}`} style={styles.logRow}>
+            <FoodImage
+              testID={`food-log-image-${log.id}`}
+              uri={log.imageUrl}
+              name={log.foodNameSnapshot}
+              size={40}
+              zoomable
+            />
+            <View
+              testID={`food-log-info-${log.id}`}
+              style={styles.logInfo}
+              accessible
+              accessibilityLabel={`${log.foodNameSnapshot}, ${wholeFigure(log.calories)} calories`}
+              accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'delete') void handleDelete(log.id);
+              }}
+            >
+              <Text style={styles.logName} numberOfLines={1}>
+                {log.foodNameSnapshot}
+              </Text>
+              <Text style={styles.logMeta} numberOfLines={1}>
+                {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein ·{' '}
+                {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
+              </Text>
+            </View>
+            <View style={styles.quantityColumn}>
+              <TextInput
+                testID={`food-log-quantity-${log.id}`}
+                style={styles.quantityInput}
+                accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
+                  2,
+                  log.enteredUnit ?? 'servings',
+                  servingMeasures(log).pieces,
+                )}`}
+                accessibilityHint="Enter 0 to take it off the day."
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                inputAccessoryViewID={AMOUNT_DONE_ID}
+                value={quantityInputs[log.id] ?? ''}
+                onChangeText={(text) => setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))}
+                onEndEditing={() => handleUpdateQuantity(log)}
+              />
+              <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
+                {unitWord(
+                  log.enteredAmount ?? log.quantity,
+                  log.enteredUnit ?? 'servings',
+                  servingMeasures(log).pieces,
+                )}
+              </Text>
+            </View>
+          </View>
+        </SwipeToDelete>
+      ))}
+    </View>
+  );
+  const foodShortcuts =
+    (isToday && yesterdayLogs.length > 0) || logs.some((log) => log.foodId !== null) ? (
+      <View style={styles.foodShortcuts}>
+        {isToday && yesterdayLogs.length > 0 ? (
+          <TextButton
+            testID="nutrition-today-copy-yesterday"
+            label="Copy Yesterday"
+            onPress={() => setCopyOpen(true)}
+          />
+        ) : null}
+        {logs.some((log) => log.foodId !== null) ? (
+          <TextButton
+            testID="nutrition-today-save-meal"
+            label="Save as Meal"
+            onPress={() => setSaveMealOpen(true)}
+          />
+        ) : null}
+      </View>
+    ) : null;
+
+  // The ways to log, as four tiles: what each is, at a glance.
+  const logWays: {
+    key: 'BarcodeScanner' | 'FoodSearch' | 'AiFoodSearch' | 'QuickFoodEntry';
+    testID: string;
+    label: string;
+    spoken?: string;
+    icon: ReactNode;
+  }[] = [
+    {
+      key: 'BarcodeScanner',
+      testID: 'scan-barcode-button',
+      label: 'Scan\nBarcode',
+      spoken: 'Scan Barcode',
+      icon: <MaterialCommunityIcons name="barcode-scan" size={22} color={accent} />,
+    },
+    {
+      key: 'FoodSearch',
+      testID: 'search-food-button',
+      label: 'Search\nFood',
+      spoken: 'Search Food',
+      icon: <Feather name="search" size={21} color={accent} />,
+    },
+    {
+      key: 'AiFoodSearch',
+      testID: 'ai-food-search-button',
+      label: 'Describe\nFood (AI)',
+      spoken: 'AI Food Search',
+      icon: <Feather name="zap" size={21} color={accent} />,
+    },
+    {
+      key: 'QuickFoodEntry',
+      testID: 'quick-food-entry-button',
+      label: 'Quick\nEntry',
+      spoken: 'Quick Macro Entry',
+      icon: <Feather name="edit-2" size={20} color={accent} />,
+    },
+  ];
+
+  /** A card's heading: its glyph in the accent, its title, and a link on its right. */
+  const cardHead = (
+    icon: ReactNode,
+    title: string,
+    link?: { label: string; onPress: () => void; testID: string; spoken?: string },
+  ) => (
+    <View style={styles.cardHead}>
+      {icon}
+      <Text style={styles.cardTitle} numberOfLines={1}>
+        {title}
+      </Text>
+      {link ? (
+        <TouchableOpacity
+          testID={link.testID}
+          onPress={link.onPress}
+          hitSlop={12}
+          style={styles.cardLink}
+          accessibilityRole="button"
+          accessibilityLabel={link.spoken ?? link.label}
+        >
+          <Text style={[styles.cardLinkText, { color: accent }]}>{link.label}</Text>
+          <Feather name="chevron-right" size={15} color={accent} />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+
+  const targetGlyphs: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+    calories: 'fire',
+    protein: 'food-drumstick-outline',
+    carbs: 'barley',
+    fat: 'water-outline',
+  };
+
+  // One page, top to bottom, with nothing to scroll on a phone of today's size (Harbir's design,
+  // November 2026): the day's figures, the ways to log, the day's foods (which take whatever room
+  // is left, scrolling inside their card), the week in one line, and the daily targets.
   const dayWidgets = (
     <>
       {displayError ? (
@@ -404,13 +571,13 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       ) : null}
 
       {logsLoading ? (
-        <Animated.View style={dayTurn.widgetStyle(0)}>
-          <SkeletonCards testID="nutrition-day-loading" heights={[216, 176]} />
+        <Animated.View style={[dayTurn.widgetStyle(0), styles.fill]}>
+          <SkeletonCards testID="nutrition-day-loading" heights={[168, 104, 140]} />
         </Animated.View>
       ) : (
         <>
           <Animated.View style={dayTurn.widgetStyle(0)}>
-            <AppCard hero testID="nutrition-today-macros">
+            <AppCard hero testID="nutrition-today-macros" style={styles.heroCard}>
               <View style={styles.summary}>
                 <View style={styles.ringColumn}>
                   <CalorieRing
@@ -419,22 +586,123 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                     goal={goals.calories}
                     accentColor={accent}
                     size={RING_SIZE}
-                    strokeWidth={12}
+                    strokeWidth={10}
+                    goalJoin="/"
+                    glyph={<MaterialCommunityIcons name="fire" size={18} color={accent} />}
                   />
                   {remaining.calories !== null ? (
-                    <Text testID="calories-remaining" style={styles.ringRemaining}>
-                      {wholeFigure(remaining.calories)} cal remaining
-                    </Text>
+                    <View style={styles.remainingPill}>
+                      <Text
+                        testID="calories-remaining"
+                        style={[styles.ringRemaining, { color: accent }]}
+                        numberOfLines={1}
+                      >
+                        {remaining.calories >= 0
+                          ? `${wholeFigure(remaining.calories)} cal remaining`
+                          : `${wholeFigure(-remaining.calories)} cal over`}
+                      </Text>
+                    </View>
                   ) : null}
                 </View>
-
-                <MacroRows macros={macros} accentColor={accent} />
+                <View style={styles.heroRule} />
+                <View style={styles.macroColumn}>
+                  <MacroRows macros={macros} accentColor={accent} compact />
+                  <MicronutrientsWidget
+                    accentColor={accent}
+                    onPress={() => navigation.navigate('Micronutrients', { day })}
+                  />
+                </View>
               </View>
             </AppCard>
           </Animated.View>
 
           <Animated.View style={dayTurn.widgetStyle(1)}>
+            <AppCard testID="nutrition-today-actions" style={styles.compactCard}>
+              {cardHead(
+                <MaterialCommunityIcons name="silverware-fork-knife" size={18} color={accent} />,
+                'Log Food',
+                {
+                  label: 'Food Library',
+                  onPress: () => logVia('FoodLibrary'),
+                  testID: 'log-food-button',
+                  spoken: 'Log Food from your Food Library',
+                },
+              )}
+              <View style={styles.tiles}>
+                {logWays.map((way) => (
+                  <Pressable
+                    key={way.key}
+                    testID={way.testID}
+                    onPress={() => logVia(way.key)}
+                    style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={way.spoken ?? way.label}
+                  >
+                    {way.icon}
+                    <Text style={styles.tileLabel} numberOfLines={2}>
+                      {way.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </AppCard>
+          </Animated.View>
+
+          <Animated.View style={[dayTurn.widgetStyle(2), styles.foodsWrap]}>
+            <AppCard testID="nutrition-today-foods" style={styles.foodsCard}>
+              {cardHead(
+                <MaterialCommunityIcons name="bowl-mix-outline" size={19} color={accent} />,
+                isToday ? "Today's Foods" : 'Foods',
+                {
+                  label: 'View All',
+                  onPress: () => navigation.navigate('NutritionHistory'),
+                  testID: 'nutrition-today-view-all',
+                },
+              )}
+              <ScrollView
+                keyboardDismissMode="on-drag"
+                testID="nutrition-today-foods-scroll"
+                style={styles.foodsList}
+                contentContainerStyle={logs.length === 0 ? styles.foodsEmptyContent : undefined}
+                nestedScrollEnabled
+                scrollEnabled={!rowSwiping}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {logs.length === 0 ? (
+                  <View style={styles.foodsEmpty}>
+                    <View style={styles.emptyLine}>
+                      <MaterialCommunityIcons
+                        name="bowl-outline"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                      <Text testID="food-log-empty" style={styles.emptyTitle}>
+                        {isToday ? 'No foods logged today' : 'No foods logged this day'}
+                      </Text>
+                    </View>
+                    <PrimaryButton
+                      testID="food-log-empty-log"
+                      label={isToday ? 'Log Your First Meal' : 'Log a Food'}
+                      icon="plus"
+                      size="md"
+                      onPress={() => logVia('FoodLibrary')}
+                      accentColor={accent}
+                      onAccentColor={nutritionTheme.onAccent}
+                    />
+                  </View>
+                ) : (
+                  foodRows
+                )}
+                {foodShortcuts}
+              </ScrollView>
+            </AppCard>
+          </Animated.View>
+
+          <Animated.View style={dayTurn.widgetStyle(3)}>
             <WeeklyCalorieBudget
+              layout="summary"
+              onOpenDetails={() => setWeekOpen(true)}
               title={week.title}
               today={isToday}
               consumed={week.earlier === null ? null : week.earlier + consumed.calories}
@@ -449,175 +717,27 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
             />
           </Animated.View>
 
-          <Animated.View style={dayTurn.widgetStyle(2)}>
-            <MicronutrientsWidget onPress={() => navigation.navigate('Micronutrients', { day })} />
-          </Animated.View>
-
-          <Animated.View style={dayTurn.widgetStyle(3)}>
-            <AppCard testID="nutrition-today-actions" style={styles.actions}>
-              <PrimaryButton
-                testID="log-food-button"
-                label="Log Food"
-                icon="plus"
-                onPress={() => logVia('FoodLibrary')}
-                accentColor={accent}
-                onAccentColor={nutritionTheme.onAccent}
-              />
-              <View style={styles.secondaryActions}>
-                <View style={styles.secondaryAction}>
-                  <SecondaryButton
-                    testID="scan-barcode-button"
-                    label="Scan Barcode"
-                    icon="maximize"
-                    size="md"
-                    onPress={() => logVia('BarcodeScanner')}
-                  />
-                </View>
-                <View style={styles.secondaryAction}>
-                  <SecondaryButton
-                    testID="search-food-button"
-                    label="Search Food"
-                    icon="search"
-                    size="md"
-                    onPress={() => logVia('FoodSearch')}
-                  />
-                </View>
-              </View>
-              <SecondaryButton
-                testID="ai-food-search-button"
-                label="Describe a Food (AI)"
-                accessibilityLabel="AI Food Search"
-                icon="zap"
-                size="md"
-                onPress={() => logVia('AiFoodSearch')}
-              />
-              <SecondaryButton
-                testID="quick-food-entry-button"
-                label="Quick Macro Entry"
-                icon="edit-3"
-                size="md"
-                onPress={() => logVia('QuickFoodEntry')}
-              />
-            </AppCard>
-          </Animated.View>
-
-          <Animated.View style={dayTurn.widgetStyle(4)}>
-            <AppCard testID="nutrition-today-foods">
-              <Section
-                title={isToday ? "Today's Foods" : 'Foods'}
-                action={{
-                  label: 'View All',
-                  onPress: () => navigation.navigate('NutritionHistory'),
-                  testID: 'nutrition-today-view-all',
-                }}
-              >
-                {logs.length === 0 ? (
-                  <EmptyState
-                    testID="food-log-empty"
-                    icon={
-                      <View style={styles.emptyGlyph}>
-                        <Feather name="coffee" size={22} color={colors.textSecondary} />
-                      </View>
-                    }
-                    title={isToday ? 'No foods logged today' : 'No foods logged this day'}
-                    action={{
-                      label: isToday ? 'Log Your First Meal' : 'Log a Food',
-                      onPress: () => logVia('FoodLibrary'),
-                      testID: 'food-log-empty-log',
-                    }}
-                  />
-                ) : (
-                  <View {...dayTurn.rowSwipeZone}>
-                    {logs.map((log, index) => (
-                      <SwipeToDelete
-                        key={log.id}
-                        testID={`food-log-swipe-${log.id}`}
-                        style={index > 0 && styles.divider}
-                        name={log.foodNameSnapshot}
-                        open={swipeOpenId === log.id}
-                        onOpenChange={(open) => setSwipeOpenId(open ? log.id : null)}
-                        onSwipingChange={setRowSwiping}
-                        onDelete={() => void handleDelete(log.id)}
-                      >
-                        <View testID={`food-log-row-${log.id}`} style={styles.logRow}>
-                          <FoodImage
-                            testID={`food-log-image-${log.id}`}
-                            uri={log.imageUrl}
-                            name={log.foodNameSnapshot}
-                            size={44}
-                            zoomable
-                          />
-                          <View
-                            testID={`food-log-info-${log.id}`}
-                            style={styles.logInfo}
-                            accessible
-                            accessibilityLabel={`${log.foodNameSnapshot}, ${wholeFigure(log.calories)} calories`}
-                            accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
-                            onAccessibilityAction={(event) => {
-                              if (event.nativeEvent.actionName === 'delete')
-                                void handleDelete(log.id);
-                            }}
-                          >
-                            <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
-                            <Text style={styles.logMeta}>
-                              {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein
-                              · {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
-                            </Text>
-                          </View>
-                          <View style={styles.quantityColumn}>
-                            <TextInput
-                              testID={`food-log-quantity-${log.id}`}
-                              style={styles.quantityInput}
-                              accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
-                                2,
-                                log.enteredUnit ?? 'servings',
-                                servingMeasures(log).pieces,
-                              )}`}
-                              accessibilityHint="Enter 0 to take it off the day."
-                              keyboardType="decimal-pad"
-                              returnKeyType="done"
-                              inputAccessoryViewID={AMOUNT_DONE_ID}
-                              value={quantityInputs[log.id] ?? ''}
-                              onChangeText={(text) =>
-                                setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
-                              }
-                              onEndEditing={() => handleUpdateQuantity(log)}
-                            />
-                            <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
-                              {unitWord(
-                                log.enteredAmount ?? log.quantity,
-                                log.enteredUnit ?? 'servings',
-                                servingMeasures(log).pieces,
-                              )}
-                            </Text>
-                          </View>
-                        </View>
-                      </SwipeToDelete>
-                    ))}
-                  </View>
-                )}
-                {(isToday && yesterdayLogs.length > 0) ||
-                logs.some((log) => log.foodId !== null) ? (
-                  <View style={styles.foodShortcuts}>
-                    {isToday && yesterdayLogs.length > 0 ? (
-                      <TextButton
-                        testID="nutrition-today-copy-yesterday"
-                        label="Copy Yesterday"
-                        onPress={() => setCopyOpen(true)}
-                      />
-                    ) : null}
-                    {logs.some((log) => log.foodId !== null) ? (
-                      <TextButton
-                        testID="nutrition-today-save-meal"
-                        label="Save as Meal"
-                        onPress={() => setSaveMealOpen(true)}
-                      />
-                    ) : null}
-                  </View>
-                ) : null}
-              </Section>
-            </AppCard>
-          </Animated.View>
+          <BottomSheet
+            visible={weekOpen}
+            onClose={() => setWeekOpen(false)}
+            swipeToDismiss
+            testID="nutrition-week-sheet"
+          >
+            <WeeklyCalorieBudget
+              layout="details"
+              title={week.title}
+              today={isToday}
+              consumed={week.earlier === null ? null : week.earlier + consumed.calories}
+              dailyTarget={goals.calories}
+              daysLeft={week.daysLeft}
+              goal={calorieGoal}
+              failed={weekFailed}
+              rangeText={week.rangeText}
+              logging={week.logging}
+              accentColor={accent}
+              onSetTarget={() => navigation.navigate('NutritionGoals')}
+            />
+          </BottomSheet>
 
           <CopyYesterdaySheet
             visible={copyOpen}
@@ -636,28 +756,43 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         </>
       )}
 
-      <Animated.View style={dayTurn.widgetStyle(5)}>
-        <AppCard testID="nutrition-today-targets">
-          <Section
-            title="Daily Targets"
-            action={{
-              label: 'Edit Targets',
-              onPress: () => navigation.navigate('NutritionGoals'),
-              testID: 'nutrition-today-edit-targets',
-            }}
-            actionColor={accent}
-          >
-            <View style={styles.targets}>
-              {targets.map((target) => (
-                <StatBlock
-                  key={target.key}
-                  testID={`target-${target.key}`}
-                  value={target.value !== null ? `${wholeFigure(target.value)}${target.unit}` : '—'}
-                  label={target.label}
-                />
-              ))}
-            </View>
-          </Section>
+      <Animated.View style={dayTurn.widgetStyle(4)}>
+        <AppCard testID="nutrition-today-targets" style={styles.compactCard}>
+          {cardHead(<Feather name="target" size={18} color={accent} />, 'Daily Targets', {
+            label: 'Edit Targets',
+            onPress: () => navigation.navigate('NutritionGoals'),
+            testID: 'nutrition-today-edit-targets',
+          })}
+          <View style={styles.targets}>
+            {targets.map((target) => (
+              <View
+                key={target.key}
+                testID={`target-${target.key}`}
+                style={styles.targetTile}
+                accessible
+                accessibilityLabel={`${target.label}, ${
+                  target.value !== null ? `${wholeFigure(target.value)}${target.unit}` : 'not set'
+                }`}
+              >
+                <View style={styles.targetLine}>
+                  <MaterialCommunityIcons
+                    name={targetGlyphs[target.key]!}
+                    size={14}
+                    color={accent}
+                  />
+                  <Text
+                    style={styles.targetValue}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    {target.value !== null ? `${wholeFigure(target.value)}${target.unit}` : '—'}
+                  </Text>
+                </View>
+                <Text style={styles.targetLabel}>{target.label}</Text>
+              </View>
+            ))}
+          </View>
         </AppCard>
       </Animated.View>
     </>
@@ -697,85 +832,176 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   );
 }
 
-const RING_SIZE = 128;
+/** The widgets' gap: a little tighter than other pages', so the page fits one screen. */
+const GAP = 6;
+/** The cards' own top and bottom padding here: a little slimmer than elsewhere, for the same. */
+const CARD_PAD = 10;
+const RING_SIZE = 108;
 
 const styles = StyleSheet.create({
+  // The page fills the screen: the day's widgets take it, the foods card the rest of it.
   content: {
-    gap: widgetGap,
-    paddingBottom: spacing.xxl,
+    flexGrow: 1,
+    gap: GAP,
+    paddingBottom: spacing.sm,
   },
-  // The day's widgets, as one block that follows a swipe between days.
+  // Each at its own size first, then filling what's left -- so on a smaller phone the page
+  // scrolls rather than squeezing anything.
   dayContent: {
-    gap: widgetGap,
+    flexGrow: 1,
+    gap: GAP,
+  },
+  fill: {
+    flexGrow: 1,
   },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
   },
-  // Copy Yesterday and Save as Meal, under the day's foods.
-  foodShortcuts: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
 
-  // The hero: the ring on the left, the three macros on the right.
+  // The hero: the ring and what's left on the left, the macros and Micronutrients on the right.
+  heroCard: {
+    paddingVertical: CARD_PAD,
+  },
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   ringColumn: {
     alignItems: 'center',
     gap: spacing.sm,
   },
+  remainingPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceRaised,
+  },
   ringRemaining: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
     textAlign: 'center',
-    maxWidth: RING_SIZE,
+  },
+  heroRule: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: colors.divider,
+  },
+  macroColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  // A card's own heading: glyph, title, and a link on the right.
+  compactCard: {
+    paddingVertical: CARD_PAD,
+  },
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 6,
+  },
+  cardTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  cardLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  cardLinkText: {
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
+  },
+
+  // The four ways to log, side by side.
+  tiles: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  tile: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 2,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  tilePressed: {
+    opacity: 0.7,
+  },
+  tileLabel: {
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+
+  // The day's foods: whatever room is left, never less than a row or two, scrolling inside.
+  foodsWrap: {
+    flexGrow: 1,
+    minHeight: 112,
+  },
+  foodsCard: {
+    flexGrow: 1,
+    paddingVertical: CARD_PAD,
+  },
+  foodsList: {
+    flex: 1,
+  },
+  foodsEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  foodsEmpty: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyTitle: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
+  // Copy Yesterday and Save as Meal, under the day's foods.
+  foodShortcuts: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
   },
   divider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
   },
-
-  actions: {
-    gap: spacing.sm,
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  secondaryAction: {
-    flex: 1,
-  },
-
-  emptyGlyph: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.xs,
-  },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
   logInfo: {
     flex: 1,
+    minWidth: 0,
   },
   logName: {
-    ...typeScale.cardTitle,
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
   },
   logMeta: {
-    ...typeScale.secondary,
+    ...typeScale.caption,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -798,8 +1024,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.divider,
   },
   quantityInput: {
-    width: 64,
-    height: minTouchTarget,
+    width: 60,
+    height: 40,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -809,8 +1035,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // The daily targets, four tiles.
   targets: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  targetTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 1,
+    paddingVertical: 6,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceRaised,
+  },
+  targetLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: '100%',
+  },
+  targetValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  targetLabel: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
   },
 });

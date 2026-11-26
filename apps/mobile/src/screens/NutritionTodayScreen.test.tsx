@@ -228,7 +228,7 @@ describe('NutritionTodayScreen', () => {
     expect(
       await screen.findByTestId('nutrition-today-calorie-ring-value', includeHidden),
     ).toHaveTextContent('330');
-    expect(screen.getByTestId('nutrition-today-calorie-ring')).toHaveTextContent(/of 2000 cal/);
+    expect(screen.getByTestId('nutrition-today-calorie-ring')).toHaveTextContent(/\/ 2000 cal/);
     expect(screen.getByTestId('calories-remaining')).toHaveTextContent('1670 cal remaining');
     // Each macro: what's been eaten against the target, and a bar of the way there.
     expect(screen.getByTestId('protein-consumed')).toHaveTextContent('62g');
@@ -441,17 +441,20 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
   });
 
-  it('offers Micronutrients as one quiet row between the weekly summary and Log Food', async () => {
+  it("offers Micronutrients as a row under the macros, in the day's figures", async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
     const widget = screen.getByTestId('nutrition-micronutrients');
-    expect(widget).toHaveTextContent(/Micronutrients.*Vitamins, minerals and more/);
+    expect(widget).toHaveTextContent(/Micronutrients.*Vitamins & minerals/);
     // No vitamin or mineral figures on the dashboard itself.
     expect(widget).not.toHaveTextContent(/\d/);
-    // Right after the week's budget and before Log Food, in the page's own order.
+    // Under protein, carbs and fat, in the hero, before Log Food.
+    expect(
+      within(screen.getByTestId('nutrition-today-macros')).getByTestId('nutrition-micronutrients'),
+    ).toBeTruthy();
     expect(screen.getByTestId('nutrition-day-content')).toHaveTextContent(
-      /This Week.*Micronutrients.*Vitamins, minerals and more.*Log Food/s,
+      /Protein.*Carbs.*Fat.*Micronutrients.*Log Food/s,
     );
 
     fireEvent.press(screen.getByTestId('nutrition-micronutrients-open'));
@@ -463,7 +466,7 @@ describe('NutritionTodayScreen', () => {
     await screen.findByTestId('food-log-empty');
 
     const button = screen.getByTestId('ai-food-search-button');
-    expect(button).toHaveTextContent(/Describe a Food/);
+    expect(button).toHaveTextContent(/Describe\s*Food \(AI\)/);
     expect(button.props.accessibilityLabel).toBe('AI Food Search');
     fireEvent.press(button);
     expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch', undefined);
@@ -571,28 +574,22 @@ describe('NutritionTodayScreen background refresh from the shared cache', () => 
 });
 
 describe('NutritionTodayScreen -- widgets, one primary action', () => {
-  it("is six widgets: today's intake (the hero), the week, Micronutrients, the actions, today's foods and the daily targets", async () => {
+  it("is five widgets: today's intake (the hero), the ways to log, today's foods, the week and the daily targets", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
 
+    // One page, top to bottom: the day's figures (Micronutrients in them), the ways to log, the
+    // day's foods, the week, the daily targets.
     const cards = screen.UNSAFE_queryAllByType(AppCard);
     expect(cards.map((c) => c.props.testID)).toEqual([
       'nutrition-today-macros',
-      'nutrition-today-week',
-      'nutrition-micronutrients',
       'nutrition-today-actions',
       'nutrition-today-foods',
+      'nutrition-today-week',
       'nutrition-today-targets',
     ]);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([
-      true,
-      false,
-      false,
-      false,
-      false,
-      false,
-    ]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false, false]);
     expect(
       within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
     ).toBeTruthy();
@@ -614,14 +611,23 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     ).toHaveLength(0);
   });
 
-  it('has one filled button -- Log Food -- with Search Food outlined', async () => {
+  it('logs from four outlined tiles, with the Food Library a link -- one filled button, to log the first meal', async () => {
     renderScreen();
     await screen.findByTestId('log-food-button');
 
+    // The one filled button is the empty day's Log Your First Meal.
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    const searchFood = StyleSheet.flatten(screen.getByTestId('search-food-button').props.style);
-    expect(searchFood.backgroundColor).toBeUndefined();
-    expect(searchFood.borderWidth).toBe(1);
+    for (const id of [
+      'scan-barcode-button',
+      'search-food-button',
+      'ai-food-search-button',
+      'quick-food-entry-button',
+    ]) {
+      expect(within(screen.getByTestId('nutrition-today-actions')).getByTestId(id)).toBeTruthy();
+    }
+    expect(screen.getByTestId('log-food-button')).toHaveTextContent(/Food Library/);
+    fireEvent.press(screen.getByTestId('log-food-button'));
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
   });
 
   it('names the menu control for assistive tech', async () => {
@@ -832,7 +838,7 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '10,670 cal left · 4 days to go, today included',
+      '10,670 cal left · 4 days to go',
     );
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('3,330');
     expect(screen.getByTestId('weekly-budget-target')).toHaveTextContent('/ 14,000 cal');
@@ -855,7 +861,7 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '2,670 cal left · 1 day to go, today included',
+      '2,670 cal left · 1 day to go',
     );
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
@@ -890,7 +896,7 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '13,670 cal left · 7 days to go, today included',
+      '13,670 cal left · 7 days to go',
     );
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
@@ -927,6 +933,8 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     );
     renderScreen();
 
+    // The week in full, a tap away.
+    fireEvent.press(await screen.findByTestId('nutrition-today-week'));
     expect(await screen.findByTestId('weekly-budget-goal-label')).toHaveTextContent(
       /^Cutting · [\d,]+ below maintenance$/,
     );
@@ -943,7 +951,9 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     mockFetchNutritionGoals.mockResolvedValue(goals);
     renderScreen();
 
-    expect(await screen.findByTestId('weekly-budget-range')).toHaveTextContent(
+    expect(await screen.findByTestId('weekly-budget-range')).toHaveTextContent('Oct 18 – 24');
+    fireEvent.press(screen.getByTestId('nutrition-today-week'));
+    expect(await screen.findByTestId('weekly-budget-starts-over')).toHaveTextContent(
       'Oct 18 – 24 · starts over Sunday at 12:00 AM',
     );
   });
@@ -983,7 +993,10 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
 
     // What was logged stays what was logged: 1,800 + 2,000 + today's 330.
     expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('4,130');
-    expect(screen.getByTestId('weekly-budget-logging')).toHaveTextContent(
+    // The page says a day's unlogged; the week in full says what that means.
+    expect(screen.getByTestId('weekly-budget-unlogged')).toHaveTextContent(/Nothing logged on Mon/);
+    fireEvent.press(screen.getByTestId('nutrition-today-week'));
+    expect(await screen.findByTestId('weekly-budget-logging')).toHaveTextContent(
       'Nothing logged on Mon: that day counts as missing, not as 0 eaten.',
     );
     // Under the target only because Monday is missing: the week isn't read as a cut.
@@ -1057,10 +1070,10 @@ describe('NutritionTodayScreen -- any day', () => {
     jest.restoreAllMocks();
   });
 
-  const dayLabelText = () => screen.getByTestId('nutrition-day-label');
+  const dayLabelText = () => screen.getByTestId('nutrition-day-text');
   // A swipe turns the day; assistive tech adjusts the date instead -- the same turn.
   function turn(direction: 'previous' | 'next') {
-    fireEvent(dayLabelText(), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('nutrition-day-label'), 'accessibilityAction', {
       nativeEvent: { actionName: direction === 'previous' ? 'decrement' : 'increment' },
     });
   }
@@ -1069,7 +1082,7 @@ describe('NutritionTodayScreen -- any day', () => {
     renderScreen();
 
     await screen.findByTestId('food-log-empty');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Today, Oct 21');
   });
 
   it('turns from today to tomorrow, logs to tomorrow there, and comes back', async () => {
@@ -1078,13 +1091,13 @@ describe('NutritionTodayScreen -- any day', () => {
 
     turn('next');
 
-    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(dayLabelText()).toHaveTextContent('Thursday, Oct 22');
     expect(await screen.findByText('No foods logged this day')).toBeTruthy();
     fireEvent.press(screen.getByTestId('quick-food-entry-button'));
     expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', { day: '2026-10-22' });
 
     turn('previous');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Today, Oct 21');
   });
 
   it('turns to tomorrow on a swipe from right to left across the page', async () => {
@@ -1098,7 +1111,7 @@ describe('NutritionTodayScreen -- any day', () => {
       content.props.onResponderRelease(fakeTouch(-140, 6, 150, { x: -140, y: 6, time: 140 }));
     });
 
-    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(dayLabelText()).toHaveTextContent('Thursday, Oct 22');
   });
 
   it('holds the page still while a day is swiped, so its scroll cannot take the swipe', async () => {
@@ -1134,19 +1147,23 @@ describe('NutritionTodayScreen -- any day', () => {
     });
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
   });
 
-  it('has no arrows: the day is swiped, and the date is adjustable for VoiceOver', async () => {
+  it('turns the day by its arrows as well as a swipe, and the date is adjustable for VoiceOver', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    expect(screen.queryByTestId('nutrition-day-previous')).toBeNull();
-    expect(screen.queryByTestId('nutrition-day-next')).toBeNull();
-    expect(dayLabelText().props.accessibilityRole).toBe('adjustable');
-    expect(dayLabelText().props.accessibilityValue).toEqual({
+    const label = screen.getByTestId('nutrition-day-label');
+    expect(label.props.accessibilityRole).toBe('adjustable');
+    expect(label.props.accessibilityValue).toEqual({
       text: 'Today, Wednesday, October 21',
     });
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
+    fireEvent.press(screen.getByTestId('nutrition-day-next'));
+    await waitFor(() => expect(dayLabelText()).toHaveTextContent('Today, Oct 21'));
     // The day's widgets take the swipe (as does the bar above them).
     expect(screen.getByTestId('nutrition-day-content').props.onResponderMove).toEqual(
       expect.any(Function),
@@ -1160,7 +1177,7 @@ describe('NutritionTodayScreen -- any day', () => {
     turn('previous');
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
     // Named by its date at the top; the list is just its foods.
     expect(screen.getByText('Foods')).toBeTruthy();
     expect(screen.queryByText(/Yesterday/)).toBeNull();
@@ -1218,17 +1235,17 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(screen.queryByText('Back to Today')).toBeNull();
     turn('previous');
     turn('previous');
-    expect(dayLabelText()).toHaveTextContent('Sunday, October 18');
+    expect(dayLabelText()).toHaveTextContent('Sunday, Oct 18');
     expect(screen.queryByText('Back to Today')).toBeNull();
     turn('next');
     turn('next');
     turn('next');
     turn('next');
-    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(dayLabelText()).toHaveTextContent('Thursday, Oct 22');
     expect(screen.queryByText('Back to Today')).toBeNull();
 
     turn('previous');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Today, Oct 21');
     expect(screen.getByTestId('nutrition-today-week')).toBeTruthy();
   });
 
@@ -1245,7 +1262,7 @@ describe('NutritionTodayScreen -- any day', () => {
     nav.emit('blur');
     nav.emit('focus');
 
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Today, Oct 21');
   });
 
   it('comes back to the day it logged to, then shows today again the next time', async () => {
@@ -1260,12 +1277,12 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', { day: '2026-10-20' });
     nav.emit('blur');
     nav.emit('focus');
-    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
 
     fireEvent.press(screen.getByTestId('nutrition-today-edit-targets'));
     nav.emit('blur');
     nav.emit('focus');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Today, Oct 21');
   });
 
   it('keeps a day handed to it as the page opens', async () => {
@@ -1274,7 +1291,7 @@ describe('NutritionTodayScreen -- any day', () => {
     nav.emit('focus');
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
   });
 
   it("shows the week's budget on any day, through that day, and another week by its Sunday", async () => {
@@ -1319,14 +1336,14 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(screen.getByText('This Week')).toBeTruthy();
     expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('2,830');
     expect(screen.getByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '11,170 cal left · 5 days to go, this day included',
+      '11,170 cal left · 5 days to go',
     );
 
     // Saturday the 17th is in the week before.
     turn('previous');
     turn('previous');
     turn('previous');
-    expect(dayLabelText()).toHaveTextContent('Saturday, October 17');
+    expect(dayLabelText()).toHaveTextContent('Saturday, Oct 17');
     expect(await screen.findByText('Week of October 11')).toBeTruthy();
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
@@ -1334,7 +1351,7 @@ describe('NutritionTodayScreen -- any day', () => {
       new Date(2026, 9, 18),
     );
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '12,000 cal left · 1 day to go, this day included',
+      '12,000 cal left · 1 day to go',
     );
   });
 
@@ -1356,12 +1373,12 @@ describe('NutritionTodayScreen -- any day', () => {
   it('opens on any day handed to it, tomorrow included', async () => {
     const { unmount } = renderScreen({ params: { day: '2026-10-20' } } as never);
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, Oct 20');
     unmount();
 
     renderScreen({ params: { day: '2026-10-22' } } as never);
     await screen.findByTestId('food-log-empty');
-    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(dayLabelText()).toHaveTextContent('Thursday, Oct 22');
   });
 
   it('opens the calendar from the date, on the day shown', async () => {

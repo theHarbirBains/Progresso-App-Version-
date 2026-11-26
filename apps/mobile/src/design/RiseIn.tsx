@@ -122,7 +122,14 @@ export function RiseIn({
 // How a wrapped widget sits in its page, copied onto its rollout wrapper so
 // wrapping it never changes the layout -- e.g. a card or list that fills the
 // rest of the screen keeps filling it.
-const LAYOUT_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf'] as const;
+const LAYOUT_KEYS = [
+  'flex',
+  'flexGrow',
+  'flexShrink',
+  'flexBasis',
+  'alignSelf',
+  'minHeight',
+] as const;
 // Scrolling lists fill the space they're given by default, without saying so
 // in their own style.
 const FILLS_BY_DEFAULT = new Set<unknown>([ScrollView, FlatList, SectionList]);

@@ -36,6 +36,11 @@ interface Props {
   testIDPrefix?: string;
   /** Read out after each figure: "a day on average". */
   spokenSuffix?: string;
+  /**
+   * Shorter rows, for the Nutrition screen's one-page hero: a smaller glyph tile, the label and the
+   * figures on one line with the bar under them, and no dividers.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -44,7 +49,13 @@ interface Props {
  * past full; with no target, no "/ target" and no bar. The Nutrition screen's hero, and
  * Progress's average day.
  */
-export function MacroRows({ macros, accentColor, testIDPrefix = '', spokenSuffix }: Props) {
+export function MacroRows({
+  macros,
+  accentColor,
+  testIDPrefix = '',
+  spokenSuffix,
+  compact = false,
+}: Props) {
   const { decorating } = useAppTheme();
   return (
     <View style={styles.column}>
@@ -59,20 +70,22 @@ export function MacroRows({ macros, accentColor, testIDPrefix = '', spokenSuffix
           <View
             key={macro.key}
             testID={`${testIDPrefix}${macro.key}-row`}
-            style={[styles.row, index > 0 && styles.divider]}
+            style={[styles.row, compact ? styles.rowCompact : index > 0 && styles.divider]}
             accessible
             accessibilityLabel={spokenSuffix ? `${spoken} ${spokenSuffix}` : spoken}
           >
-            <View style={styles.glyph}>
+            <View style={[styles.glyph, compact && styles.glyphCompact]}>
               <MaterialCommunityIcons
                 name={MACRO_GLYPHS[macro.key]}
-                size={18}
+                size={compact ? 14 : 18}
                 color={accentColor}
               />
             </View>
             <View style={styles.body}>
-              <Text style={styles.label}>{macro.label}</Text>
+              {compact ? null : <Text style={styles.label}>{macro.label}</Text>}
               <View style={styles.figures}>
+                {compact ? <Text style={styles.label}>{macro.label}</Text> : null}
+                {compact ? <View style={styles.flex} /> : null}
                 <Text testID={`${testIDPrefix}${macro.key}-consumed`} style={styles.value}>
                   {grams(macro.consumed)}
                 </Text>
@@ -114,6 +127,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.sm,
   },
+  rowCompact: {
+    gap: spacing.sm,
+    paddingVertical: 2,
+  },
+  flex: {
+    flex: 1,
+  },
   divider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
@@ -125,6 +145,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceLift,
+  },
+  glyphCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   body: {
     flex: 1,

@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { Feather } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { TextButton } from '../design/Button';
 import { Section } from '../design/Section';
 import { Text } from '../design/Text';
-import { colors, spacing, typeScale } from '../design/theme';
+import { colors, fonts, spacing, typeScale } from '../design/theme';
 import {
   calorieGoalLabel,
   computeWeeklyCalorieSummary,
@@ -43,6 +44,15 @@ interface Props {
   logging?: WeekLogging | null;
   accentColor: string;
   onSetTarget: () => void;
+  /**
+   * The whole widget as one card (the default); or, for the Nutrition screen's one page, `summary`
+   * -- one slim card: the title and dates, the bar, the week so far against its budget and
+   * what's left, and a line when a day's unlogged; a tap opens the rest (`onOpenDetails`) -- and
+   * `details`, that rest on its own, for a sheet: when the week starts over, what's left in full,
+   * the unlogged days, how the week sits with the goal, and Estimate the Missing Days.
+   */
+  layout?: 'card' | 'summary' | 'details';
+  onOpenDetails?: () => void;
 }
 
 /**
@@ -72,6 +82,8 @@ export function WeeklyCalorieBudget({
   logging = null,
   accentColor,
   onSetTarget,
+  layout = 'card',
+  onOpenDetails,
 }: Props) {
   const [estimateOpen, setEstimateOpen] = useState(false);
   const { decorating } = useAppTheme();
@@ -101,6 +113,174 @@ export function WeeklyCalorieBudget({
         : weekGoalNote(goal.goal, summary.consumed, dailyTarget, 8 - daysLeft)
       : null;
   const goalLabel = goal ? calorieGoalLabel(goal) : null;
+  const spoken = summary
+    ? [
+        `${title}, ${wholeFigureText(summary.consumed)} of ${wholeFigureText(summary.target)} calories.`,
+        remainingText,
+        loggingText,
+        goalLabel,
+        goalNote,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : `${title}, loading`;
+
+  if (layout === 'summary') {
+    const short = summary
+      ? summary.remaining >= 0
+        ? `${wholeFigureText(summary.remaining)} cal left · ${daysLeft} ${
+            daysLeft === 1 ? 'day' : 'days'
+          } to go`
+        : `${wholeFigureText(-summary.remaining)} cal over`
+      : null;
+    return (
+      <AppCard
+        testID="nutrition-today-week"
+        onPress={dailyTarget !== null && !failed ? onOpenDetails : undefined}
+        accessibilityLabel={
+          dailyTarget !== null && !failed ? `${spoken} Opens the week in full.` : undefined
+        }
+        style={styles.summaryCard}
+      >
+        <View style={styles.summaryHead}>
+          <Feather name="trending-up" size={18} color={accentColor} />
+          <Text style={styles.summaryTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          {rangeText ? (
+            <Text testID="weekly-budget-range" style={styles.summaryRange}>
+              {rangeText}
+            </Text>
+          ) : null}
+        </View>
+        {dailyTarget === null ? (
+          <View style={styles.summaryNoTarget}>
+            <Text testID="weekly-budget-no-target" style={styles.summaryCaption}>
+              Set a daily calorie target to get a weekly budget.
+            </Text>
+            <TextButton
+              testID="weekly-budget-set-target"
+              label="Set Target"
+              onPress={onSetTarget}
+            />
+          </View>
+        ) : failed ? (
+          <Text testID="weekly-budget-error" style={styles.summaryCaption}>
+            {today ? 'This' : 'The'} week&apos;s total couldn&apos;t be loaded.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.summaryTrack}>
+              <View
+                testID="weekly-budget-bar"
+                style={[
+                  styles.fill,
+                  { width: `${(summary?.percent ?? 0) * 100}%`, backgroundColor: accentColor },
+                ]}
+              >
+                {decorating ? <CandyStripes radius={3} /> : null}
+              </View>
+            </View>
+            <View style={styles.summaryFigures}>
+              <Text style={styles.summaryValueLine}>
+                <Text testID="weekly-budget-consumed" style={styles.summaryValue}>
+                  {summary ? wholeFigureText(summary.consumed) : '—'}
+                </Text>
+                <Text testID="weekly-budget-target" style={styles.target}>
+                  {' '}
+                  / {wholeFigureText(dailyTarget * 7)} cal
+                </Text>
+              </Text>
+              {short ? (
+                <Text testID="weekly-budget-remaining" style={styles.summaryRemaining}>
+                  {short}
+                </Text>
+              ) : null}
+            </View>
+            {unlogged.length > 0 ? (
+              <Text testID="weekly-budget-unlogged" style={styles.summaryCaption} numberOfLines={1}>
+                Nothing logged on {weekdayNames(unlogged)} · tap for the week
+              </Text>
+            ) : null}
+          </>
+        )}
+      </AppCard>
+    );
+  }
+
+  if (layout === 'details') {
+    return (
+      <View testID="weekly-budget-details" accessible={false}>
+        <Text style={styles.detailsTitle}>{title}</Text>
+        {rangeText ? (
+          <Text testID="weekly-budget-starts-over" style={styles.range}>
+            {rangeText} · starts over Sunday at 12:00 AM
+          </Text>
+        ) : null}
+        {remainingText ? (
+          <Text testID="weekly-budget-remaining-full" style={styles.caption}>
+            {remainingText}
+          </Text>
+        ) : null}
+        {loggingText ? (
+          <Text testID="weekly-budget-logging" style={styles.caption}>
+            {loggingText}
+          </Text>
+        ) : null}
+        {goalLabel && goalNote ? (
+          <View testID="weekly-budget-goal" style={styles.goal}>
+            <Text testID="weekly-budget-goal-label" style={styles.goalLabel}>
+              {goalLabel}
+            </Text>
+            <Text testID="weekly-budget-goal-note" style={styles.goalNote}>
+              {goalNote}
+            </Text>
+          </View>
+        ) : null}
+        {estimateBlock()}
+      </View>
+    );
+  }
+
+  /** Estimate the Missing Days: apart from the figures, and only on a tap. */
+  function estimateBlock() {
+    if (
+      dailyTarget === null ||
+      failed ||
+      estimate === null ||
+      logging?.averageLoggedDay == null ||
+      !summary
+    ) {
+      return null;
+    }
+    return estimateOpen ? (
+      <View testID="weekly-budget-estimate" style={styles.goal}>
+        <Text style={styles.goalLabel}>Estimate</Text>
+        <Text testID="weekly-budget-estimate-value" style={styles.goalNote}>
+          About {wholeFigureText(estimate)} of {wholeFigureText(dailyTarget * 7)} cal, had{' '}
+          {unlogged.length === 1 ? 'the unlogged day' : 'the unlogged days'} been like the rest.
+        </Text>
+        <Text testID="weekly-budget-estimate-how" style={styles.goalNote}>
+          Each day with nothing logged is counted as your logged days&apos; average,{' '}
+          {wholeFigureText(logging.averageLoggedDay)} cal. What you&apos;ve logged is still{' '}
+          {wholeFigureText(summary.consumed)} cal.
+        </Text>
+        <TextButton
+          testID="weekly-budget-estimate-toggle"
+          label="Hide Estimate"
+          onPress={() => setEstimateOpen(false)}
+        />
+      </View>
+    ) : (
+      <View style={styles.estimateToggle}>
+        <TextButton
+          testID="weekly-budget-estimate-toggle"
+          label="Estimate the Missing Days"
+          onPress={() => setEstimateOpen(true)}
+        />
+      </View>
+    );
+  }
 
   return (
     <AppCard testID="nutrition-today-week">
@@ -126,22 +306,7 @@ export function WeeklyCalorieBudget({
             {today ? 'This' : 'The'} week&apos;s total couldn&apos;t be loaded.
           </Text>
         ) : (
-          <View
-            accessible
-            accessibilityLabel={
-              summary
-                ? [
-                    `${title}, ${wholeFigureText(summary.consumed)} of ${wholeFigureText(summary.target)} calories.`,
-                    remainingText,
-                    loggingText,
-                    goalLabel,
-                    goalNote,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')
-                : `${title}, loading`
-            }
-          >
+          <View accessible accessibilityLabel={spoken}>
             <View style={styles.figures}>
               <Text testID="weekly-budget-consumed" style={styles.value}>
                 {summary ? wholeFigureText(summary.consumed) : '—'}
@@ -185,39 +350,7 @@ export function WeeklyCalorieBudget({
           </View>
         )}
         {/* Apart from the figures above, and only on a tap: never read as what was eaten. */}
-        {dailyTarget !== null &&
-        !failed &&
-        estimate !== null &&
-        logging?.averageLoggedDay != null ? (
-          estimateOpen ? (
-            <View testID="weekly-budget-estimate" style={styles.goal}>
-              <Text style={styles.goalLabel}>Estimate</Text>
-              <Text testID="weekly-budget-estimate-value" style={styles.goalNote}>
-                About {wholeFigureText(estimate)} of {wholeFigureText(dailyTarget * 7)} cal, had{' '}
-                {unlogged.length === 1 ? 'the unlogged day' : 'the unlogged days'} been like the
-                rest.
-              </Text>
-              <Text testID="weekly-budget-estimate-how" style={styles.goalNote}>
-                Each day with nothing logged is counted as your logged days&apos; average,{' '}
-                {wholeFigureText(logging.averageLoggedDay)} cal. What you&apos;ve logged is still{' '}
-                {wholeFigureText(summary!.consumed)} cal.
-              </Text>
-              <TextButton
-                testID="weekly-budget-estimate-toggle"
-                label="Hide Estimate"
-                onPress={() => setEstimateOpen(false)}
-              />
-            </View>
-          ) : (
-            <View style={styles.estimateToggle}>
-              <TextButton
-                testID="weekly-budget-estimate-toggle"
-                label="Estimate the Missing Days"
-                onPress={() => setEstimateOpen(true)}
-              />
-            </View>
-          )
-        ) : null}
+        {estimateBlock()}
       </Section>
     </AppCard>
   );
@@ -265,6 +398,66 @@ const styles = StyleSheet.create({
   estimateToggle: {
     alignItems: 'flex-start',
     marginTop: spacing.xs,
+  },
+  // The one-page summary card: slimmer padding, the title and dates on one line, a 6pt bar.
+  summaryCard: {
+    paddingVertical: 10,
+  },
+  summaryHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  summaryTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  summaryRange: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  summaryTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+  },
+  summaryFigures: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  summaryValueLine: {
+    flexShrink: 0,
+  },
+  summaryValue: {
+    ...typeScale.statSmall,
+    fontFamily: fonts.mono,
+    color: colors.textPrimary,
+  },
+  summaryRemaining: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  summaryCaption: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  summaryNoTarget: {
+    alignItems: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  detailsTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   // What the target is for, and how the week so far sits with it.
   goal: {
