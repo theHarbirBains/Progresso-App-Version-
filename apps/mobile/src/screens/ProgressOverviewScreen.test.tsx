@@ -72,6 +72,21 @@ jest.mock('../progress/progressStatsQueries', () => ({
 jest.mock('../cardio/cardioQueries', () => ({
   fetchCardioHistory: jest.fn().mockResolvedValue([]),
 }));
+// The Muscles tab's read (progress/muscleActivityQueries.ts): one bench session, three days ago.
+jest.mock('../progress/muscleActivityQueries', () => ({
+  fetchMuscleActivity: jest.fn().mockResolvedValue([
+    {
+      workoutId: 'w1',
+      performedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      exerciseId: 'bench',
+      exerciseName: 'Bench Press',
+      muscleGroup: 'chest',
+      measurementType: 'weight_reps',
+      sets: [{ weightKg: 100, reps: 5, isDrop: false }],
+    },
+  ]),
+}));
+jest.mock('../exercises/exerciseGuide', () => ({}));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
@@ -284,12 +299,28 @@ describe('ProgressOverviewScreen shell', () => {
     }
   });
 
-  it('lists its sections (Overview, Top Sets, Cardio, All Time, Steps), defaulting to Overview', async () => {
+  it('has Muscle Activity as a section of its own: the Muscles tab opens the body map', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    renderScreen();
+    await screen.findByTestId('progress-overview-scroll');
+    goToSection('Muscles');
+    expect(await screen.findByTestId('muscle-activity-map')).toBeTruthy();
+    expect(screen.getByTestId('muscle-activity-figure-front')).toBeTruthy();
+    expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(/1 set/);
+    fireEvent.press(screen.getByTestId('muscle-activity-row-chest'));
+    fireEvent.press(screen.getByTestId('muscle-activity-exercise-bench'));
+    expect(mockNavigate).toHaveBeenCalledWith('ProgressExerciseDetail', {
+      exerciseId: 'bench',
+      exerciseName: 'Bench Press',
+    });
+  });
+
+  it('lists its sections (Overview, Top Sets, Muscles, Cardio, All Time, Steps), defaulting to Overview', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-tabs');
 
-    for (const section of ['Overview', 'TopSets', 'Cardio', 'AllTime', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'AllTime', 'Steps']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
     // Nutrition is All Time's second tab, not a section of its own.

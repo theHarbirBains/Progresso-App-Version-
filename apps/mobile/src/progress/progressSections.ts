@@ -8,10 +8,12 @@ import { Platform } from 'react-native';
 // cardio in the person's own workouts (CardioProgressSection). Steps (from
 // Apple Health) is iPhone only, and only ever the person's own -- a trainer's
 // view of a client has no Steps tab (see TrainerClientDetailScreen), and no
-// Cardio tab yet.
+// Cardio tab yet. Muscles is Muscle Activity (MuscleActivitySection), the
+// person's own too.
 export const PROGRESS_SECTIONS = [
   { key: 'Overview', label: 'Overview', icon: 'bar-chart-2' },
   { key: 'TopSets', label: 'Top Sets', icon: 'target' },
+  { key: 'Muscles', label: 'Muscles', icon: 'user' },
   { key: 'Cardio', label: 'Cardio', icon: 'activity' },
   { key: 'AllTime', label: 'All Time', icon: 'calendar' },
   { key: 'Steps', label: 'Steps', icon: 'trending-up' },
@@ -26,8 +28,8 @@ export function ownProgressSections() {
 
 /**
  * A trainer's view of a client's Progress: never Steps -- they're on the client's phone only --
- * and no Cardio tab yet.
+ * and no Cardio or Muscles tab yet.
  */
 export const CLIENT_PROGRESS_SECTIONS = PROGRESS_SECTIONS.filter(
-  (section) => section.key !== 'Steps' && section.key !== 'Cardio',
+  (section) => section.key !== 'Steps' && section.key !== 'Cardio' && section.key !== 'Muscles',
 );

@@ -124,17 +124,3 @@ describe('OverviewSection', () => {
     expect(screen.queryByText('Recent Milestones')).toBeNull();
   });
 });
-
-describe('OverviewSection -- Muscle Activity', () => {
-  it('offers Muscle Activity on your own Progress, opening it on a tap', () => {
-    const onOpenMuscleActivity = jest.fn();
-    renderOverview({ onOpenMuscleActivity });
-    fireEvent.press(screen.getByTestId('progress-overview-muscle-activity'));
-    expect(onOpenMuscleActivity).toHaveBeenCalled();
-  });
-
-  it("has no Muscle Activity card where nothing opens it (a trainer's view of a client)", () => {
-    renderOverview();
-    expect(screen.queryByTestId('progress-overview-muscle-activity')).toBeNull();
-  });
-});

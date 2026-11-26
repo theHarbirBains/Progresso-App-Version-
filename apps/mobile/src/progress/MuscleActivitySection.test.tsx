@@ -1,19 +1,11 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import type { ActivityEntry } from '../progress/muscleActivityQueries';
-import { MuscleActivityScreen } from './MuscleActivityScreen';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import type { ActivityEntry } from './muscleActivityQueries';
+import { MuscleActivitySection } from './MuscleActivitySection';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
-jest.mock('../progress/useProgressTheme', () => ({
-  useProgressTheme: () => ({
-    theme: { accent: '#D99A50', onAccent: '#12110F', accentBg: '#2A2018' },
-    weightUnit: 'kg',
-    themeLoading: false,
-  }),
-}));
-
 const mockFetch = jest.fn();
-jest.mock('../progress/muscleActivityQueries', () => ({
+jest.mock('./muscleActivityQueries', () => ({
   fetchMuscleActivity: (...args: unknown[]) => mockFetch(...args),
 }));
 jest.mock('../exercises/builtinExtras', () => ({
@@ -33,16 +25,7 @@ jest.mock('../exercises/builtinExtras', () => ({
   setBuiltinSources: jest.fn(),
 }));
 
-let focus: (() => void) | null = null;
-const mockNavigate = jest.fn();
-const navigation = {
-  navigate: mockNavigate,
-  goBack: jest.fn(),
-  addListener: jest.fn((_event: string, listener: () => void) => {
-    focus = listener;
-    return jest.fn();
-  }),
-} as never;
+const mockOpenExercise = jest.fn();
 
 function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
@@ -72,22 +55,29 @@ const entries: ActivityEntry[] = [
   },
 ];
 
+function renderSection() {
+  return render(
+    <MuscleActivitySection
+      accentColor="#D99A50"
+      onAccentColor="#12110F"
+      weightUnit="kg"
+      onOpenExercise={mockOpenExercise}
+    />,
+  );
+}
+
 async function renderScreen() {
-  render(<MuscleActivityScreen navigation={navigation} route={{ params: undefined } as never} />);
-  await act(async () => {
-    focus?.();
-    await Promise.resolve();
-  });
+  renderSection();
   await screen.findByTestId('muscle-activity-map');
 }
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockFetch.mockResolvedValue(entries);
-  focus = null;
+  mockOpenExercise.mockClear();
 });
 
-describe('MuscleActivityScreen', () => {
+describe("MuscleActivitySection -- Progress's Muscles tab", () => {
   it('reads the last 90 days once as it opens, and shows the last 30 first', async () => {
     await renderScreen();
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -121,10 +111,7 @@ describe('MuscleActivityScreen', () => {
     expect(screen.getByTestId('muscle-activity-group-volume')).toHaveTextContent(/1,000 kg/);
     expect(screen.getByTestId('muscle-activity-group-last')).toHaveTextContent(/Today|Yesterday/);
     fireEvent.press(screen.getByTestId('muscle-activity-exercise-bench'));
-    expect(mockNavigate).toHaveBeenCalledWith('ProgressExerciseDetail', {
-      exerciseId: 'bench',
-      exerciseName: 'Bench Press',
-    });
+    expect(mockOpenExercise).toHaveBeenCalledWith('bench', 'Bench Press');
     fireEvent.press(screen.getByTestId('muscle-activity-group-close'));
     expect(screen.queryByTestId('muscle-activity-group')).toBeNull();
   });
@@ -147,11 +134,7 @@ describe('MuscleActivityScreen', () => {
 
   it('offers Try Again when it cannot be read', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network down'));
-    render(<MuscleActivityScreen navigation={navigation} route={{ params: undefined } as never} />);
-    await act(async () => {
-      focus?.();
-      await Promise.resolve();
-    });
+    renderSection();
     expect(await screen.findByTestId('muscle-activity-error')).toBeTruthy();
   });
 });

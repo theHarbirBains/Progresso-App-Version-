@@ -26,6 +26,7 @@ import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
 import { StepsSection } from '../progress/StepsSection';
 import { CardioProgressSection } from '../progress/CardioProgressSection';
+import { MuscleActivitySection } from '../progress/MuscleActivitySection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -191,7 +192,6 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
                   setAllTimeView('workouts');
                   setActiveSection('AllTime');
                 }}
-                onOpenMuscleActivity={() => navigation.navigate('MuscleActivity')}
                 top={
                   <>
                     <WeeklySummaryBlock
@@ -220,6 +220,18 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
                 onAccentColor={theme.onAccent}
                 navigation={navigation}
                 onEdit={setEditing}
+              />
+            ) : null}
+
+            {/* Muscles: Muscle Activity, from the person's own sets -- read as the tab opens. */}
+            {contentReady && activeSection === 'Muscles' ? (
+              <MuscleActivitySection
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+                weightUnit={weightUnit}
+                onOpenExercise={(exerciseId, exerciseName) =>
+                  navigation.navigate('ProgressExerciseDetail', { exerciseId, exerciseName })
+                }
               />
             ) : null}
 
