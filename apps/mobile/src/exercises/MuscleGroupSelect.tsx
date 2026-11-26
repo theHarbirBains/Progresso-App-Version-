@@ -56,7 +56,11 @@ export function MuscleGroupSelect({
         testID={testID ? `${testID}-sheet` : 'muscle-group-select-sheet'}
       >
         <Text style={styles.sheetTitle}>Muscle Group</Text>
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.sheetScroll}>
+        <ScrollView
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          style={styles.sheetScroll}
+        >
           {MUSCLE_GROUPS.map((group, index) => (
             <ListRow
               key={group}

@@ -374,7 +374,11 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
       >
         <View style={styles.sheetContent}>
           <Text style={styles.sheetTitle}>Unit</Text>
-          <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            keyboardDismissMode="on-drag"
+            style={styles.sheetList}
+            showsVerticalScrollIndicator={false}
+          >
             {unitsFor(foodName).map((option) => (
               <OnboardingOptionCard
                 key={option.value}

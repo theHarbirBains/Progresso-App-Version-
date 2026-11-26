@@ -27,7 +27,7 @@ export function RankExplainerPage({ visible, onClose }: { visible: boolean; onCl
             testID: 'rank-explainer-page-close',
           }}
         />
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
           <RankExplainer />
         </ScrollView>
       </View>

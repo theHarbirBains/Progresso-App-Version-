@@ -246,6 +246,7 @@ export function ProgramDetailScreen({ navigation, route }: Props) {
 
           <SectionHeader label="Muscle Group Targets" />
           <ScrollView
+            keyboardDismissMode="on-drag"
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.targets}

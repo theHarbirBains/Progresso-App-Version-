@@ -193,6 +193,7 @@ export function CardioProgressSection({
 
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID="progress-cardio"
       style={progressStyles.sectionFill}
       contentContainerStyle={styles.content}

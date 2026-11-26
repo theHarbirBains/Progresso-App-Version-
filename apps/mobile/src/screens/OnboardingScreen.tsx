@@ -1317,6 +1317,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <View style={styles.scrollContent}>{content}</View>
           ) : (
             <ScrollView
+              keyboardDismissMode="on-drag"
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"

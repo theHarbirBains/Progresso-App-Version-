@@ -207,6 +207,7 @@ export function FoodPickerStep({ title, excludeId, onPick, onCancel }: Props) {
             />
           ) : (
             <SectionList
+              keyboardDismissMode="on-drag"
               testID="food-picker-list"
               sections={sections}
               keyExtractor={(item) => item.id}

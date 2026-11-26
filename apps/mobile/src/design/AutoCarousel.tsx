@@ -71,6 +71,7 @@ export function AutoCarousel<T>({ items, keyOf, renderSlide, initialIndex = 0, t
   return (
     <View>
       <ScrollView
+        keyboardDismissMode="on-drag"
         ref={scrollRef}
         horizontal
         pagingEnabled

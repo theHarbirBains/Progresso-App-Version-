@@ -50,6 +50,7 @@ export function WheelPicker({ testID, values, selectedValue, onChange }: Props) 
     <View testID={testID} style={styles.container}>
       <View pointerEvents="none" style={styles.highlight} />
       <FlatList
+        keyboardDismissMode="on-drag"
         ref={listRef}
         data={values}
         keyExtractor={(value) => value}

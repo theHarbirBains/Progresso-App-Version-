@@ -105,6 +105,7 @@ export function TopSetsSection({
         <ProgressEmptyState testID="progress-topsets-no-results" title="No matching exercises" />
       ) : (
         <FlatList
+          keyboardDismissMode="on-drag"
           testID="progress-topsets-list"
           style={styles.sectionFill}
           data={filtered}

@@ -212,6 +212,7 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
         }
       >
         <ScrollView
+          keyboardDismissMode="on-drag"
           style={liveWorkoutStyles.flex}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"

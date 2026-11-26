@@ -36,7 +36,11 @@ export function AppFailure({ error, onRetry }: Props) {
           : 'Something went wrong while Progresso was opening. Close it and open it again.'}{' '}
         If it keeps happening, send this to Progresso:
       </Text>
-      <ScrollView style={styles.detail} contentContainerStyle={styles.detailContent}>
+      <ScrollView
+        keyboardDismissMode="on-drag"
+        style={styles.detail}
+        contentContainerStyle={styles.detailContent}
+      >
         <Text testID="app-failure-message" selectable style={styles.message}>
           {describe(error)}
         </Text>

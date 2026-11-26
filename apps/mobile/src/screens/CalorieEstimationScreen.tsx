@@ -502,7 +502,11 @@ export function CalorieEstimationScreen({ navigation }: Props) {
         testID="calorie-estimation-activity-sheet"
       >
         <Text style={styles.sheetTitle}>Activity Level</Text>
-        <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          keyboardDismissMode="on-drag"
+          style={styles.sheetList}
+          showsVerticalScrollIndicator={false}
+        >
           {ACTIVITY_LEVELS.map((option) => (
             <OnboardingOptionCard
               key={option.value}

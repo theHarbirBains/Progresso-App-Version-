@@ -301,6 +301,7 @@ export function ExercisePickerModal({
           <View style={[styles.pickerBody, tab !== 'previous' && styles.hidden]}>
             <AppCard testID="exercise-picker-previous-card" style={styles.flex}>
               <ScrollView
+                keyboardDismissMode="on-drag"
                 testID="exercise-picker-previous-scroll"
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"

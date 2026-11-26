@@ -43,7 +43,11 @@ function LogChecklist({
   testIDPrefix: string;
 }) {
   return (
-    <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      keyboardDismissMode="on-drag"
+      style={styles.list}
+      showsVerticalScrollIndicator={false}
+    >
       {logs.map((log, index) => {
         const ticked = selected.has(log.id);
         return (

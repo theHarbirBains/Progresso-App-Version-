@@ -220,6 +220,7 @@ export function CardioSheet({
         </View>
       ) : (
         <ScrollView
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}

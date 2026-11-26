@@ -101,6 +101,7 @@ export function OverviewSection({
     // The week can have food logged, or bodyweight work, before any weighted lift.
     return top ? (
       <ScrollView
+        keyboardDismissMode="on-drag"
         testID="progress-overview-scroll"
         style={styles.sectionFill}
         contentContainerStyle={{ paddingBottom: 32 }}
@@ -116,6 +117,7 @@ export function OverviewSection({
 
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID="progress-overview-scroll"
       style={styles.sectionFill}
       contentContainerStyle={{ paddingBottom: 32 }}

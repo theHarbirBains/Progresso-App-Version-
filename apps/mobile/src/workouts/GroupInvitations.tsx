@@ -235,7 +235,7 @@ export function GroupInvitations({
             Everyone you follow is in this workout or invited already.
           </Text>
         ) : (
-          <ScrollView style={styles.list}>
+          <ScrollView keyboardDismissMode="on-drag" style={styles.list}>
             {offered.map((friend, index) => {
               const on = chosen.has(friend.id);
               return (

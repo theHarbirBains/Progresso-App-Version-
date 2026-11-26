@@ -54,7 +54,7 @@ export function AchievementLevelsSheet({
             {status.apEarned.toLocaleString('en-US')} of {available.toLocaleString('en-US')} AP
             earned
           </Text>
-          <ScrollView style={styles.list}>
+          <ScrollView keyboardDismissMode="on-drag" style={styles.list}>
             {definition.levels.map((level, index) => {
               const reached = level.level <= status.level;
               const next = level.level === status.level + 1;

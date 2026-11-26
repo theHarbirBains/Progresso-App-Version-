@@ -223,6 +223,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
       }
     >
       <ScrollView
+        keyboardDismissMode="on-drag"
         style={styles.flex}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"

@@ -127,6 +127,7 @@ export function AllTimeSection({
 
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID="progress-all-time-scroll"
       style={styles.sectionFill}
       contentContainerStyle={{ paddingBottom: 32 }}

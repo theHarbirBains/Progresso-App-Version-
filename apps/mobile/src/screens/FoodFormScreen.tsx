@@ -325,7 +325,11 @@ export function FoodFormScreen(props: Props) {
       >
         <View style={styles.sheetContent}>
           <Text style={styles.sheetTitle}>Serving unit</Text>
-          <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            keyboardDismissMode="on-drag"
+            style={styles.sheetList}
+            showsVerticalScrollIndicator={false}
+          >
             {servingUnitOptions(servingUnit).map((option) => (
               <OnboardingOptionCard
                 key={option.value}

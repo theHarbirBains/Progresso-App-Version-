@@ -459,6 +459,7 @@ export function ExerciseBrowser({
             accessibilityState={{ busy: switching }}
           >
             <SectionList
+              keyboardDismissMode="on-drag"
               testID="exercise-library-list-section"
               sections={listSections}
               keyExtractor={(item) => item.id}

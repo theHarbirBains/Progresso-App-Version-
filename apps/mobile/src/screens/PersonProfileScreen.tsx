@@ -1046,7 +1046,7 @@ export function PersonProfilePage({
           >
             <Text style={styles.sheetTitle}>Mutual Friends</Text>
             <Text style={styles.sheetSubtitle}>People you follow who follow {title}</Text>
-            <ScrollView>
+            <ScrollView keyboardDismissMode="on-drag">
               <PeopleList
                 people={profile.mutuals.people.map((user) => ({ user, status: 'accepted' }))}
                 selfId=""

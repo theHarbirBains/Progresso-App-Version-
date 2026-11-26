@@ -156,6 +156,7 @@ export function NutritionProgressSection({
 
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID="progress-nutrition-scroll"
       style={progressStyles.sectionFill}
       contentContainerStyle={styles.content}

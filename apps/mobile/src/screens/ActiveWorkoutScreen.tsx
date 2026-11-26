@@ -1185,6 +1185,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         }
       >
         <Animated.ScrollView
+          keyboardDismissMode="on-drag"
           ref={pagerRef}
           testID="active-workout-pager"
           horizontal
@@ -1223,6 +1224,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               </View>
             ) : null}
             <ScrollView
+              keyboardDismissMode="on-drag"
               style={styles.flex}
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
@@ -1316,6 +1318,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
             importantForAccessibility={page === CARDIO_PAGE ? 'auto' : 'no-hide-descendants'}
           >
             <ScrollView
+              keyboardDismissMode="on-drag"
               style={styles.flex}
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"

@@ -152,6 +152,7 @@ export function AppSideMenu({
       >
         <GlassBackground variant="chrome" bordered={false} />
         <ScrollView
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxl }}
           showsVerticalScrollIndicator={false}
         >

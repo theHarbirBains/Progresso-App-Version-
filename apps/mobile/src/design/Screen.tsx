@@ -71,6 +71,7 @@ export function Screen({
 
   const body = scroll ? (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID={scrollTestID}
       style={styles.flex}
       contentContainerStyle={[horizontal, styles.scrollContent, contentContainerStyle]}

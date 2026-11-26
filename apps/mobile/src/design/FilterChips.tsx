@@ -35,6 +35,7 @@ export function FilterChips<T extends string>({
   const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID={testID}
       horizontal
       showsHorizontalScrollIndicator={false}

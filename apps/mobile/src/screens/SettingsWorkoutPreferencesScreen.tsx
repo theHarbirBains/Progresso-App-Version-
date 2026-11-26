@@ -339,7 +339,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         onClose={() => setPrioritiesDraft(null)}
         testID="training-priorities-sheet"
       >
-        <ScrollView>
+        <ScrollView keyboardDismissMode="on-drag">
           <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
             What would you like to prioritize in the gym?
           </Text>
@@ -395,7 +395,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         onClose={() => setHomeDraft(null)}
         testID="home-equipment-sheet"
       >
-        <ScrollView>
+        <ScrollView keyboardDismissMode="on-drag">
           <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
             What equipment do you have at home?
           </Text>

@@ -125,6 +125,7 @@ export function SharePhotoControl({
 
         <Text style={styles.kicker}>FROM YOUR PROFILE</Text>
         <ScrollView
+          keyboardDismissMode="on-drag"
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.choices}

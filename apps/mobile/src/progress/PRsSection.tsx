@@ -146,6 +146,7 @@ export function PRsSection({
       </TouchableOpacity>
       {scrollable ? (
         <FlatList
+          keyboardDismissMode="on-drag"
           testID="progress-prs-list"
           style={styles.sectionFill}
           data={rows}

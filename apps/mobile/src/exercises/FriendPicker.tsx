@@ -94,6 +94,7 @@ export function FriendPicker({
             leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
           />
           <ScrollView
+            keyboardDismissMode="on-drag"
             testID={`${testID}-list`}
             style={styles.list}
             keyboardShouldPersistTaps="handled"

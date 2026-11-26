@@ -106,6 +106,7 @@ export function StepsSection({ accentColor, now = () => new Date() }: Props) {
 
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID="progress-steps"
       style={progressStyles.sectionFill}
       contentContainerStyle={styles.content}

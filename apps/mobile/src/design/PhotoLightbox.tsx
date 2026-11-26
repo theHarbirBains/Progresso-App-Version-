@@ -78,6 +78,7 @@ export function PhotoLightbox({ visible, uri, onClose, testID }: Props) {
     <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={onClose}>
       <View testID={testID} style={styles.root}>
         <ScrollView
+          keyboardDismissMode="on-drag"
           testID={testID ? `${testID}-zoom` : undefined}
           style={styles.root}
           contentContainerStyle={styles.centre}

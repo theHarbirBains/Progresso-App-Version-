@@ -199,7 +199,11 @@ export function ExerciseGuideSheet({
           <Pager
             testID={testID}
             pages={[
-              <ScrollView key="how" contentContainerStyle={styles.content}>
+              <ScrollView
+                keyboardDismissMode="on-drag"
+                key="how"
+                contentContainerStyle={styles.content}
+              >
                 <TitleRow
                   name={shown.name}
                   subtitle={target}
@@ -211,7 +215,11 @@ export function ExerciseGuideSheet({
               </ScrollView>,
               ...(technique.length > 0 && shown.slug
                 ? [
-                    <ScrollView key="technique" contentContainerStyle={styles.content}>
+                    <ScrollView
+                      keyboardDismissMode="on-drag"
+                      key="technique"
+                      contentContainerStyle={styles.content}
+                    >
                       <TitleRow
                         name={shown.name}
                         subtitle="Technique & Setup"
@@ -232,7 +240,7 @@ export function ExerciseGuideSheet({
             accent={accent}
           />
         ) : (
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
             <TitleRow
               name={exerciseName}
               subtitle={null}
@@ -319,6 +327,7 @@ function Pager({
   return (
     <View style={styles.pager} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
       <ScrollView
+        keyboardDismissMode="on-drag"
         ref={scroller}
         testID={`${testID}-pages`}
         // As tall as they are, as far as there's room (a ScrollView shrinks to fit).
@@ -396,6 +405,7 @@ function CardPage({ page, label, testID }: { page: GuideCardPage; label: string;
   const width = pageWidth - 2 * CARD_GUTTER;
   return (
     <ScrollView
+      keyboardDismissMode="on-drag"
       testID={`${testID}-zoom`}
       style={styles.cardPage}
       contentContainerStyle={styles.cardContent}

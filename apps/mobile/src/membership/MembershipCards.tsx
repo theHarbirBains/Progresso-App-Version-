@@ -88,6 +88,7 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
   return (
     <View testID={testID} onLayout={onLayout}>
       <ScrollView
+        keyboardDismissMode="on-drag"
         ref={scroller}
         testID={`${testID}-pager`}
         horizontal

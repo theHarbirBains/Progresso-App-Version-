@@ -587,7 +587,11 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                 return `${active.length} ${active.length === 1 ? 'food' : 'foods'} · ${calories} cal`;
               })()}
             </Text>
-            <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              keyboardDismissMode="on-drag"
+              style={styles.sheetList}
+              showsVerticalScrollIndicator={false}
+            >
               {openMeal.items.map((entry, i) => (
                 <ListRow
                   key={`${entry.food.id}-${i}`}
@@ -689,6 +693,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           ) : (
             <View style={styles.flex}>
               <SectionList
+                keyboardDismissMode="on-drag"
                 testID="food-library-list"
                 sections={listSections}
                 keyExtractor={(item) => `${item.kind}-${item.id}`}

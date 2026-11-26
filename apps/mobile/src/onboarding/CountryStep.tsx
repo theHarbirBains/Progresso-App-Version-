@@ -80,6 +80,7 @@ export function CountryStep({ testID, value, onChange, located = null }: Props) 
       />
       <AppCard style={styles.card}>
         <FlatList
+          keyboardDismissMode="on-drag"
           testID={`${testID}-list`}
           data={filtered}
           keyExtractor={(item) => item.code}
