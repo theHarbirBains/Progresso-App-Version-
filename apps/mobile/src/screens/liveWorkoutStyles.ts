@@ -407,6 +407,10 @@ export const liveWorkoutStyles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.sm,
   },
+  // Last Time's two cards, scrolling together, with room under the last.
+  previousContent: {
+    paddingBottom: spacing.xxl,
+  },
   // A tab not chosen: kept mounted, out of sight.
   hidden: {
     display: 'none',

@@ -117,6 +117,36 @@ def cut(tile):
     return Image.fromarray(out.clip(0, 255).astype(np.uint8)), top / h
 
 
+def layers(picture):
+    """The figure in two layers, for a picture tinted in the theme's accent (Add Exercise's Last
+    Time): the body in grey with its muscles black, on a clear background; and the muscles alone,
+    white, as strong as they were bright -- for the app to tint in the accent over the black."""
+    rgb = np.asarray(picture.convert('RGB')).astype(float) / 255.0
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    high = rgb.max(axis=2)
+    low = rgb.min(axis=2)
+    sat = np.where(high > 0, (high - low) / np.maximum(high, 1e-6), 0)
+    # Red to orange: red the largest, green below it, blue the least.
+    reddish = (r >= g) & (r >= b) & (g - b >= -0.02) & (r - g > 0.08)
+    strength = np.clip((sat - 0.28) / 0.32, 0, 1) * reddish
+    lum = (0.299 * r + 0.587 * g + 0.114 * b)
+    # Under the muscles, black: the tint over it, as strong as the muscle was bright, is the accent
+    # times its shading -- the light and shadow of every fibre kept, in any colour.
+    base_rgb = rgb * (1 - strength[..., None])
+    # The tile's near-black clears; the body's darkest shadow stays.
+    alpha = np.clip((lum * 255 - 9) / 22, 0, 1)
+    # Nothing of the tile's border at the picture's edges.
+    edge = 6
+    alpha[:edge, :] = 0
+    alpha[-edge:, :] = 0
+    alpha[:, :edge] = 0
+    alpha[:, -edge:] = 0
+    base = np.dstack([base_rgb * 255, alpha * 255]).clip(0, 255).astype(np.uint8)
+    glow_alpha = strength * np.clip(high / 0.9, 0, 1)
+    glow = np.dstack([np.full(lum.shape + (3,), 255.0), glow_alpha * 255]).clip(0, 255).astype(np.uint8)
+    return Image.fromarray(base, 'RGBA'), Image.fromarray(glow, 'RGBA')
+
+
 def main(sheets):
     if len(sheets) != 3:
         raise SystemExit(__doc__)
@@ -137,6 +167,9 @@ def main(sheets):
             os.makedirs(os.path.join(OUT, sex), exist_ok=True)
             path = os.path.join(OUT, sex, f'{group}.webp')
             picture.save(path, 'WEBP', quality=84, method=6)
+            figure, muscle = layers(picture)
+            figure.save(os.path.join(OUT, sex, f'{group}-figure.webp'), 'WEBP', quality=84, method=6)
+            muscle.save(os.path.join(OUT, sex, f'{group}-muscle.webp'), 'WEBP', quality=84, method=6)
             entries.append((sex, group, picture.width, picture.height))
             print(f'{sex:6} {group:11} {picture.width}x{picture.height}  name at {name_at:.2f}')
 
@@ -150,6 +183,10 @@ def main(sheets):
         '  image: number;',
         '  /** Width over height. */',
         '  aspect: number;',
+        '  /** The figure alone, grey, on a clear background (Last Time\'s session card). */',
+        '  figure: number;',
+        '  /** Its muscles alone, white: tinted in the accent over `figure`. */',
+        '  muscle: number;',
         '}',
         '',
         "export const MUSCLE_TILES: Record<'male' | 'female', Partial<Record<MuscleGroup, MuscleTile>>> = {",
@@ -161,7 +198,9 @@ def main(sheets):
                 continue
             lines.append(
                 f"    {group}: {{ image: require('../../assets/muscle-groups/{sex}/{group}.webp'), "
-                f'aspect: {w / h:.4f} }},'
+                f'aspect: {w / h:.4f}, '
+                f"figure: require('../../assets/muscle-groups/{sex}/{group}-figure.webp'), "
+                f"muscle: require('../../assets/muscle-groups/{sex}/{group}-muscle.webp') }},"
             )
         lines.append('  },')
     lines.append('};')

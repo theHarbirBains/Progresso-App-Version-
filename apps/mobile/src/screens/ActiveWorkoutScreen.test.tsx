@@ -2947,8 +2947,12 @@ describe('ActiveWorkoutScreen -- previous exercises in Add Exercise', () => {
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    // The session card: the day's own name, as the workout is called.
     expect(await screen.findByTestId('exercise-picker-previous-title')).toHaveTextContent(
-      'Last Time You Trained — Chest & Triceps',
+      'Push Day',
+    );
+    expect(screen.getByTestId('exercise-picker-previous-session')).toHaveTextContent(
+      /YOUR PREVIOUS SESSION/,
     );
     expect(fetchSplitDayMuscleGroups).toHaveBeenCalledWith('day-push');
     expect(fetchPreviousExercises).toHaveBeenCalledWith('user-1');
@@ -2975,12 +2979,12 @@ describe('ActiveWorkoutScreen -- previous exercises in Add Exercise', () => {
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
     expect(await screen.findByTestId('exercise-picker-previous-title')).toHaveTextContent(
-      'Your Previous Exercises',
+      'Recent Training',
     );
     expect(fetchSplitDayMuscleGroups).not.toHaveBeenCalled();
     // Bench Press (chest) is already in the workout, so Chest leads.
-    expect(screen.getByTestId('exercise-picker-previous')).toHaveTextContent(
-      /^Your Previous Exercises.*Chest.*Triceps.*Back/,
+    expect(screen.getByTestId('exercise-picker-previous-list')).toHaveTextContent(
+      /^CHEST.*TRICEPS.*BACK/,
     );
   });
 });

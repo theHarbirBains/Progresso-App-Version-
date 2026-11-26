@@ -2,7 +2,6 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useAuth } from '../auth/AuthProvider';
 import { updateExercise } from '../lib/api';
 import { Alert, Modal, ScrollView, View } from 'react-native';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { TextButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
@@ -52,6 +51,8 @@ interface Props {
     state: PreviousExercisesState;
     addedGroups: MuscleGroup[];
     weightUnit: 'kg' | 'lb';
+    /** The session's own name (the split day's), for Last Time's session card. */
+    sessionName?: string | null;
   };
   /** Defaults to the static brand accent -- pass the user's Workout accent. */
   accentColor?: string;
@@ -296,12 +297,14 @@ export function ExercisePickerModal({
         {/* Both tabs stay mounted, so switching is instant and each keeps its place. */}
         {previous ? (
           <View style={[styles.pickerBody, tab !== 'previous' && styles.hidden]}>
-            <AppCard testID="exercise-picker-previous-card" style={styles.flex}>
+            {/* The session card and the muscle groups' card, scrolling together. */}
+            <View testID="exercise-picker-previous-card" style={styles.flex}>
               <ScrollView
                 keyboardDismissMode="on-drag"
                 testID="exercise-picker-previous-scroll"
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.previousContent}
               >
                 <PreviousExercisesSection
                   testID="exercise-picker-previous"
@@ -314,6 +317,8 @@ export function ExercisePickerModal({
                   library={library}
                   alreadyAddedIds={alreadyAddedIdSet}
                   weightUnit={previous.weightUnit}
+                  sessionName={previous.sessionName}
+                  accentColor={accentColor}
                   onSelect={(exercise) => void choose(exercise)}
                 />
                 <TextButton
@@ -322,7 +327,7 @@ export function ExercisePickerModal({
                   onPress={() => chooseTab('all')}
                 />
               </ScrollView>
-            </AppCard>
+            </View>
           </View>
         ) : null}
 

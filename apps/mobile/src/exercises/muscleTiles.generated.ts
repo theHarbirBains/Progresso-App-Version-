@@ -7,53 +7,159 @@ export interface MuscleTile {
   image: number;
   /** Width over height. */
   aspect: number;
+  /** The figure alone, grey, on a clear background (Last Time's session card). */
+  figure: number;
+  /** Its muscles alone, white: tinted in the accent over `figure`. */
+  muscle: number;
 }
 
 export const MUSCLE_TILES: Record<'male' | 'female', Partial<Record<MuscleGroup, MuscleTile>>> = {
   male: {
-    chest: { image: require('../../assets/muscle-groups/male/chest.webp'), aspect: 0.9091 },
-    back: { image: require('../../assets/muscle-groups/male/back.webp'), aspect: 0.8772 },
-    shoulders: { image: require('../../assets/muscle-groups/male/shoulders.webp'), aspect: 0.8824 },
-    biceps: { image: require('../../assets/muscle-groups/male/biceps.webp'), aspect: 0.885 },
-    triceps: { image: require('../../assets/muscle-groups/male/triceps.webp'), aspect: 0.9091 },
-    forearms: { image: require('../../assets/muscle-groups/male/forearms.webp'), aspect: 0.8772 },
+    chest: {
+      image: require('../../assets/muscle-groups/male/chest.webp'),
+      aspect: 0.9091,
+      figure: require('../../assets/muscle-groups/male/chest-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/chest-muscle.webp'),
+    },
+    back: {
+      image: require('../../assets/muscle-groups/male/back.webp'),
+      aspect: 0.8772,
+      figure: require('../../assets/muscle-groups/male/back-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/back-muscle.webp'),
+    },
+    shoulders: {
+      image: require('../../assets/muscle-groups/male/shoulders.webp'),
+      aspect: 0.8824,
+      figure: require('../../assets/muscle-groups/male/shoulders-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/shoulders-muscle.webp'),
+    },
+    biceps: {
+      image: require('../../assets/muscle-groups/male/biceps.webp'),
+      aspect: 0.885,
+      figure: require('../../assets/muscle-groups/male/biceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/biceps-muscle.webp'),
+    },
+    triceps: {
+      image: require('../../assets/muscle-groups/male/triceps.webp'),
+      aspect: 0.9091,
+      figure: require('../../assets/muscle-groups/male/triceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/triceps-muscle.webp'),
+    },
+    forearms: {
+      image: require('../../assets/muscle-groups/male/forearms.webp'),
+      aspect: 0.8772,
+      figure: require('../../assets/muscle-groups/male/forearms-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/forearms-muscle.webp'),
+    },
     quadriceps: {
       image: require('../../assets/muscle-groups/male/quadriceps.webp'),
       aspect: 0.8798,
+      figure: require('../../assets/muscle-groups/male/quadriceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/quadriceps-muscle.webp'),
     },
     hamstrings: {
       image: require('../../assets/muscle-groups/male/hamstrings.webp'),
       aspect: 0.8798,
+      figure: require('../../assets/muscle-groups/male/hamstrings-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/hamstrings-muscle.webp'),
     },
-    adductors: { image: require('../../assets/muscle-groups/male/adductors.webp'), aspect: 0.9063 },
-    glutes: { image: require('../../assets/muscle-groups/male/glutes.webp'), aspect: 0.8876 },
-    calves: { image: require('../../assets/muscle-groups/male/calves.webp'), aspect: 0.8772 },
-    core: { image: require('../../assets/muscle-groups/male/core.webp'), aspect: 0.8824 },
+    adductors: {
+      image: require('../../assets/muscle-groups/male/adductors.webp'),
+      aspect: 0.9063,
+      figure: require('../../assets/muscle-groups/male/adductors-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/adductors-muscle.webp'),
+    },
+    glutes: {
+      image: require('../../assets/muscle-groups/male/glutes.webp'),
+      aspect: 0.8876,
+      figure: require('../../assets/muscle-groups/male/glutes-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/glutes-muscle.webp'),
+    },
+    calves: {
+      image: require('../../assets/muscle-groups/male/calves.webp'),
+      aspect: 0.8772,
+      figure: require('../../assets/muscle-groups/male/calves-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/calves-muscle.webp'),
+    },
+    core: {
+      image: require('../../assets/muscle-groups/male/core.webp'),
+      aspect: 0.8824,
+      figure: require('../../assets/muscle-groups/male/core-figure.webp'),
+      muscle: require('../../assets/muscle-groups/male/core-muscle.webp'),
+    },
   },
   female: {
-    chest: { image: require('../../assets/muscle-groups/female/chest.webp'), aspect: 0.8876 },
-    back: { image: require('../../assets/muscle-groups/female/back.webp'), aspect: 0.8571 },
+    chest: {
+      image: require('../../assets/muscle-groups/female/chest.webp'),
+      aspect: 0.8876,
+      figure: require('../../assets/muscle-groups/female/chest-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/chest-muscle.webp'),
+    },
+    back: {
+      image: require('../../assets/muscle-groups/female/back.webp'),
+      aspect: 0.8571,
+      figure: require('../../assets/muscle-groups/female/back-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/back-muscle.webp'),
+    },
     shoulders: {
       image: require('../../assets/muscle-groups/female/shoulders.webp'),
       aspect: 0.8621,
+      figure: require('../../assets/muscle-groups/female/shoulders-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/shoulders-muscle.webp'),
     },
-    biceps: { image: require('../../assets/muscle-groups/female/biceps.webp'), aspect: 0.8646 },
-    triceps: { image: require('../../assets/muscle-groups/female/triceps.webp'), aspect: 0.8876 },
-    forearms: { image: require('../../assets/muscle-groups/female/forearms.webp'), aspect: 0.8547 },
+    biceps: {
+      image: require('../../assets/muscle-groups/female/biceps.webp'),
+      aspect: 0.8646,
+      figure: require('../../assets/muscle-groups/female/biceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/biceps-muscle.webp'),
+    },
+    triceps: {
+      image: require('../../assets/muscle-groups/female/triceps.webp'),
+      aspect: 0.8876,
+      figure: require('../../assets/muscle-groups/female/triceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/triceps-muscle.webp'),
+    },
+    forearms: {
+      image: require('../../assets/muscle-groups/female/forearms.webp'),
+      aspect: 0.8547,
+      figure: require('../../assets/muscle-groups/female/forearms-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/forearms-muscle.webp'),
+    },
     quadriceps: {
       image: require('../../assets/muscle-groups/female/quadriceps.webp'),
       aspect: 0.8571,
+      figure: require('../../assets/muscle-groups/female/quadriceps-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/quadriceps-muscle.webp'),
     },
     hamstrings: {
       image: require('../../assets/muscle-groups/female/hamstrings.webp'),
       aspect: 0.8571,
+      figure: require('../../assets/muscle-groups/female/hamstrings-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/hamstrings-muscle.webp'),
     },
     adductors: {
       image: require('../../assets/muscle-groups/female/adductors.webp'),
       aspect: 0.885,
+      figure: require('../../assets/muscle-groups/female/adductors-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/adductors-muscle.webp'),
     },
-    glutes: { image: require('../../assets/muscle-groups/female/glutes.webp'), aspect: 0.8671 },
-    calves: { image: require('../../assets/muscle-groups/female/calves.webp'), aspect: 0.8547 },
-    core: { image: require('../../assets/muscle-groups/female/core.webp'), aspect: 0.8596 },
+    glutes: {
+      image: require('../../assets/muscle-groups/female/glutes.webp'),
+      aspect: 0.8671,
+      figure: require('../../assets/muscle-groups/female/glutes-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/glutes-muscle.webp'),
+    },
+    calves: {
+      image: require('../../assets/muscle-groups/female/calves.webp'),
+      aspect: 0.8547,
+      figure: require('../../assets/muscle-groups/female/calves-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/calves-muscle.webp'),
+    },
+    core: {
+      image: require('../../assets/muscle-groups/female/core.webp'),
+      aspect: 0.8596,
+      figure: require('../../assets/muscle-groups/female/core-figure.webp'),
+      muscle: require('../../assets/muscle-groups/female/core-muscle.webp'),
+    },
   },
 };

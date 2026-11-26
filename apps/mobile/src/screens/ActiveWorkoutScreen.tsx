@@ -1356,6 +1356,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           state: previousExercises,
           addedGroups: workout.exercises.map((ex) => ex.muscleGroup),
           weightUnit,
+          sessionName: workout.name,
         }}
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}

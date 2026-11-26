@@ -211,7 +211,20 @@ describe('ExercisePickerModal -- previous exercises', () => {
     );
 
     const section = await screen.findByTestId('exercise-picker-previous');
-    expect(section).toHaveTextContent(/Your Previous Exercises/);
+    // The session card: what's below it, counted.
+    expect(screen.getByTestId('exercise-picker-previous-session')).toHaveTextContent(
+      /YOUR PREVIOUS SESSIONS.*Recent Training/,
+    );
+    expect(screen.getByTestId('exercise-picker-previous-stat-groups')).toHaveTextContent(
+      /1.*Muscle Group/,
+    );
+    expect(screen.getByTestId('exercise-picker-previous-stat-exercises')).toHaveTextContent(
+      /1.*Exercise/,
+    );
+    expect(screen.getByTestId('exercise-picker-previous-stat-sets')).toHaveTextContent(
+      /3.*Total Sets/,
+    );
+    expect(section).toHaveTextContent(/CHEST/);
     expect(screen.getByTestId('exercise-picker-previous-group-chest-date')).toHaveTextContent(
       /Last trained Nov 18/,
     );
@@ -226,7 +239,7 @@ describe('ExercisePickerModal -- previous exercises', () => {
     expect(hidden('exercise-library-list')).toBe(true);
     expect(
       screen.getByTestId('exercise-library-list', { includeHiddenElements: true }),
-    ).not.toHaveTextContent(/Your Previous Exercises/);
+    ).not.toHaveTextContent(/Recent Training/);
 
     fireEvent.press(screen.getByTestId('exercise-picker-previous-group-chest-ex1'));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex1' }));

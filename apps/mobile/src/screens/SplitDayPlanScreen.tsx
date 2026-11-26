@@ -312,6 +312,7 @@ export function SplitDayPlanScreen({ navigation, route }: Props) {
           state: previous,
           addedGroups: plan.map((p) => p.muscleGroup),
           weightUnit,
+          sessionName: dayName,
         }}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
