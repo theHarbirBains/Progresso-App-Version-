@@ -46,7 +46,7 @@ async function settle() {
 }
 
 describe('ExerciseOverview', () => {
-  it("shows a built-in's movement large, its muscles on the figure, and how it's set up", async () => {
+  it("shows a built-in's movement large, its name and muscles under it, and how it's set up", async () => {
     const onOpenGuide = jest.fn();
     render(
       <ExerciseOverview
@@ -59,7 +59,11 @@ describe('ExerciseOverview', () => {
     );
     await settle();
     expect(screen.getByTestId('exercise-overview-hero')).toBeTruthy();
-    expect(screen.getByTestId('exercise-overview-figure')).toBeTruthy();
+    expect(screen.getByTestId('exercise-overview-name')).toHaveTextContent(/Lat Pulldown/);
+    expect(screen.getByTestId('exercise-overview-muscles')).toHaveTextContent(/Primary: Back/);
+    expect(screen.getByTestId('exercise-overview-secondary')).toHaveTextContent(
+      /Secondary: Biceps, Shoulders/,
+    );
     expect(screen.getByTestId('exercise-overview-fact-equipment')).toHaveTextContent(/Cable/);
     expect(screen.getByTestId('exercise-overview-fact-grip')).toHaveTextContent(/Neutral/);
     expect(screen.getByTestId('exercise-overview-fact-attachment')).toHaveTextContent(/V-Handle/);
@@ -67,10 +71,9 @@ describe('ExerciseOverview', () => {
     expect(screen.getByTestId('exercise-overview-fact-movement')).toHaveTextContent(
       /Vertical Pull · Pull/,
     );
-    // The picture, and How to Do It, open the guide.
+    // The picture opens the guide.
     fireEvent.press(screen.getByTestId('exercise-overview-hero'));
-    fireEvent.press(screen.getByTestId('exercise-overview-how-to'));
-    expect(onOpenGuide).toHaveBeenCalledTimes(2);
+    expect(onOpenGuide).toHaveBeenCalledTimes(1);
   });
 
   it("shows a person's own exercise without a photo plainly: its initial, muscle and setup", async () => {
@@ -84,7 +87,8 @@ describe('ExerciseOverview', () => {
     );
     await settle();
     expect(screen.queryByTestId('exercise-overview-hero')).toBeNull();
-    expect(screen.getByTestId('exercise-overview-muscles')).toHaveTextContent(/Back/);
+    expect(screen.getByTestId('exercise-overview-muscles')).toHaveTextContent(/Primary: Back/);
+    expect(screen.queryByTestId('exercise-overview-secondary')).toBeNull();
     expect(screen.getByTestId('exercise-overview-fact-gym')).toHaveTextContent(/Kits Iron/);
     expect(screen.queryByTestId('exercise-overview-fact-movement')).toBeNull();
     expect(screen.queryByTestId('exercise-overview-how-to')).toBeNull();

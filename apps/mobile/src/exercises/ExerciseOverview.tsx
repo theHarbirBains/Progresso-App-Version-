@@ -6,13 +6,12 @@ import { TextButton } from '../design/Button';
 import { PhotoLightbox } from '../design/PhotoLightbox';
 import { Text } from '../design/Text';
 import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
-import { withAlpha } from '../theme/accentColor';
 import { useBuiltinExtras } from './builtinExtras';
 import { EQUIPMENT_LABELS } from './equipment';
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseDetails } from './exerciseQueries';
-import { hasIllustration, illustrationFor, muscleMapFor } from './illustrations/exerciseArt';
-import { Frame, MuscleFigures, usePrefix } from './illustrations/ExerciseIllustration';
+import { hasIllustration, illustrationFor } from './illustrations/exerciseArt';
+import { Frame, usePrefix } from './illustrations/ExerciseIllustration';
 import { EXERCISE_RENDERS } from './illustrations/renders.generated';
 import { LOAD_TYPE_LABELS, pulleyPositionText, pulleyText } from './machineLoad';
 import {
@@ -21,7 +20,7 @@ import {
   movementPatternLabel,
 } from './movementCategories';
 import { MOVEMENT_TYPE_LABELS } from './movementTypes';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { MUSCLE_GROUP_LABELS } from './muscleGroups';
 import { changeOwnPhoto } from './ownPhotoActions';
 import { canKeepOwnPhotos, useOwnPhoto } from './ownPhotos';
 
@@ -51,7 +50,7 @@ function Hero({
 }) {
   const prefix = usePrefix();
   const [photoOpen, setPhotoOpen] = useState(false);
-  const side = Math.min(width, HERO_MAX);
+  const side = Math.min(Math.round(width * 0.8), HERO_MAX);
   if (photoUri) {
     return (
       <>
@@ -61,7 +60,7 @@ function Hero({
           activeOpacity={0.85}
           accessibilityRole="imagebutton"
           accessibilityLabel={`${exerciseName} photo. View full screen`}
-          style={[styles.hero, { height: side }]}
+          style={[styles.hero, { width, height: side }]}
         >
           <Image
             source={{ uri: photoUri }}
@@ -117,7 +116,7 @@ function Hero({
       activeOpacity={0.85}
       accessibilityRole={onOpenGuide ? 'button' : 'image'}
       accessibilityLabel={`${exerciseName}${onOpenGuide ? '. How to Do It' : ''}`}
-      style={[styles.hero, styles.heroArt, { height: side }]}
+      style={[styles.hero, styles.heroArt, { width, height: side }]}
     >
       {art}
     </TouchableOpacity>
@@ -134,37 +133,12 @@ function Fact({ label, value, testID }: { label: string; value: string; testID: 
   );
 }
 
-/** A muscle group as a small pill: primary filled in the accent's tint, secondary plain. */
-function MusclePill({
-  group,
-  primary,
-  accentColor,
-}: {
-  group: MuscleGroup;
-  primary: boolean;
-  accentColor: string;
-}) {
-  return (
-    <View
-      style={[
-        styles.musclePill,
-        primary && { borderColor: accentColor, backgroundColor: withAlpha(accentColor, 0.14) },
-      ]}
-    >
-      <Text style={[styles.musclePillText, primary && { color: accentColor }]}>
-        {MUSCLE_GROUP_LABELS[group]}
-      </Text>
-    </View>
-  );
-}
-
 /**
- * The top of an exercise's own page (ProgressExerciseDetail), Hevy-style: the picture as large as
- * the card allows, its muscles -- the primary group and the ones it also works, on the anatomy
- * figure with its key for a built-in -- then what it's done with, set out one fact at a time
- * (equipment, grip, attachment, where its cable starts, how it's loaded, its movement, one side at
- * a time, its gym), and How to Do It and Add Your Machine Photo. Nothing until it's read: the
- * page's figures below are whole without it.
+ * The top of an exercise's own page (ProgressExerciseDetail's Summary), after Hevy's: the picture
+ * across the card, its name, "Primary: Back" and "Secondary: Biceps, Shoulders", then what it's
+ * done with, set out one fact at a time (equipment, grip, attachment, where its cable starts, how
+ * it's loaded, its movement, one side at a time, its gym), and Add Your Machine Photo. A built-in's
+ * picture opens How to Do It. Nothing until it's read: the page's figures are whole without it.
  */
 export function ExerciseOverview({
   details,
@@ -178,7 +152,7 @@ export function ExerciseOverview({
   exerciseId: string;
   exerciseName: string;
   accentColor: string;
-  /** Opens How to Do It; absent where the exercise has none (a person's own). */
+  /** Opens How to Do It (the page's How To tab); absent where the exercise has none. */
   onOpenGuide?: () => void;
   testID?: string;
 }) {
@@ -194,7 +168,6 @@ export function ExerciseOverview({
   const secondary = (extras?.secondaryMuscleGroups ?? []).filter(
     (group) => group !== details.muscleGroup,
   );
-  const figure = !!muscleMapFor(slug);
   const category = movementCategoryOf(extras?.movementPattern);
   const pattern = movementPatternLabel(extras?.movementPattern);
   const facts: { key: string; label: string; value: string }[] = [
@@ -253,18 +226,17 @@ export function ExerciseOverview({
         )}
 
         <View style={styles.block}>
-          <Text style={styles.kicker}>MUSCLES</Text>
-          {figure ? (
-            // A built-in's muscles on the anatomy figure, its key naming each, primary and secondary.
-            <MuscleFigures slug={slug} height={132} testID={`${testID}-figure`} />
-          ) : (
-            <View testID={`${testID}-muscles`} style={styles.pills}>
-              <MusclePill group={details.muscleGroup} primary accentColor={accentColor} />
-              {secondary.map((group) => (
-                <MusclePill key={group} group={group} primary={false} accentColor={accentColor} />
-              ))}
-            </View>
-          )}
+          <Text testID={`${testID}-name`} style={styles.name} accessibilityRole="header">
+            {exerciseName}
+          </Text>
+          <Text testID={`${testID}-muscles`} style={styles.muscleLine}>
+            Primary: {MUSCLE_GROUP_LABELS[details.muscleGroup]}
+          </Text>
+          {secondary.length > 0 ? (
+            <Text testID={`${testID}-secondary`} style={styles.muscleLine}>
+              Secondary: {secondary.map((group) => MUSCLE_GROUP_LABELS[group]).join(', ')}
+            </Text>
+          ) : null}
         </View>
 
         {facts.length > 0 ? (
@@ -280,18 +252,13 @@ export function ExerciseOverview({
           </View>
         ) : null}
 
-        {onOpenGuide || (builtin && canKeepOwnPhotos()) ? (
+        {builtin && canKeepOwnPhotos() ? (
           <View style={styles.actions}>
-            {onOpenGuide ? (
-              <TextButton testID={`${testID}-how-to`} label="How to Do It" onPress={onOpenGuide} />
-            ) : null}
-            {builtin && canKeepOwnPhotos() ? (
-              <TextButton
-                testID={`${testID}-photo-action`}
-                label={own ? 'Change Photo' : 'Add Your Machine Photo'}
-                onPress={() => changeOwnPhoto({ exerciseId, hasPhoto: !!own })}
-              />
-            ) : null}
+            <TextButton
+              testID={`${testID}-photo-action`}
+              label={own ? 'Change Photo' : 'Add Your Machine Photo'}
+              onPress={() => changeOwnPhoto({ exerciseId, hasPhoto: !!own })}
+            />
           </View>
         ) : null}
       </View>
@@ -316,29 +283,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   block: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
-  kicker: {
-    ...typeScale.caption,
-    fontFamily: fonts.semibold,
-    color: colors.textMuted,
-    letterSpacing: 0.8,
+  name: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
   },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  musclePill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.glassBorderStrong,
-  },
-  musclePillText: {
-    ...typeScale.label,
-    color: colors.textSecondaryBright,
+  muscleLine: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
   },
   facts: {
     flexDirection: 'row',

@@ -7,6 +7,7 @@ import { ProgressExerciseDetailScreen } from './ProgressExerciseDetailScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 import { updateSet } from '../workouts/workoutQueries';
 import { fetchExerciseDetails } from '../exercises/exerciseQueries';
+import { forgetBuiltinExtras, setBuiltinSources } from '../exercises/builtinExtras';
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchExerciseDetails: jest.fn(async () => null),
@@ -54,6 +55,11 @@ const navigation: any = {
   }),
 };
 const route = { params: { exerciseId: 'ex-1', exerciseName: 'Bench Press' } } as never;
+
+/** Its History tab: each workout's top set. */
+async function openHistory() {
+  fireEvent.press(await screen.findByTestId('progress-exercise-detail-tabs-history'));
+}
 
 const twoSessionHistory = [
   {
@@ -136,7 +142,10 @@ describe('ProgressExerciseDetailScreen', () => {
       wrapper: ProfileProvider,
     });
 
+    await openHistory();
     expect(await screen.findByText('Top Sets')).toBeTruthy();
+    // With how many sets each workout had.
+    expect(screen.getByTestId('progress-exercise-detail-top-set-0')).toHaveTextContent(/2 sets/);
     expect(screen.getByTestId('progress-exercise-detail-top-set-0')).toHaveTextContent(/110kg × 8/);
     expect(screen.getByTestId('progress-exercise-detail-top-set-1')).toHaveTextContent(/100kg × 8/);
     expect(screen.queryByTestId('progress-exercise-detail-top-set-2')).toBeNull();
@@ -156,11 +165,15 @@ describe('ProgressExerciseDetailScreen', () => {
       wrapper: ProfileProvider,
     });
 
+    await openHistory();
     expect(await screen.findByTestId('progress-exercise-detail-top-set-0')).toHaveTextContent(
       /71kg × 5/,
     );
     expect(screen.getByTestId('progress-exercise-detail-top-set-9')).toHaveTextContent(/62kg × 5/);
     expect(screen.queryByTestId('progress-exercise-detail-top-set-10')).toBeNull();
+    // Every one, a tap away.
+    fireEvent.press(screen.getByTestId('progress-exercise-detail-top-sets-all'));
+    expect(screen.getByTestId('progress-exercise-detail-top-set-11')).toHaveTextContent(/60kg × 5/);
   });
 
   it('draws no line graph and no time range', async () => {
@@ -195,6 +208,13 @@ describe('ProgressExerciseDetailScreen', () => {
       /140/,
     );
     expect(screen.getByTestId('progress-exercise-detail-metric-prs')).toHaveTextContent(/1/);
+    // From the sets themselves: the heaviest, and the most weight x reps in one set.
+    expect(screen.getByTestId('progress-exercise-detail-record-heaviest')).toHaveTextContent(
+      /110kg/,
+    );
+    expect(screen.getByTestId('progress-exercise-detail-record-best-set')).toHaveTextContent(
+      /880kg/,
+    );
   });
 
   it('goes back when the back button is pressed', async () => {
@@ -321,6 +341,7 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
     });
 
     await screen.findByTestId('progress-exercise-detail-details');
+    await openHistory();
     fireEvent.press(screen.getByTestId('progress-exercise-detail-top-set-0'));
     expect(screen.getByTestId('edit-top-set-summary')).toHaveTextContent(
       /^Bench Press · Fit4Less Downtown, /,
@@ -349,6 +370,7 @@ describe('ProgressExerciseDetailScreen -- editing a top set', () => {
     });
 
     // Newest first: February's 110 kg x 8.
+    await openHistory();
     fireEvent.press(await screen.findByTestId('progress-exercise-detail-top-set-0'));
     expect(screen.getByTestId('edit-top-set-weight').props.value).toBe('110');
     expect(screen.getByTestId('edit-top-set-reps').props.value).toBe('8');
@@ -372,6 +394,7 @@ describe('ProgressExerciseDetailScreen -- editing a top set', () => {
       wrapper: ProfileProvider,
     });
 
+    await openHistory();
     fireEvent.press(await screen.findByTestId('progress-exercise-detail-top-set-0'));
     fireEvent.changeText(screen.getByTestId('edit-top-set-reps'), '');
     await act(async () => {
@@ -380,5 +403,73 @@ describe('ProgressExerciseDetailScreen -- editing a top set', () => {
 
     expect(screen.getByTestId('edit-top-set-error')).toHaveTextContent(/rep count/);
     expect(updateSet).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProgressExerciseDetailScreen -- its tabs', () => {
+  it('opens on Summary, with History beside it -- and no How To for an exercise with no guide', async () => {
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    expect(await screen.findByTestId('progress-exercise-detail-tabs-summary')).toBeTruthy();
+    expect(screen.getByTestId('progress-exercise-detail-tabs-history')).toBeTruthy();
+    expect(screen.queryByTestId('progress-exercise-detail-tabs-howto')).toBeNull();
+    expect(screen.queryByTestId('progress-exercise-detail-info')).toBeNull();
+    // Summary has the records; History has the top sets.
+    expect(screen.getByTestId('progress-exercise-detail-records')).toBeTruthy();
+    expect(screen.queryByTestId('progress-exercise-detail-top-set-0')).toBeNull();
+    await openHistory();
+    expect(screen.getByTestId('progress-exercise-detail-top-set-0')).toBeTruthy();
+    expect(screen.queryByTestId('progress-exercise-detail-records')).toBeNull();
+  });
+
+  it("gives a built-in a How To tab -- its guide inline -- that the header's (i) opens too", async () => {
+    forgetBuiltinExtras();
+    setBuiltinSources({
+      extras: async () =>
+        new Map([
+          [
+            'ex-1',
+            {
+              slug: 'bb-bench-press',
+              secondaryMuscleGroups: ['shoulders', 'triceps'],
+              searchAliases: [],
+              movementPattern: 'horizontal_push',
+              illustrationUrl: null,
+            },
+          ],
+        ]),
+      guide: async () => ({
+        name: 'Bench Press',
+        muscleGroup: 'chest',
+        equipment: 'barbell',
+        movementType: 'bilateral',
+        measurementType: 'weight_reps',
+        slug: 'bb-bench-press',
+        secondaryMuscleGroups: ['shoulders', 'triceps'],
+        movementPattern: 'horizontal_push',
+        summary: 'A flat-bench press.',
+        setupSteps: ['Lie back under the bar.'],
+        executionSteps: ['Lower it to your chest.', 'Press it up.'],
+        commonMistakes: ['Bouncing it.'],
+        illustrationUrl: null,
+      }),
+    });
+    try {
+      render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+        wrapper: ProfileProvider,
+      });
+      expect(await screen.findByTestId('progress-exercise-detail-tabs-howto')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('progress-exercise-detail-info'));
+      expect(await screen.findByTestId('progress-exercise-detail-howto')).toBeTruthy();
+      expect(await screen.findByTestId('progress-exercise-detail-guide-pages')).toBeTruthy();
+      // Back to Summary.
+      fireEvent.press(screen.getByTestId('progress-exercise-detail-tabs-summary'));
+      expect(screen.queryByTestId('progress-exercise-detail-howto')).toBeNull();
+    } finally {
+      forgetBuiltinExtras();
+      setBuiltinSources(null);
+    }
   });
 });

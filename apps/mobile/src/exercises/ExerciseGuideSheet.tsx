@@ -103,20 +103,14 @@ function cardLabels(
  * and the way back -- with a numbered row for each; then its Key Tips beside its Common Mistakes.
  * Read when it opens.
  */
-export function ExerciseGuideSheet({
-  visible,
-  onClose,
-  exerciseId,
-  exerciseName,
-  testID = 'exercise-guide',
-}: Props) {
-  const accent = useAppTheme().accent.accent;
+/** An exercise's guide, read once `active` (a sheet open, a tab shown), with Try Again. */
+export function useExerciseGuide(exerciseId: string, active: boolean) {
   const [guide, setGuide] = useState<ExerciseGuide | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!active) return;
     let cancelled = false;
     setError(null);
     readExerciseGuide(exerciseId)
@@ -131,23 +125,27 @@ export function ExerciseGuideSheet({
     return () => {
       cancelled = true;
     };
-  }, [visible, exerciseId, attempt]);
+  }, [active, exerciseId, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  const shown = guide && guide.name ? guide : null;
-  // What it targets, under its name: the drawn illustration's primary muscles ("Quads / Glutes"),
-  // or the exercise's own muscle group.
-  const target = shown
-    ? (muscleMapFor(shown.slug)?.primaryNames.join(' / ') ?? MUSCLE_GROUP_LABELS[shown.muscleGroup])
-    : null;
-  const drawn = shown && !shown.illustrationUrl && hasIllustration(shown.slug);
-  // Technique & Setup's cards: only a drawn built-in has them.
-  const technique = shown?.slug && drawn ? (BUILTIN_GUIDES[shown.slug]?.technique ?? []) : [];
-  // The exercise's own two cards, known from its extras (read before anything offers this page).
-  const slug = useBuiltinExtras(exerciseId)?.slug ?? shown?.slug;
-  const cards = slug ? GUIDE_CARDS[slug] : undefined;
-  const labels =
-    cards && slug ? cardLabels(slug, shown?.name ?? exerciseName, shown?.commonMistakes ?? []) : [];
+  return { guide: guide && guide.name ? guide : null, error, retry };
+}
+
+/** The exercise's own two cards, where it has them (known from its extras, or its guide). */
+function useGuideCards(exerciseId: string, guide: ExerciseGuide | null) {
+  const slug = useBuiltinExtras(exerciseId)?.slug ?? guide?.slug;
+  return { slug, cards: slug ? GUIDE_CARDS[slug] : undefined };
+}
+
+export function ExerciseGuideSheet({
+  visible,
+  onClose,
+  exerciseId,
+  exerciseName,
+  testID = 'exercise-guide',
+}: Props) {
+  const state = useExerciseGuide(exerciseId, visible);
+  const { cards } = useGuideCards(exerciseId, state.guide);
 
   return (
     <Modal
@@ -181,82 +179,127 @@ export function ExerciseGuideSheet({
             <Feather name="x" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
-        {cards ? (
-          <Pager
-            testID={testID}
-            pages={cards.map((page, i) => (
-              <CardPage
-                key={i}
-                page={page}
-                label={labels[i] ?? ''}
-                testID={`${testID}-card-page-${i}`}
-              />
-            ))}
-            pagesHeight={(width) => cardsHeight(cards, width)}
-            accent={accent}
+        <ExerciseGuideBody
+          exerciseId={exerciseId}
+          exerciseName={exerciseName}
+          state={state}
+          testID={testID}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+/**
+ * The guide itself, filling the room it's given -- the sheet's, or an exercise page's How to tab:
+ * the exercise's own two cards swiped between where it has them, else How to Do It and Technique
+ * & Setup swiped between, each page scrolling on its own; placeholders while it's read, and Try
+ * Again if it can't be.
+ */
+export function ExerciseGuideBody({
+  exerciseId,
+  exerciseName,
+  state,
+  testID = 'exercise-guide',
+}: {
+  exerciseId: string;
+  exerciseName: string;
+  state: ReturnType<typeof useExerciseGuide>;
+  testID?: string;
+}) {
+  const accent = useAppTheme().accent.accent;
+  const { guide: shown, error, retry } = state;
+  // What it targets, under its name: the drawn illustration's primary muscles ("Quads / Glutes"),
+  // or the exercise's own muscle group.
+  const target = shown
+    ? (muscleMapFor(shown.slug)?.primaryNames.join(' / ') ?? MUSCLE_GROUP_LABELS[shown.muscleGroup])
+    : null;
+  const drawn = shown && !shown.illustrationUrl && hasIllustration(shown.slug);
+  // Technique & Setup's cards: only a drawn built-in has them.
+  const technique = shown?.slug && drawn ? (BUILTIN_GUIDES[shown.slug]?.technique ?? []) : [];
+  const { slug, cards } = useGuideCards(exerciseId, shown);
+  const labels =
+    cards && slug ? cardLabels(slug, shown?.name ?? exerciseName, shown?.commonMistakes ?? []) : [];
+
+  if (cards) {
+    return (
+      <Pager
+        testID={testID}
+        pages={cards.map((page, i) => (
+          <CardPage
+            key={i}
+            page={page}
+            label={labels[i] ?? ''}
+            testID={`${testID}-card-page-${i}`}
           />
-        ) : shown && !error ? (
-          <Pager
-            testID={testID}
-            pages={[
-              <ScrollView
-                keyboardDismissMode="on-drag"
-                key="how"
-                contentContainerStyle={styles.content}
-              >
-                <TitleRow
-                  name={shown.name}
-                  subtitle={target}
-                  equipment={shown.equipment}
-                  accent={accent}
-                  testID={testID}
-                />
-                <HowToPage guide={shown} drawn={!!drawn} accent={accent} testID={testID} />
-              </ScrollView>,
-              ...(technique.length > 0 && shown.slug
-                ? [
-                    <ScrollView
-                      keyboardDismissMode="on-drag"
-                      key="technique"
-                      contentContainerStyle={styles.content}
-                    >
-                      <TitleRow
-                        name={shown.name}
-                        subtitle="Technique & Setup"
-                        equipment={shown.equipment}
-                        accent={accent}
-                        testID={`${testID}-technique`}
-                      />
-                      <TechniquePage
-                        slug={shown.slug}
-                        cards={technique}
-                        accent={accent}
-                        testID={`${testID}-technique`}
-                      />
-                    </ScrollView>,
-                  ]
-                : []),
-            ]}
-            accent={accent}
-          />
-        ) : (
-          <ScrollView keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
+        ))}
+        pagesHeight={(width) => cardsHeight(cards, width)}
+        accent={accent}
+      />
+    );
+  }
+  if (shown && !error) {
+    return (
+      <Pager
+        testID={testID}
+        pages={[
+          <ScrollView
+            keyboardDismissMode="on-drag"
+            key="how"
+            contentContainerStyle={styles.content}
+          >
             <TitleRow
-              name={exerciseName}
-              subtitle={null}
-              equipment={shown?.equipment ?? null}
+              name={shown.name}
+              subtitle={target}
+              equipment={shown.equipment}
               accent={accent}
               testID={testID}
             />
-            {error ? (
-              <ErrorState testID={`${testID}-error`} message={error} onRetry={retry} />
-            ) : (
-              <SkeletonRows testID={`${testID}-loading`} count={5} />
-            )}
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
+            <HowToPage guide={shown} drawn={!!drawn} accent={accent} testID={testID} />
+          </ScrollView>,
+          ...(technique.length > 0 && shown.slug
+            ? [
+                <ScrollView
+                  keyboardDismissMode="on-drag"
+                  key="technique"
+                  contentContainerStyle={styles.content}
+                >
+                  <TitleRow
+                    name={shown.name}
+                    subtitle="Technique & Setup"
+                    equipment={shown.equipment}
+                    accent={accent}
+                    testID={`${testID}-technique`}
+                  />
+                  <TechniquePage
+                    slug={shown.slug}
+                    cards={technique}
+                    accent={accent}
+                    testID={`${testID}-technique`}
+                  />
+                </ScrollView>,
+              ]
+            : []),
+        ]}
+        accent={accent}
+      />
+    );
+  }
+  return (
+    <ScrollView keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
+      <TitleRow
+        name={exerciseName}
+        subtitle={null}
+        equipment={shown?.equipment ?? null}
+        accent={accent}
+        testID={testID}
+      />
+      {error ? (
+        <ErrorState testID={`${testID}-error`} message={error} onRetry={retry} />
+      ) : (
+        <SkeletonRows testID={`${testID}-loading`} count={5} />
+      )}
+    </ScrollView>
   );
 }
 
