@@ -2,12 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { PreviousMuscleGroup } from './previousExercises';
-import { PreviousExercisesSection } from './PreviousExercisesSection';
+import { PreviousExercisesSection, profileInitials } from './PreviousExercisesSection';
 import type { PreviousExercisesState } from './usePreviousExercises';
 
 let mockGender: string | null = 'female';
+let mockProfile: Record<string, unknown> = {};
 jest.mock('../profile/profileContext', () => ({
-  useProfileIfAny: () => ({ gender: mockGender }),
+  useProfileIfAny: () => ({ gender: mockGender, ...mockProfile }),
 }));
 
 const row = (id: string, name: string, muscleGroup: MuscleGroup): ExerciseRow => ({
@@ -115,12 +116,36 @@ describe('PreviousExercisesSection -- Last Time, after Harbir’s reference', ()
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'curl' }));
   });
 
-  it("draws the first muscle group's figure, its muscles tinted in the accent", () => {
+  it('shows their profile picture on the session card, not a body figure', () => {
+    mockProfile = {
+      avatarUrl: 'https://example.com/me.jpg',
+      displayName: 'Harbir',
+      lastName: 'Bains',
+    };
     const { UNSAFE_root } = renderSection();
+    expect(screen.getByTestId('previous-exercises-avatar-content').props.source).toEqual({
+      uri: 'https://example.com/me.jpg',
+    });
+    // No figure's muscles tinted in the accent any more.
     const tinted = UNSAFE_root.findAll(
       (node: { props: Record<string, unknown> }) => node.props.tintColor === '#D99A50',
     );
-    expect(tinted.length).toBeGreaterThan(0);
+    expect(tinted).toHaveLength(0);
+    mockProfile = {};
+  });
+
+  it('shows their initials without a profile picture', () => {
+    mockProfile = { avatarUrl: null, displayName: 'Harbir', lastName: 'Bains' };
+    renderSection();
+    expect(screen.getByTestId('previous-exercises-avatar-content')).toHaveTextContent('HB');
+    mockProfile = {};
+  });
+
+  it('makes initials from what the profile has', () => {
+    expect(profileInitials({ displayName: 'harbir', lastName: 'bains' })).toBe('HB');
+    expect(profileInitials({ displayName: 'Sam', lastName: null })).toBe('S');
+    expect(profileInitials({ displayName: ' ', lastName: '', username: 'lifter' })).toBe('L');
+    expect(profileInitials(null)).toBeNull();
   });
 
   it('says it is the day’s muscle groups when the session has no name of its own', () => {

@@ -2,6 +2,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
+import { Avatar } from '../design/Avatar';
 import { TextButton } from '../design/Button';
 import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { Text } from '../design/Text';
@@ -9,8 +10,9 @@ import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/t
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { machineLine } from '../exercises/machineDetails';
-import { MuscleFigure } from '../exercises/MuscleFigure';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
+import { useProfileIfAny } from '../profile/profileContext';
+import { withAlpha } from '../theme/accentColor';
 import { formatRecentDate } from './workoutFormat';
 import {
   muscleGroupList,
@@ -102,7 +104,7 @@ function Stat({
  * did the last time they trained each muscle group, laid out after Harbir's reference. A session
  * card first: YOUR PREVIOUS SESSION, the split day's name (or, without one, their recent
  * training), the day it was last done, how many muscle groups, exercises and sets there are below,
- * and the first muscle group on Harbir's figure in the accent. Then one card of the muscle groups,
+ * and their profile picture (their initials without one). Then one card of the muscle groups,
  * each under an accent bar with when it was last trained, and its exercises -- each the very one
  * they did, with its photo, its setup and how it went, a tap from being added.
  */
@@ -117,6 +119,7 @@ export function PreviousExercisesSection({
   accentColor,
   testID = 'previous-exercises',
 }: Props) {
+  const profile = useProfileIfAny();
   const [expanded, setExpanded] = useState(false);
   const plan = useMemo(
     () => planPreviousExercises(previous.groups, { dayGroups: previous.dayGroups, addedGroups }),
@@ -180,19 +183,27 @@ export function PreviousExercisesSection({
     plan.mode === 'day'
       ? sessionName?.trim() || muscleGroupList(previous.dayGroups)
       : 'Recent Training';
-  const figureGroup = (withExercises[0]?.section ?? plan.sections[0])!.muscleGroup;
 
   return (
     <View testID={testID} style={styles.stack}>
       <AppCard hero testID={`${testID}-session`}>
-        {/* The session's first muscle group on Harbir's figure, its muscles in the accent. */}
-        <View style={styles.figure} pointerEvents="none">
-          <MuscleFigure
-            group={figureGroup}
-            accentColor={accentColor}
-            width={FIGURE_WIDTH}
-            height={FIGURE_WIDTH / 0.88}
-            style={styles.figureLayer}
+        {/* Their own sessions: their profile picture, or their initials without one. */}
+        <View
+          testID={`${testID}-avatar`}
+          style={[
+            styles.avatar,
+            { borderColor: accentColor, backgroundColor: withAlpha(accentColor, 0.14) },
+          ]}
+          pointerEvents="none"
+        >
+          <Avatar
+            uri={profile?.avatarUrl ?? null}
+            initial={profileInitials(profile)}
+            size={AVATAR}
+            iconSize={30}
+            iconColor={accentColor}
+            initialStyle={[styles.initials, { color: accentColor }]}
+            testID={`${testID}-avatar-content`}
           />
         </View>
         <View style={styles.sessionWords}>
@@ -342,27 +353,55 @@ export function PreviousExercisesSection({
   );
 }
 
-const FIGURE_WIDTH = 150;
+/** The profile picture's size, top right of the session card. */
+const AVATAR = 76;
+
+/**
+ * A person's initials: their first and last names' first letters ("Harbir Bains" -> "HB"), one
+ * name's alone, or their username's first letter -- null with none of them (a person glyph shows).
+ */
+export function profileInitials(
+  profile: {
+    displayName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+  } | null,
+): string | null {
+  const first = profile?.displayName?.trim() ?? '';
+  const last = profile?.lastName?.trim() ?? '';
+  const letters = [first, last]
+    .filter(Boolean)
+    .map((name) => name.charAt(0).toUpperCase())
+    .join('');
+  if (letters) return letters;
+  const username = profile?.username?.trim();
+  return username ? username.charAt(0).toUpperCase() : null;
+}
 
 const styles = StyleSheet.create({
   stack: {
     gap: widgetGap * 2,
   },
-  // The figure, top right, behind the words; it fades into the card at its own bottom.
-  figure: {
+  // The profile picture, top right, in a ring of the accent.
+  avatar: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: FIGURE_WIDTH,
-    height: 168,
+    top: spacing.lg,
+    right: spacing.lg,
+    width: AVATAR + 4,
+    height: AVATAR + 4,
+    borderRadius: (AVATAR + 4) / 2,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
-    borderTopRightRadius: radii.xl,
   },
-  figureLayer: {
-    marginTop: -spacing.sm,
+  initials: {
+    fontFamily: fonts.displayHeavy,
+    fontSize: 28,
+    letterSpacing: 1,
   },
   sessionWords: {
-    paddingRight: FIGURE_WIDTH - spacing.xl,
+    paddingRight: AVATAR + spacing.lg,
     gap: spacing.xs,
     minHeight: 120,
     justifyContent: 'center',
