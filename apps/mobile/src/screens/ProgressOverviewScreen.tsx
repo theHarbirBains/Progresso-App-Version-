@@ -163,6 +163,7 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
               active={activeSection}
               onSelect={setActiveSection}
               accentColor={theme.accent}
+              compact
             />
 
             {error ? (

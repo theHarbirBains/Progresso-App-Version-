@@ -100,3 +100,29 @@ describe('UnderlineTabs', () => {
     );
   });
 });
+
+describe('UnderlineTabs, compact', () => {
+  it('is labels only, in a row that can slide sideways, the chosen one underlined', () => {
+    const onSelect = jest.fn();
+    const { UNSAFE_root } = render(
+      <UnderlineTabs
+        testID="tabs"
+        categories={CATEGORIES}
+        active="Stats"
+        onSelect={onSelect}
+        accentColor="#2F80FF"
+        compact
+      />,
+    );
+    const stats = screen.getByTestId('tabs-Stats');
+    expect(stats).toHaveTextContent('Stats');
+    expect(stats.props.accessibilityState).toEqual({ selected: true });
+    expect(StyleSheet.flatten(stats.props.style).borderBottomColor).toBe('#2F80FF');
+    // No icons.
+    expect(
+      UNSAFE_root.findAll((node: { props: Record<string, unknown> }) => node.props.name === 'list'),
+    ).toHaveLength(0);
+    fireEvent.press(screen.getByTestId('tabs-PRs'));
+    expect(onSelect).toHaveBeenCalledWith('PRs');
+  });
+});

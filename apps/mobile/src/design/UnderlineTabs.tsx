@@ -1,13 +1,25 @@
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typeScale } from './theme';
+import { colors, fonts, spacing, typeScale } from './theme';
 
 interface Props<T extends string> {
   categories: { key: T; label: string; icon: keyof typeof Feather.glyphMap }[];
   active: T;
   onSelect: (category: T) => void;
   accentColor: string;
+  /**
+   * Labels only, in one line that slides sideways when the tabs don't all fit -- the selected one
+   * kept in view (Progress's many sections). Otherwise icons over labels, dividing the row evenly.
+   */
+  compact?: boolean;
   testID?: string;
 }
 
@@ -28,8 +40,20 @@ export function UnderlineTabs<T extends string>({
   active,
   onSelect,
   accentColor,
+  compact = false,
   testID,
 }: Props<T>) {
+  if (compact) {
+    return (
+      <CompactTabs
+        categories={categories}
+        active={active}
+        onSelect={onSelect}
+        accentColor={accentColor}
+        testID={testID}
+      />
+    );
+  }
   return (
     <View testID={testID} style={styles.row}>
       {categories.map((category) => {
@@ -65,6 +89,79 @@ export function UnderlineTabs<T extends string>({
   );
 }
 
+/** Labels only, sliding sideways when they don't fit; filling the row evenly when they do. */
+function CompactTabs<T extends string>({
+  categories,
+  active,
+  onSelect,
+  accentColor,
+  testID,
+}: Omit<Props<T>, 'compact'>) {
+  const scroll = useRef<ScrollViewInstance>(null);
+  // Where each tab starts and how wide it is, to keep the selected one in view.
+  const spots = useRef(new Map<T, { x: number; width: number }>());
+  const rowWidth = useRef(0);
+  const reveal = (key: T, animated: boolean) => {
+    const spot = spots.current.get(key);
+    if (!spot || !scroll.current) return;
+    const x = Math.max(0, spot.x - (rowWidth.current - spot.width) / 2);
+    scroll.current.scrollTo({ x, animated });
+  };
+  useEffect(() => {
+    reveal(active, true);
+    // Only when the selected tab changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  return (
+    <View testID={testID} style={styles.row}>
+      <ScrollView
+        ref={scroll}
+        horizontal
+        keyboardDismissMode="on-drag"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.compactContent}
+        onLayout={(event) => {
+          rowWidth.current = event.nativeEvent.layout.width;
+        }}
+      >
+        {categories.map((category) => {
+          const selected = category.key === active;
+          return (
+            <TouchableOpacity
+              key={category.key}
+              testID={testID ? `${testID}-${category.key}` : undefined}
+              style={[styles.compactTab, selected && { borderBottomColor: accentColor }]}
+              onPress={() => onSelect(category.key)}
+              onLayout={(event) => {
+                const { x, width } = event.nativeEvent.layout;
+                spots.current.set(category.key, { x, width });
+                if (selected) reveal(category.key, false);
+              }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={category.label}
+              accessibilityState={{ selected }}
+            >
+              <Text
+                style={[
+                  styles.compactLabel,
+                  selected
+                    ? { color: colors.textPrimary, fontFamily: fonts.semibold }
+                    : { color: colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {category.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -85,5 +182,21 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typeScale.caption,
+  },
+  // Compact: as wide as their labels, sharing out any room left over.
+  compactContent: {
+    flexGrow: 1,
+  },
+  compactTab: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -StyleSheet.hairlineWidth,
+  },
+  compactLabel: {
+    ...typeScale.label,
   },
 });
