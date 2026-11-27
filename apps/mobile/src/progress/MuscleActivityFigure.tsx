@@ -53,7 +53,7 @@ function figureFor(side: FigureSide, regionColors: Partial<Record<MuscleRegion, 
  * Muscle Activity's anatomy figure, from the front or behind: every muscle in the colour of its
  * group's level (levelColors), the chosen group outlined, and a tap on a muscle choosing its group.
  * Turning it round plays a short turn -- narrowing and fading out, then back in from the other
- * side -- or none under Reduce Motion.
+ * side -- and new colours (another period) come in with a soft fade; neither under Reduce Motion.
  */
 export function MuscleActivityFigure({
   activity,
@@ -113,6 +113,26 @@ export function MuscleActivityFigure({
     });
   }, [side, shown, reduceMotion, turn]);
 
+  // A new period's colours come in softly: the figure dips and returns as they change.
+  const settle = useRef(new Animated.Value(1)).current;
+  const firstColors = useRef(true);
+  useEffect(() => {
+    if (firstColors.current) {
+      firstColors.current = false;
+      return undefined;
+    }
+    if (reduceMotion) return undefined;
+    settle.setValue(0.35);
+    const animation = Animated.timing(settle, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [regionColors, reduceMotion, settle]);
+
   const view = figureFor(shown, regionColors);
   const outlined = useMemo(
     () => new Set<MuscleRegion>(selected ? regionsOf(selected) : []),
@@ -135,7 +155,7 @@ export function MuscleActivityFigure({
       <Animated.View
         testID={`${testID}-${shown}`}
         style={{
-          opacity: turn,
+          opacity: Animated.multiply(turn, settle),
           transform: [{ scaleX: turn.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) }],
         }}
         accessible

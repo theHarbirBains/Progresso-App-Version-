@@ -10,9 +10,11 @@ export const ACTIVITY_PERIODS = [7, 30, 90] as const;
 export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];
 
 /**
- * How a muscle group has been trained in the period, in order: trained as the main muscle today
- * or yesterday; on average at least twice a week; at all (or only as a muscle it also works); or
- * not at all.
+ * How lately a muscle group was trained as the main muscle, in the period (Harbir's heat map,
+ * November 2026), by the day it was last trained -- today counted as its first day: within the
+ * last 2 days (today or yesterday); 3 to 7 days; 8 to 14 days; or longer ago, or not in the
+ * period at all. A muscle an exercise only also works never colours it: that isn't a set of its
+ * own.
  */
 export const ACTIVITY_LEVELS = ['recent', 'frequent', 'less', 'none'] as const;
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
@@ -24,36 +26,21 @@ export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
   none: 'No recent training',
 };
 
-/** What each level means, in a line. */
+/** The days each level covers, as the legend says them. */
 export const ACTIVITY_LEVEL_NOTES: Record<ActivityLevel, string> = {
-  recent: 'Trained today or yesterday',
-  frequent: 'Twice a week or more, on average',
-  less: 'Trained less often, or only as a muscle it also works',
-  none: 'Nothing logged in this period',
+  recent: '1–2 days',
+  frequent: '3–7 days',
+  less: '8–14 days',
+  none: '15+ days',
 };
 
-/** Sessions a week, on average, for a group to count as frequently trained. */
-export const FREQUENT_PER_WEEK = 2;
+/** The most days since it was trained (0 today, 1 yesterday) for each level but none. */
+const LEVEL_MAX_DAYS = { recent: 1, frequent: 6, less: 13 } as const;
 
 /** Every muscle group drawn on the anatomy figure. */
 export const ACTIVITY_GROUPS: readonly MuscleGroup[] = MUSCLE_GROUPS.filter(
   (group) => group !== 'full_body' && group !== 'other',
 );
-
-/** The groups a training week is usually built around -- the ones checked for less training. */
-export const MAIN_GROUPS: readonly MuscleGroup[] = [
-  'chest',
-  'back',
-  'shoulders',
-  'biceps',
-  'triceps',
-  'forearms',
-  'quadriceps',
-  'hamstrings',
-  'glutes',
-  'calves',
-  'core',
-];
 
 export interface ActivityExercise {
   exerciseId: string;
@@ -134,9 +121,19 @@ function bucketOf(starts: readonly Date[], at: Date): number {
   return -1;
 }
 
-/** Whether a day is today or yesterday. */
-function withinTwoDays(at: string, now: Date): boolean {
-  return new Date(at).getTime() >= addDays(startOfDay(now), -1).getTime();
+/** Whole days from a moment's day to today's: 0 today, 1 yesterday. */
+export function daysSince(at: string, now: Date): number {
+  return Math.round((startOfDay(now).getTime() - startOfDay(new Date(at)).getTime()) / DAY_MS);
+}
+
+/** A group's level from when it was last trained as the main muscle in the period, if it was. */
+export function levelFor(lastTrainedAt: string | null, now: Date): ActivityLevel {
+  if (lastTrainedAt === null) return 'none';
+  const days = daysSince(lastTrainedAt, now);
+  if (days <= LEVEL_MAX_DAYS.recent) return 'recent';
+  if (days <= LEVEL_MAX_DAYS.frequent) return 'frequent';
+  if (days <= LEVEL_MAX_DAYS.less) return 'less';
+  return 'none';
 }
 
 /**
@@ -242,14 +239,7 @@ export function muscleActivity(
       : 0;
     const perWeek = sessions / weeks;
     const lastTrainedAt = tally?.lastTrainedAt ?? null;
-    const level: ActivityLevel =
-      lastTrainedAt !== null && withinTwoDays(lastTrainedAt, now)
-        ? 'recent'
-        : perWeek >= FREQUENT_PER_WEEK
-          ? 'frequent'
-          : sessions > 0 || (tally?.secondarySets ?? 0) > 0
-            ? 'less'
-            : 'none';
+    const level = levelFor(lastTrainedAt, now);
     return {
       group,
       level,
@@ -273,26 +263,52 @@ export function muscleActivity(
   });
 }
 
+/** How many groups were trained as the main muscle in the period. */
+export function musclesTrained(activity: readonly GroupActivity[]): number {
+  return activity.filter((group) => group.sets > 0).length;
+}
+
+/** A group's sessions against the most any group had in the period: 0 to 1. */
+export function sessionShare(group: GroupActivity, activity: readonly GroupActivity[]): number {
+  const most = Math.max(0, ...activity.map((other) => other.sessions));
+  return most === 0 ? 0 : group.sessions / most;
+}
+
+/** How Muscle Breakdown is ordered. */
+export const BREAKDOWN_SORTS = ['recent', 'most', 'least'] as const;
+export type BreakdownSort = (typeof BREAKDOWN_SORTS)[number];
+
+export const BREAKDOWN_SORT_LABELS: Record<BreakdownSort, string> = {
+  recent: 'Recent',
+  most: 'Most Trained',
+  least: 'Least Trained',
+};
+
 /**
- * The main groups trained least in the period -- less trained or not at all -- fewest sets as the
- * main muscle first (then fewest also-worked sets). What the page suggests a look at, never a
- * verdict.
+ * Muscle Breakdown's order: Recent -- last trained first, then the ones not trained in the
+ * period; Most Trained -- most sessions, then most sets; Least Trained -- fewest sessions, then
+ * fewest sets (a pointer, never a verdict). Ties keep the app's order of muscle groups.
  */
-export function lessTrained(activity: readonly GroupActivity[]): GroupActivity[] {
-  return activity
-    .filter(
-      (group) =>
-        MAIN_GROUPS.includes(group.group) && (group.level === 'less' || group.level === 'none'),
-    )
-    .sort((a, b) => a.sets - b.sets || a.secondarySets - b.secondarySets);
+export function sortBreakdown(
+  activity: readonly GroupActivity[],
+  sort: BreakdownSort,
+): GroupActivity[] {
+  const order = new Map(activity.map((group, index) => [group.group, index]));
+  const appOrder = (a: GroupActivity, b: GroupActivity) =>
+    order.get(a.group)! - order.get(b.group)!;
+  const when = (group: GroupActivity) =>
+    group.lastTrainedAt ? new Date(group.lastTrainedAt).getTime() : -Infinity;
+  return [...activity].sort((a, b) => {
+    if (sort === 'recent') return when(b) - when(a) || appOrder(a, b);
+    if (sort === 'most') return b.sessions - a.sessions || b.sets - a.sets || appOrder(a, b);
+    return a.sessions - b.sessions || a.sets - b.sets || appOrder(a, b);
+  });
 }
 
 /** "Today", "Yesterday", "3 days ago", or the date for longer ago. */
 export function sinceText(at: string | null, now: Date): string | null {
   if (!at) return null;
-  const days = Math.round(
-    (startOfDay(now).getTime() - startOfDay(new Date(at)).getTime()) / DAY_MS,
-  );
+  const days = daysSince(at, now);
   if (days <= 0) return 'Today';
   if (days === 1) return 'Yesterday';
   if (days < 14) return `${days} days ago`;

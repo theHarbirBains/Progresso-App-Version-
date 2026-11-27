@@ -1,10 +1,14 @@
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import {
   ACTIVITY_GROUPS,
-  lessTrained,
+  ACTIVITY_LEVEL_NOTES,
+  levelFor,
   muscleActivity,
+  musclesTrained,
   periodStart,
+  sessionShare,
   sinceText,
+  sortBreakdown,
   trendBuckets,
 } from './muscleActivity';
 import type { ActivityEntry } from './muscleActivityQueries';
@@ -87,7 +91,8 @@ describe('muscleActivity', () => {
     expect(triceps.volumeKg).toBe(0);
     expect(triceps.lastTrainedAt).toBeNull();
     expect(triceps.lastWorkedAt).toBe(daysAgo(3));
-    expect(triceps.level).toBe('less');
+    // Only as a muscle an exercise also works: never coloured as trained.
+    expect(triceps.level).toBe('none');
     expect(triceps.exercises[0]).toMatchObject({ name: 'Bench Press', primary: false });
   });
 
@@ -104,28 +109,55 @@ describe('muscleActivity', () => {
       NOW,
       secondaryOf,
     );
-    expect(groupOf(activity, 'core')).toMatchObject({ sets: 1, volumeKg: 0, level: 'less' });
+    expect(groupOf(activity, 'core')).toMatchObject({ sets: 1, volumeKg: 0, level: 'frequent' });
   });
 
-  it('says recently trained for today or yesterday, frequently for twice a week, less otherwise', () => {
+  it('colours each group by when it was last trained: 1–2, 3–7, 8–14 days, or longer', () => {
     const activity = muscleActivity(
       [
         entry({ daysAgo: 1, muscleGroup: 'back', exerciseId: 'row' }),
-        // Legs four times in 14 days... over 7 days, twice.
+        // The last time counts, however often before it.
         entry({ daysAgo: 2, muscleGroup: 'quadriceps', exerciseId: 'squat' }),
-        entry({ daysAgo: 5, muscleGroup: 'quadriceps', exerciseId: 'squat' }),
-        entry({ daysAgo: 4, muscleGroup: 'calves', exerciseId: 'calf' }),
+        entry({ daysAgo: 20, muscleGroup: 'quadriceps', exerciseId: 'squat' }),
+        entry({ daysAgo: 9, muscleGroup: 'calves', exerciseId: 'calf' }),
+        entry({ daysAgo: 16, muscleGroup: 'glutes', exerciseId: 'thrust' }),
       ],
-      7,
+      30,
       NOW,
       secondaryOf,
     );
     expect(groupOf(activity, 'back').level).toBe('recent');
     expect(groupOf(activity, 'quadriceps').level).toBe('frequent');
     expect(groupOf(activity, 'calves').level).toBe('less');
+    expect(groupOf(activity, 'glutes').level).toBe('none');
+    expect(groupOf(activity, 'glutes').sets).toBe(3);
     expect(groupOf(activity, 'hamstrings').level).toBe('none');
-    // Biceps only as a muscle a row also works: less, not none.
-    expect(groupOf(activity, 'biceps').level).toBe('less');
+    // Biceps only as a muscle a row also works: not trained.
+    expect(groupOf(activity, 'biceps').level).toBe('none');
+    expect(ACTIVITY_LEVEL_NOTES).toEqual({
+      recent: '1–2 days',
+      frequent: '3–7 days',
+      less: '8–14 days',
+      none: '15+ days',
+    });
+  });
+
+  it('draws each band from the day, today its first', () => {
+    expect(levelFor(daysAgo(0, 1), NOW)).toBe('recent');
+    expect(levelFor(daysAgo(1, 0), NOW)).toBe('recent');
+    expect(levelFor(daysAgo(2, 23), NOW)).toBe('frequent');
+    expect(levelFor(daysAgo(6), NOW)).toBe('frequent');
+    expect(levelFor(daysAgo(7), NOW)).toBe('less');
+    expect(levelFor(daysAgo(13), NOW)).toBe('less');
+    expect(levelFor(daysAgo(14), NOW)).toBe('none');
+    expect(levelFor(null, NOW)).toBe('none');
+  });
+
+  it('colours only what was trained in the period chosen', () => {
+    // Ten days ago: Less trained over 30 days, but not in the last 7 at all.
+    const entries = [entry({ daysAgo: 10 })];
+    expect(groupOf(muscleActivity(entries, 30, NOW, secondaryOf), 'chest').level).toBe('less');
+    expect(groupOf(muscleActivity(entries, 7, NOW, secondaryOf), 'chest').level).toBe('none');
   });
 
   it('only counts the period chosen', () => {
@@ -142,12 +174,11 @@ describe('muscleActivity', () => {
     ).toBe(0);
   });
 
-  it('ranks frequency per week whatever the period', () => {
-    // Eight chest sessions in 30 days: 1.9 a week -- not quite twice.
+  it('gives sessions a week, on average over the period', () => {
     const eight = Array.from({ length: 8 }, (_, i) => entry({ daysAgo: 3 + i * 3 }));
-    const nine = [...eight, entry({ daysAgo: 28 })];
-    expect(groupOf(muscleActivity(eight, 30, NOW, secondaryOf), 'chest').level).toBe('less');
-    expect(groupOf(muscleActivity(nine, 30, NOW, secondaryOf), 'chest').level).toBe('frequent');
+    expect(groupOf(muscleActivity(eight, 30, NOW, secondaryOf), 'chest').perWeek).toBeCloseTo(
+      8 / (30 / 7),
+    );
   });
 
   it('buckets the trend by day for a week and by seven days for longer', () => {
@@ -166,24 +197,46 @@ describe('muscleActivity', () => {
   });
 });
 
-describe('lessTrained', () => {
-  it('points out the main groups trained least, fewest sets first -- never adductors', () => {
-    const activity = muscleActivity(
-      [
-        entry({ daysAgo: 3, muscleGroup: 'back', exerciseId: 'row', setCount: 2 }),
-        ...Array.from({ length: 10 }, (_, i) => entry({ daysAgo: 1 + i })),
-      ],
-      30,
-      NOW,
-      secondaryOf,
-    );
-    const fewest = lessTrained(activity).map((g) => g.group);
-    expect(fewest).not.toContain('chest');
-    expect(fewest).not.toContain('adductors');
-    expect(fewest.indexOf('hamstrings')).toBeLessThan(fewest.indexOf('back'));
-    // Untrained, then only as an also-worked muscle, then trained a little.
-    expect(fewest.indexOf('hamstrings')).toBeLessThan(fewest.indexOf('triceps'));
-    expect(fewest.indexOf('triceps')).toBeLessThan(fewest.indexOf('back'));
+describe('Muscle Breakdown', () => {
+  const activity = muscleActivity(
+    [
+      // Chest: three sessions, last 4 days ago. Back: one, yesterday. Quads: two, 2 days ago.
+      entry({ daysAgo: 4, workoutId: 'c1' }),
+      entry({ daysAgo: 8, workoutId: 'c2' }),
+      entry({ daysAgo: 12, workoutId: 'c3' }),
+      entry({ daysAgo: 1, muscleGroup: 'back', exerciseId: 'row', setCount: 5 }),
+      entry({ daysAgo: 2, muscleGroup: 'quadriceps', exerciseId: 'squat', workoutId: 'q1' }),
+      entry({ daysAgo: 9, muscleGroup: 'quadriceps', exerciseId: 'squat', workoutId: 'q2' }),
+    ],
+    30,
+    NOW,
+    secondaryOf,
+  );
+  const order = (sort: 'recent' | 'most' | 'least') =>
+    sortBreakdown(activity, sort).map((g) => g.group);
+
+  it('counts the muscles trained as the main muscle -- never one only also worked', () => {
+    expect(musclesTrained(activity)).toBe(3);
+  });
+
+  it('sorts by the last trained, then the rest in the app’s order', () => {
+    expect(order('recent').slice(0, 4)).toEqual(['back', 'quadriceps', 'chest', 'shoulders']);
+    expect(order('recent')).toHaveLength(ACTIVITY_GROUPS.length);
+  });
+
+  it('sorts by most sessions, then sets -- and by fewest', () => {
+    expect(order('most').slice(0, 3)).toEqual(['chest', 'quadriceps', 'back']);
+    expect(order('least').slice(-3)).toEqual(['back', 'quadriceps', 'chest']);
+    expect(order('least')[0]).toBe('shoulders');
+  });
+
+  it('gives each a share of the busiest muscle’s sessions', () => {
+    const share = (group: MuscleGroup) => sessionShare(groupOf(activity, group), activity);
+    expect(share('chest')).toBe(1);
+    expect(share('quadriceps')).toBeCloseTo(2 / 3);
+    expect(share('hamstrings')).toBe(0);
+    const none = muscleActivity([], 30, NOW, secondaryOf);
+    expect(sessionShare(none[0]!, none)).toBe(0);
   });
 });
 
