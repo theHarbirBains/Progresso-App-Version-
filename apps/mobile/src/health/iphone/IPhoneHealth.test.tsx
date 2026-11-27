@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { expectNoBareText } from '../../testUtils/expectNoBareText';
 import { HealthOverview } from '../preview/HealthOverview';
+import { setPreviewSetup } from '../preview/healthPreview';
+import { NO_DEVICES } from '../preview/sampleHealthData';
 import { IPhoneHealth } from './IPhoneHealth';
 
 // The overview reads today's steps from Apple Health for its tile; nothing here.
@@ -37,7 +39,6 @@ describe('iPhone-only Health (prototype)', () => {
     expect(screen.getByTestId('iphone-health-steadiness-value')).toHaveTextContent('OK');
     expect(screen.getByTestId('iphone-health-asymmetry-value')).toHaveTextContent('2.1%');
     expect(screen.getByTestId('iphone-health-doubleSupport-value')).toHaveTextContent('27.4%');
-    expect(screen.getByTestId('iphone-health-sample-note')).toHaveTextContent(/sample data/);
     expectNoBareText();
   });
 
@@ -101,10 +102,13 @@ describe('iPhone-only Health (prototype)', () => {
     }
   });
 
-  it('opens from the Health overview’s preview bar', () => {
-    const onOpen = jest.fn();
-    render(<HealthOverview accent={ACCENT} onOpen={onOpen} />);
-    fireEvent.press(screen.getByTestId('health-preview-iphone'));
-    expect(onOpen).toHaveBeenCalledWith('iphone');
+  it('is what Health shows when the preview is just an iPhone, and only then', () => {
+    act(() => setPreviewSetup({ ...NO_DEVICES, iphone: true }));
+    render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
+    expect(screen.getByTestId('iphone-health')).toBeTruthy();
+    // Adding a watch brings the wearable overview back.
+    fireEvent.press(screen.getByTestId('health-preview-device-appleWatch'));
+    expect(screen.queryByTestId('iphone-health')).toBeNull();
+    act(() => setPreviewSetup({ ...NO_DEVICES, iphone: true, appleWatch: true }));
   });
 });

@@ -9,6 +9,7 @@ import { Columns, Ring, StackedBar } from './healthCharts';
 import { BlockTitle, InsightRow, MetricTile, SampleNote, Tile } from './healthParts';
 import { setPreviewSetup, usePreviewSetup, type HealthPage } from './healthPreview';
 import { useRealSteps } from './realSteps';
+import { IPhoneHealth } from '../iphone/IPhoneHealth';
 import {
   anyDevice,
   DEVICE_ORDER,
@@ -83,6 +84,62 @@ export function HealthOverview({
   const insights = insightsFor(setup).slice(0, 2);
   const readiness = Math.max(40, READINESS.score - dayOffset * 4);
   const steps = useRealSteps();
+  // Just an iPhone, no watch or ring: the iPhone-only design (all sample, steps too).
+  const phoneOnly = setup.iphone && !wearable;
+
+  // The prototype's own controls: which devices it pretends this person has.
+  const previewBar = (
+    <View style={styles.previewBar}>
+      <View style={styles.previewHead}>
+        <SampleNote testID="health-sample-note" exceptSteps={!phoneOnly} />
+        <Pressable
+          testID="health-preview-onboarding"
+          onPress={() => onOpen('setup', undefined, true)}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.previewLink, { color: accent }]}>Onboarding step</Text>
+        </Pressable>
+      </View>
+      <View style={styles.previewChips}>
+        {DEVICE_ORDER.map((key) => {
+          const on = setup[key];
+          return (
+            <Pressable
+              key={key}
+              testID={`health-preview-device-${key}`}
+              onPress={() => setPreviewSetup({ ...setup, [key]: !on })}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: on }}
+              style={[
+                styles.previewChip,
+                on && { backgroundColor: withAlpha(accent, 0.16), borderColor: accent },
+              ]}
+            >
+              <Text style={[styles.previewChipText, on && { color: accent }]}>
+                {key === 'otherWatch' ? 'Other Watch' : DEVICES[key].name.replace(' Ring', '')}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  if (phoneOnly) {
+    return (
+      <ScrollView
+        testID="health-overview"
+        keyboardDismissMode="on-drag"
+        style={styles.fill}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {previewBar}
+        <IPhoneHealth accent={accent} onAddDevice={() => open('setup')} />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -92,52 +149,7 @@ export function HealthOverview({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* The prototype's own controls: which devices it pretends this person has. */}
-      <View style={styles.previewBar}>
-        <View style={styles.previewHead}>
-          <SampleNote testID="health-sample-note" exceptSteps />
-          <View style={styles.previewLinks}>
-            <Pressable
-              testID="health-preview-iphone"
-              onPress={() => onOpen('iphone')}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.previewLink, { color: accent }]}>iPhone only</Text>
-            </Pressable>
-            <Pressable
-              testID="health-preview-onboarding"
-              onPress={() => onOpen('setup', undefined, true)}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.previewLink, { color: accent }]}>Onboarding step</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.previewChips}>
-          {DEVICE_ORDER.map((key) => {
-            const on = setup[key];
-            return (
-              <Pressable
-                key={key}
-                testID={`health-preview-device-${key}`}
-                onPress={() => setPreviewSetup({ ...setup, [key]: !on })}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: on }}
-                style={[
-                  styles.previewChip,
-                  on && { backgroundColor: withAlpha(accent, 0.16), borderColor: accent },
-                ]}
-              >
-                <Text style={[styles.previewChipText, on && { color: accent }]}>
-                  {key === 'otherWatch' ? 'Other Watch' : DEVICES[key].name.replace(' Ring', '')}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      {previewBar}
 
       {anything ? (
         <View style={styles.dateRow}>
@@ -412,10 +424,6 @@ const styles = StyleSheet.create({
   previewLink: {
     ...typeScale.caption,
     fontFamily: fonts.semibold,
-  },
-  previewLinks: {
-    flexDirection: 'row',
-    gap: spacing.md,
   },
   previewChips: {
     flexDirection: 'row',

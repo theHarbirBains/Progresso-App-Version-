@@ -1,14 +1,12 @@
 import { Feather } from '@expo/vector-icons';
-import { useState, type ComponentProps } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { AppCard } from '../../design/AppCard';
+import { useState, type ComponentProps, type ReactNode } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SecondaryButton } from '../../design/Button';
 import { SegmentedControl } from '../../design/SegmentedControl';
 import { Text } from '../../design/Text';
 import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../../design/theme';
 import { withAlpha } from '../../theme/accentColor';
 import { Columns, Ring } from '../preview/healthCharts';
-import { SampleNote } from '../preview/healthParts';
 import {
   METRIC_INFO,
   PERIOD_CAPTION,
@@ -23,8 +21,8 @@ import {
   type PeriodFigures,
 } from './iphoneHealthSample';
 
-// iPhone-only Health -- a UI PROTOTYPE (Harbir's brief, 2026-11-27): what an iPhone measures by
-// itself, with no watch or ring, at a glance. Activity (steps, walking and running distance,
+// iPhone-only Health -- a UI PROTOTYPE (Harbir's brief, 2026-11-27, approved): what Health shows
+// when the preview's devices are just an iPhone -- what an iPhone measures by itself, at a glance. Activity (steps, walking and running distance,
 // flights climbed) and Mobility (walking speed, steadiness, asymmetry, double support time), each
 // in its own widget with a large figure, a compact chart and how it compares -- for today, the
 // last 7 days or the last 30. Sample data only; nothing is read. No sleep and no heart: an
@@ -50,6 +48,34 @@ const STEPS_AGAINST: Record<HealthPeriod, { ratio: number; label: string }> = {
   week: { ratio: 1.04, label: 'of the week before' },
   month: { ratio: 0.98, label: 'of the month before' },
 };
+
+/**
+ * A widget: a raised tile, as the rest of Health's are -- Health sits inside Progress's own card,
+ * and a card never holds another. The steps widget, the one hero, has the accent's edge.
+ */
+function Widget({
+  children,
+  hero,
+  accent,
+  testID,
+}: {
+  children: ReactNode;
+  hero?: boolean;
+  accent: string;
+  testID?: string;
+}) {
+  return (
+    <View
+      testID={testID}
+      style={[
+        styles.widget,
+        hero && { backgroundColor: withAlpha(accent, 0.07), borderColor: withAlpha(accent, 0.3) },
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
 
 function formatValue(metric: MetricKey, value: number): string {
   const { digits } = METRIC_INFO[metric];
@@ -139,7 +165,7 @@ function StepsHero({
   const against = STEPS_AGAINST[period];
   const percent = Math.round(against.ratio * 100);
   return (
-    <AppCard hero testID="iphone-health-steps">
+    <Widget accent={accent} hero testID="iphone-health-steps">
       <View style={styles.heroBody}>
         <View style={styles.heroTop}>
           <View style={styles.flex}>
@@ -196,7 +222,7 @@ function StepsHero({
           </>
         ) : null}
       </View>
-    </AppCard>
+    </Widget>
   );
 }
 
@@ -215,29 +241,31 @@ function ActivityTile({
   const info = METRIC_INFO[metric];
   const figures = sampleFigures(metric, period, state);
   return (
-    <AppCard testID={`iphone-health-${metric}`} style={styles.half}>
-      <View style={styles.tileBody}>
-        <WidgetHead metric={metric} accent={accent} />
-        {figures.value === null ? (
-          <NotMeasured reason={figures.missing ?? 'Not measured yet'} />
-        ) : (
-          <>
-            <Text testID={`iphone-health-${metric}-value`} style={styles.tileValue}>
-              {formatValue(metric, figures.value)}
-              <Text style={styles.tileUnit}> {info.unit}</Text>
-            </Text>
-            <Columns
-              values={figures.chart}
-              highlight={figures.chart.length - 1}
-              height={30}
-              color={accent}
-              gap={period === 'week' ? 4 : 1}
-            />
-            {figures.change ? <ChangeLine change={figures.change} /> : null}
-          </>
-        )}
-      </View>
-    </AppCard>
+    <View style={styles.half}>
+      <Widget accent={accent} testID={`iphone-health-${metric}`}>
+        <View style={styles.tileBody}>
+          <WidgetHead metric={metric} accent={accent} />
+          {figures.value === null ? (
+            <NotMeasured reason={figures.missing ?? 'Not measured yet'} />
+          ) : (
+            <>
+              <Text testID={`iphone-health-${metric}-value`} style={styles.tileValue}>
+                {formatValue(metric, figures.value)}
+                <Text style={styles.tileUnit}> {info.unit}</Text>
+              </Text>
+              <Columns
+                values={figures.chart}
+                highlight={figures.chart.length - 1}
+                height={30}
+                color={accent}
+                gap={period === 'week' ? 4 : 1}
+              />
+              {figures.change ? <ChangeLine change={figures.change} /> : null}
+            </>
+          )}
+        </View>
+      </Widget>
+    </View>
   );
 }
 
@@ -307,46 +335,48 @@ function MobilityTile({
   const info = METRIC_INFO[metric];
   const figures = sampleFigures(metric, period, state);
   return (
-    <AppCard testID={`iphone-health-${metric}`} style={styles.half}>
-      <View style={styles.tileBody}>
-        <WidgetHead metric={metric} accent={accent} />
-        <Text style={styles.what} numberOfLines={1}>
-          {info.what}
-        </Text>
-        {figures.value === null ? (
-          <NotMeasured
-            reason={figures.missing ?? 'Not measured yet'}
-            testID={`iphone-health-${metric}-missing`}
-          />
-        ) : (
-          <>
-            <Text testID={`iphone-health-${metric}-value`} style={styles.tileValue}>
-              {formatValue(metric, figures.value)}
-              <Text style={styles.tileUnit}>{info.unit === '%' ? '%' : ` ${info.unit}`}</Text>
-            </Text>
-            {period === 'day' && figures.usual ? (
-              <UsualRange
-                value={figures.value}
-                usual={figures.usual}
-                accent={accent}
-                digits={info.digits}
-                unit={info.unit}
-              />
-            ) : (
-              <Columns
-                values={figures.chart}
-                highlight={figures.chart.length - 1}
-                band={figures.usual}
-                height={30}
-                color={accent}
-                gap={4}
-              />
-            )}
-            {figures.change ? <ChangeLine change={figures.change} /> : null}
-          </>
-        )}
-      </View>
-    </AppCard>
+    <View style={styles.half}>
+      <Widget accent={accent} testID={`iphone-health-${metric}`}>
+        <View style={styles.tileBody}>
+          <WidgetHead metric={metric} accent={accent} />
+          <Text style={styles.what} numberOfLines={1}>
+            {info.what}
+          </Text>
+          {figures.value === null ? (
+            <NotMeasured
+              reason={figures.missing ?? 'Not measured yet'}
+              testID={`iphone-health-${metric}-missing`}
+            />
+          ) : (
+            <>
+              <Text testID={`iphone-health-${metric}-value`} style={styles.tileValue}>
+                {formatValue(metric, figures.value)}
+                <Text style={styles.tileUnit}>{info.unit === '%' ? '%' : ` ${info.unit}`}</Text>
+              </Text>
+              {period === 'day' && figures.usual ? (
+                <UsualRange
+                  value={figures.value}
+                  usual={figures.usual}
+                  accent={accent}
+                  digits={info.digits}
+                  unit={info.unit}
+                />
+              ) : (
+                <Columns
+                  values={figures.chart}
+                  highlight={figures.chart.length - 1}
+                  band={figures.usual}
+                  height={30}
+                  color={accent}
+                  gap={4}
+                />
+              )}
+              {figures.change ? <ChangeLine change={figures.change} /> : null}
+            </>
+          )}
+        </View>
+      </Widget>
+    </View>
   );
 }
 
@@ -364,57 +394,59 @@ function SteadinessTile({
   const figures = sampleFigures('steadiness', period, state);
   const level = figures.value === null ? null : steadinessLevel(figures.value);
   return (
-    <AppCard testID="iphone-health-steadiness" style={styles.half}>
-      <View style={styles.tileBody}>
-        <WidgetHead metric="steadiness" accent={accent} />
-        <Text style={styles.what} numberOfLines={1}>
-          {info.what}
-        </Text>
-        {figures.value === null || level === null ? (
-          <NotMeasured
-            reason={figures.missing ?? 'Not measured yet'}
-            testID="iphone-health-steadiness-missing"
-          />
-        ) : (
-          <>
-            <Text testID="iphone-health-steadiness-value" style={styles.tileValue}>
-              {level}
-            </Text>
-            <View
-              style={styles.levels}
-              accessible
-              accessibilityLabel={`Walking steadiness ${level}, of Very Low, Low and OK`}
-            >
-              {STEADINESS_LEVELS.map((name, i) => (
-                <View key={name} style={styles.level}>
-                  <View
-                    style={[
-                      styles.levelBar,
-                      {
-                        backgroundColor:
-                          name === level ? accent : withAlpha(accent, 0.18 + i * 0.06),
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[styles.levelName, name === level && styles.levelNameOn]}
-                    numberOfLines={1}
-                  >
-                    {name}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <View style={styles.change}>
-              <Feather name="calendar" size={12} color={colors.textSecondary} />
-              <Text style={styles.changeText} numberOfLines={1}>
-                {STEADINESS_UPDATED}
+    <View style={styles.half}>
+      <Widget accent={accent} testID="iphone-health-steadiness">
+        <View style={styles.tileBody}>
+          <WidgetHead metric="steadiness" accent={accent} />
+          <Text style={styles.what} numberOfLines={1}>
+            {info.what}
+          </Text>
+          {figures.value === null || level === null ? (
+            <NotMeasured
+              reason={figures.missing ?? 'Not measured yet'}
+              testID="iphone-health-steadiness-missing"
+            />
+          ) : (
+            <>
+              <Text testID="iphone-health-steadiness-value" style={styles.tileValue}>
+                {level}
               </Text>
-            </View>
-          </>
-        )}
-      </View>
-    </AppCard>
+              <View
+                style={styles.levels}
+                accessible
+                accessibilityLabel={`Walking steadiness ${level}, of Very Low, Low and OK`}
+              >
+                {STEADINESS_LEVELS.map((name, i) => (
+                  <View key={name} style={styles.level}>
+                    <View
+                      style={[
+                        styles.levelBar,
+                        {
+                          backgroundColor:
+                            name === level ? accent : withAlpha(accent, 0.18 + i * 0.06),
+                        },
+                      ]}
+                    />
+                    <Text
+                      style={[styles.levelName, name === level && styles.levelNameOn]}
+                      numberOfLines={1}
+                    >
+                      {name}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.change}>
+                <Feather name="calendar" size={12} color={colors.textSecondary} />
+                <Text style={styles.changeText} numberOfLines={1}>
+                  {STEADINESS_UPDATED}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+      </Widget>
+    </View>
   );
 }
 
@@ -434,7 +466,7 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
 /** Nothing yet: one card saying what an iPhone already counts -- not a page of empty widgets. */
 function NothingYet({ accent, onConnect }: { accent: string; onConnect: () => void }) {
   return (
-    <AppCard hero testID="iphone-health-nothing">
+    <Widget accent={accent} hero testID="iphone-health-nothing">
       <View style={styles.nothing}>
         <View style={[styles.nothingIcon, { backgroundColor: withAlpha(accent, 0.14) }]}>
           <Feather name="smartphone" size={22} color={accent} />
@@ -451,11 +483,18 @@ function NothingYet({ accent, onConnect }: { accent: string; onConnect: () => vo
           onPress={onConnect}
         />
       </View>
-    </AppCard>
+    </Widget>
   );
 }
 
-export function IPhoneHealth({ accent }: { accent: string }) {
+export function IPhoneHealth({
+  accent,
+  onAddDevice,
+}: {
+  accent: string;
+  /** A watch or ring is always a tap away, never pushed. */
+  onAddDevice?: () => void;
+}) {
   const [period, setPeriod] = useState<HealthPeriod>('day');
   const [state, setState] = useState<IPhonePreviewState>('all');
 
@@ -463,7 +502,6 @@ export function IPhoneHealth({ accent }: { accent: string }) {
     <View testID="iphone-health" style={styles.page}>
       {/* The prototype's own control: what it pretends Apple Health has. */}
       <View style={styles.preview}>
-        <SampleNote testID="iphone-health-sample-note" />
         <SegmentedControl
           testID="iphone-health-preview"
           options={PREVIEW_STATES}
@@ -511,6 +549,18 @@ export function IPhoneHealth({ accent }: { accent: string }) {
           </View>
         </>
       )}
+
+      {onAddDevice ? (
+        <Pressable
+          testID="iphone-health-add-device"
+          onPress={onAddDevice}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.addRow, pressed && styles.pressed]}
+        >
+          <Feather name="plus-circle" size={16} color={accent} />
+          <Text style={styles.addText}>Add a watch or ring</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -525,11 +575,9 @@ const styles = StyleSheet.create({
   },
   preview: {
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
   },
   periods: {
     gap: spacing.xs,
-    paddingHorizontal: spacing.lg,
   },
   periodCaption: {
     ...typeScale.caption,
@@ -538,8 +586,27 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 2,
-    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+  },
+  widget: {
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceLift,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  addText: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+  },
+  pressed: {
+    opacity: 0.75,
   },
   sectionTitle: {
     ...typeScale.sectionHeading,

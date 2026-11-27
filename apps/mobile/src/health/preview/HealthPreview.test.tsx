@@ -95,13 +95,18 @@ describe('Health, made for each person’s devices', () => {
     expect(onOpen).toHaveBeenLastCalledWith('setup', undefined);
   });
 
-  it('with just an iPhone: steps, and a watch or ring offered -- no sleep or heart', () => {
+  it('with just an iPhone: the iPhone-only design, a watch or ring offered -- no sleep or heart', () => {
     use(setups.phone);
-    render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
-    expect(screen.getByTestId('health-activity')).toBeTruthy();
+    const onOpen = jest.fn();
+    render(<HealthOverview accent={ACCENT} onOpen={onOpen} />);
+    expect(screen.getByTestId('iphone-health')).toBeTruthy();
     expect(screen.queryByTestId('health-sleep')).toBeNull();
     expect(screen.queryByTestId('health-heart-restingHr')).toBeNull();
-    expect(screen.getByTestId('health-add-wearable')).toBeTruthy();
+    // All of it sample, steps too.
+    expect(screen.getByTestId('health-sample-note')).toHaveTextContent(/Preview · sample data$/);
+    expect(screen.getByTestId('health-sample-note')).not.toHaveTextContent(/except/);
+    fireEvent.press(screen.getByTestId('iphone-health-add-device'));
+    expect(onOpen).toHaveBeenLastCalledWith('setup', undefined);
   });
 
   it('with an Oura Ring: Oura’s own readiness, and its temperature among the heart’s figures', () => {
@@ -153,7 +158,7 @@ describe('steps are real -- Apple Health’s, never sample', () => {
     jest
       .mocked(queryStatisticsCollectionForQuantity)
       .mockResolvedValue([day(1, 9000), day(0, 5321)] as never);
-    use(setups.phone);
+    use(setups.watch);
     render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
 
     await waitFor(() =>
