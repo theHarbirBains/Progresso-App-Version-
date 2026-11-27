@@ -19,6 +19,13 @@ export interface EnvironmentVariables {
   RESEND_API_KEY: string;
   /** Optional. The welcome email's sender, e.g. "Progresso <hello@yourdomain.com>"; empty sends none. */
   EMAIL_FROM: string;
+  /**
+   * Optional, off unless "true". Whether health data is collected (health-data/): stays off until
+   * Phase 3 of the Health & Wearables brief ships with its permission wording and Privacy Policy.
+   */
+  HEALTH_DATA_ENABLED: boolean;
+  /** Optional. 32 bytes, base64: encrypts health providers' tokens (Oura). Empty stores none. */
+  HEALTH_TOKEN_KEY: string;
 }
 
 const NODE_ENVS: EnvironmentVariables['NODE_ENV'][] = ['development', 'production', 'test'];
@@ -33,6 +40,11 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
     if (!config[key] || typeof config[key] !== 'string') {
       throw new Error(`Missing required environment variable: ${key}`);
     }
+  }
+
+  const healthTokenKey = (config.HEALTH_TOKEN_KEY as string) || '';
+  if (healthTokenKey && Buffer.from(healthTokenKey, 'base64').length !== 32) {
+    throw new Error('Invalid HEALTH_TOKEN_KEY. Expected 32 bytes, base64-encoded.');
   }
 
   const port = Number(config.PORT ?? 4000);
@@ -54,5 +66,7 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
     INTERNAL_NOTIFICATIONS_SECRET: (config.INTERNAL_NOTIFICATIONS_SECRET as string) || '',
     RESEND_API_KEY: (config.RESEND_API_KEY as string) || '',
     EMAIL_FROM: (config.EMAIL_FROM as string) || '',
+    HEALTH_DATA_ENABLED: String(config.HEALTH_DATA_ENABLED ?? '').toLowerCase() === 'true',
+    HEALTH_TOKEN_KEY: healthTokenKey,
   };
 }

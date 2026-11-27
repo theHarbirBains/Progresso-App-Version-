@@ -7946,6 +7946,406 @@ async function main() {
     record("Another workout's gym never changes an earlier one's", first === 'Fit4Less Downtown');
   }
 
+  // ---- health data (Phase 2 of the Health & Wearables brief) ----
+  {
+    const owner = randomUUID();
+    const stranger = randomUUID();
+    const coach = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2), ($3, $4), ($5, $6)', [
+      owner,
+      'health-owner@test.local',
+      stranger,
+      'health-stranger@test.local',
+      coach,
+      'health-coach@test.local',
+    ]);
+    // An active trainer of the owner: they still see none of the owner's health data.
+    await admin.query(
+      `insert into public.subscriptions (user_id, revenuecat_customer_id, status, entitlement_id, current_period_ends_at)
+       values ($1, 'rc-health-coach', 'active', 'trainer', now() + interval '30 days')`,
+      [coach],
+    );
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status) values ($1, $2, 'active')",
+      [coach, owner],
+    );
+
+    const imp = (provider, trigger, metrics, extra = {}) =>
+      admin.query(
+        `select * from public.import_health_data($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::text[], $8::text[], $9::text[])`,
+        [
+          owner,
+          provider,
+          trigger,
+          JSON.stringify(metrics),
+          JSON.stringify(extra.cleared ?? []),
+          JSON.stringify(extra.sleep ?? []),
+          extra.clearedSleep ?? [],
+          extra.devices ?? null,
+          extra.granted ?? null,
+        ],
+      );
+    const value = async (day, metric, source) =>
+      (
+        await admin.query(
+          'select value from public.health_daily_metrics where user_id = $1 and day = $2 and metric = $3 and source = $4',
+          [owner, day, metric, source],
+        )
+      ).rows[0]?.value ?? null;
+
+    const definitions = await admin.query(
+      'select metric from public.health_metric_definitions order by metric',
+    );
+    record('Health has its 17 metrics, each with one unit', definitions.rowCount === 17);
+
+    // One sync: values in, a connection, a run.
+    const first = await imp(
+      'apple_health',
+      'connect',
+      [
+        { day: '2026-11-20', metric: 'steps', value: 8412, device: 'iPhone', sample_count: 40 },
+        { day: '2026-11-20', metric: 'resting_hr_bpm', value: 52, device: 'Apple Watch' },
+        // A repeat of the same day and metric keeps the last.
+        { day: '2026-11-21', metric: 'steps', value: 1000 },
+        { day: '2026-11-21', metric: 'steps', value: 9100 },
+      ],
+      { devices: ['iPhone', 'Apple Watch'], granted: ['steps', 'resting_hr'] },
+    );
+    record(
+      'A sync upserts its values and records a run',
+      first.rows[0].rows_upserted === 3 &&
+        (await value('2026-11-21', 'steps', 'apple_health')) === '9100',
+    );
+    const connection = (
+      await admin.query(
+        "select status, devices, granted, last_synced_at from public.health_connections where user_id = $1 and provider = 'apple_health'",
+        [owner],
+      )
+    ).rows[0];
+    record(
+      'A sync connects its provider, with what is behind it',
+      connection.status === 'connected' &&
+        connection.devices.join() === 'iPhone,Apple Watch' &&
+        connection.last_synced_at !== null,
+    );
+
+    // The same sync again: nothing doubles.
+    await imp('apple_health', 'app_open', [{ day: '2026-11-20', metric: 'steps', value: 8500 }]);
+    const stepsRows = await admin.query(
+      "select count(*)::int as n from public.health_daily_metrics where user_id = $1 and metric = 'steps' and day = '2026-11-20'",
+      [owner],
+    );
+    record(
+      'Re-syncing a day updates its value -- never a second row',
+      stepsRows.rows[0].n === 1 && (await value('2026-11-20', 'steps', 'apple_health')) === '8500',
+    );
+
+    // Out of range, or from a source that never measures it: refused, and the whole sync with it.
+    await expectThrows(
+      imp('apple_health', 'app_open', [
+        { day: '2026-11-22', metric: 'resting_hr_bpm', value: 400 },
+      ]),
+      'A resting heart rate of 400 is refused, not stored',
+      /health_metric_range/,
+    );
+    await expectThrows(
+      imp('apple_health', 'app_open', [{ day: '2026-11-22', metric: 'hrv_rmssd_ms', value: 40 }]),
+      "Apple Health's HRV is never stored as Oura's RMSSD",
+      /health_metric_source/,
+    );
+    await expectThrows(
+      imp('apple_health', 'app_open', [{ day: '2026-11-22', metric: 'bench_press', value: 1 }]),
+      'An unknown metric is refused',
+      /foreign key/,
+    );
+    record(
+      'A refused sync leaves nothing half-written',
+      (await value('2026-11-22', 'resting_hr_bpm', 'apple_health')) === null,
+    );
+
+    // A value the source no longer has goes.
+    await imp('apple_health', 'app_open', [], {
+      cleared: [{ day: '2026-11-21', metric: 'steps' }],
+    });
+    record(
+      'A value cleared at the source is removed -- missing, never 0',
+      (await value('2026-11-21', 'steps', 'apple_health')) === null,
+    );
+
+    // Sleep: sessions, and each day's totals worked out from them, naps aside.
+    await imp('apple_health', 'app_open', [], {
+      sleep: [
+        {
+          source_ref: 'night-1',
+          started_at: '2026-11-19T23:10:00Z',
+          ended_at: '2026-11-20T06:40:00Z',
+          day: '2026-11-20',
+          in_bed_s: 27000,
+          asleep_s: 25200,
+          rem_s: 5400,
+          light_s: 14400,
+          deep_s: 5400,
+        },
+        {
+          source_ref: 'nap-1',
+          started_at: '2026-11-20T14:00:00Z',
+          ended_at: '2026-11-20T14:30:00Z',
+          day: '2026-11-20',
+          in_bed_s: 1800,
+          asleep_s: 1500,
+          is_nap: true,
+        },
+      ],
+    });
+    record(
+      "A night's totals come from its sessions, naps aside",
+      (await value('2026-11-20', 'sleep_asleep_s', 'apple_health')) === '25200' &&
+        (await value('2026-11-20', 'sleep_in_bed_s', 'apple_health')) === '27000',
+    );
+    await imp('apple_health', 'app_open', [
+      { day: '2026-11-23', metric: 'sleep_asleep_s', value: 99 },
+    ]);
+    record(
+      'Sleep totals are never sent on their own',
+      (await value('2026-11-23', 'sleep_asleep_s', 'apple_health')) === null,
+    );
+    await imp('apple_health', 'app_open', [], { clearedSleep: ['night-1'] });
+    record(
+      'A night removed at the source takes its totals with it',
+      (await value('2026-11-20', 'sleep_asleep_s', 'apple_health')) === null,
+    );
+    await expectThrows(
+      imp('apple_health', 'app_open', [], {
+        sleep: [
+          {
+            source_ref: 'backwards',
+            started_at: '2026-11-21T07:00:00Z',
+            ended_at: '2026-11-21T06:00:00Z',
+            day: '2026-11-21',
+          },
+        ],
+      }),
+      'A sleep that ends before it starts is refused',
+      /health_sleep_sessions_times/,
+    );
+
+    // Oura as well: kept apart, one shown a metric.
+    await admin.query(`select * from public.import_health_data($1, 'oura', 'webhook', $2::jsonb)`, [
+      owner,
+      JSON.stringify([
+        { day: '2026-11-20', metric: 'resting_hr_bpm', value: 49 },
+        { day: '2026-11-20', metric: 'steps', value: 7900 },
+        { day: '2026-11-20', metric: 'oura_readiness', value: 81 },
+      ]),
+    ]);
+    const shown = async () =>
+      (
+        await asUser(owner, (c) =>
+          c.query("select * from public.health_daily('2026-11-20', '2026-11-20')"),
+        )
+      ).rows;
+    let day = await shown();
+    const pick = (rows, metric) => rows.find((r) => r.metric === metric);
+    record(
+      'Overnight measurements show from Oura, daytime ones from Apple Health -- never added up',
+      pick(day, 'resting_hr_bpm').source === 'oura' &&
+        pick(day, 'resting_hr_bpm').value === '49' &&
+        pick(day, 'steps').source === 'apple_health' &&
+        pick(day, 'steps').value === '8500' &&
+        pick(day, 'steps').other_sources.join() === 'oura',
+    );
+    await asUserCommitted(owner, (c) =>
+      c.query(
+        "insert into public.health_metric_preferences (user_id, metric, source) values ($1, 'steps', 'oura')",
+        [owner],
+      ),
+    );
+    day = await shown();
+    record(
+      'The source someone chose for a metric is the one shown',
+      pick(day, 'steps').source === 'oura' && pick(day, 'steps').value === '7900',
+    );
+    await expectThrows(
+      asUser(owner, (c) =>
+        c.query("select * from public.health_daily('2025-01-01', '2026-11-20')"),
+      ),
+      'Health reads a year at most at a time',
+      /health_daily_range/,
+    );
+
+    // Theirs alone.
+    const sees = async (userId) =>
+      (
+        await asUser(userId, (c) =>
+          c.query(
+            `select
+               (select count(*) from public.health_daily_metrics)::int as metrics,
+               (select count(*) from public.health_sleep_sessions)::int as sleep,
+               (select count(*) from public.health_connections)::int as connections,
+               (select count(*) from public.health_sync_runs)::int as runs,
+               (select count(*) from public.health_daily('2026-11-01', '2026-11-30'))::int as shown`,
+          ),
+        )
+      ).rows[0];
+    const own = await sees(owner);
+    const coachSees = await sees(coach);
+    const strangerSees = await sees(stranger);
+    record(
+      'Someone reads their own health data',
+      own.metrics > 0 && own.connections === 2 && own.runs > 0 && own.shown > 0,
+    );
+    record(
+      "Not even an active trainer sees a client's health data",
+      Object.values(coachSees).every((n) => n === 0),
+    );
+    record(
+      "Nobody else sees someone's health data",
+      Object.values(strangerSees).every((n) => n === 0),
+    );
+    await expectThrows(
+      asUser(owner, (c) =>
+        c.query(
+          "insert into public.health_daily_metrics (user_id, day, metric, source, value) values ($1, '2026-11-24', 'steps', 'apple_health', 1)",
+          [owner],
+        ),
+      ),
+      'Only the server writes health data -- not even its owner directly',
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(owner, (c) =>
+        c.query(
+          "select * from public.import_health_data($1, 'apple_health', 'manual', '[]'::jsonb)",
+          [owner],
+        ),
+      ),
+      'The app cannot call the import itself',
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(owner, (c) => c.query('select * from public.health_provider_tokens')),
+      "A provider's tokens are out of every client's reach, its owner's too",
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(stranger, (c) =>
+        c.query(
+          "insert into public.health_metric_preferences (user_id, metric, source) values ($1, 'steps', 'apple_health')",
+          [owner],
+        ),
+      ),
+      "Nobody sets someone else's source choice",
+      RLS_ERROR,
+    );
+
+    // What they said they use: their own, and None on its own.
+    await asUserCommitted(owner, (c) =>
+      c.query(
+        "insert into public.health_profiles (user_id, devices, setup_at) values ($1, array['iphone', 'oura'], now())",
+        [owner],
+      ),
+    );
+    const profileFor = async (userId) =>
+      (await asUser(userId, (c) => c.query('select devices from public.health_profiles'))).rows;
+    record(
+      'Their devices are theirs to read -- not a trainer’s',
+      (await profileFor(owner)).length === 1 && (await profileFor(coach)).length === 0,
+    );
+    await expectThrows(
+      asUser(owner, (c) =>
+        c.query(
+          "update public.health_profiles set devices = array['none', 'oura'] where user_id = $1",
+          [owner],
+        ),
+      ),
+      'No Devices is an answer on its own',
+      /health_profiles_devices_check/,
+    );
+
+    // A failed sync says so.
+    await admin.query(
+      "select public.record_health_sync_failure($1, 'oura', 'webhook', 'Token expired')",
+      [owner],
+    );
+    const oura = (
+      await admin.query(
+        "select status, last_error from public.health_connections where user_id = $1 and provider = 'oura'",
+        [owner],
+      )
+    ).rows[0];
+    record(
+      'A failed sync marks its connection',
+      oura.status === 'error' && oura.last_error === 'Token expired',
+    );
+
+    // Too many syncs at once.
+    const flooder = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2)', [
+      flooder,
+      'health-flooder@test.local',
+    ]);
+    await admin.query(
+      `insert into public.health_sync_runs (user_id, provider, trigger, status)
+       select $1, 'apple_health', 'app_open', 'succeeded' from generate_series(1, 30)`,
+      [flooder],
+    );
+    await expectThrows(
+      admin.query(
+        "select * from public.import_health_data($1, 'apple_health', 'app_open', '[]'::jsonb)",
+        [flooder],
+      ),
+      'At most 30 syncs in 10 minutes',
+      /health_import_rate_limited/,
+    );
+
+    // Sync history older than 90 days goes.
+    await admin.query(
+      "insert into public.health_sync_runs (user_id, provider, trigger, status, started_at) values ($1, 'apple_health', 'nightly', 'succeeded', now() - interval '91 days')",
+      [owner],
+    );
+    const purged = (await admin.query('select public.purge_health_sync_runs() as n')).rows[0].n;
+    record('Sync history older than 90 days is purged', purged === 1);
+
+    // Deleting: one source, then everything.
+    await admin.query("select public.delete_health_data($1, 'oura')", [owner]);
+    const after = await admin.query(
+      `select
+         (select count(*) from public.health_daily_metrics where user_id = $1 and source = 'oura')::int as oura,
+         (select count(*) from public.health_daily_metrics where user_id = $1 and source = 'apple_health')::int as apple,
+         (select status from public.health_connections where user_id = $1 and provider = 'oura') as status`,
+      [owner],
+    );
+    record(
+      "Deleting one source's history keeps the others",
+      after.rows[0].oura === 0 &&
+        after.rows[0].apple > 0 &&
+        after.rows[0].status === 'disconnected',
+    );
+    await admin.query('select public.delete_health_data($1)', [owner]);
+    const none = await admin.query(
+      `select
+         (select count(*) from public.health_daily_metrics where user_id = $1)::int +
+         (select count(*) from public.health_sleep_sessions where user_id = $1)::int +
+         (select count(*) from public.health_sync_runs where user_id = $1)::int +
+         (select count(*) from public.health_metric_preferences where user_id = $1)::int as n`,
+      [owner],
+    );
+    record('"Delete my health data" removes every health row of theirs', none.rows[0].n === 0);
+
+    // Deleting the account deletes it all.
+    await imp('apple_health', 'app_open', [{ day: '2026-11-25', metric: 'steps', value: 3000 }]);
+    await admin.query('delete from auth.users where id = $1', [owner]);
+    const left = await admin.query(
+      `select
+         (select count(*) from public.health_daily_metrics where user_id = $1)::int +
+         (select count(*) from public.health_connections where user_id = $1)::int +
+         (select count(*) from public.health_sync_runs where user_id = $1)::int +
+         (select count(*) from public.health_profiles where user_id = $1)::int as n`,
+      [owner],
+    );
+    record("Deleting an account deletes the person's health data with it", left.rows[0].n === 0);
+  }
+
   await admin.end();
 }
 

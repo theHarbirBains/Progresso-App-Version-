@@ -1,10 +1,31 @@
 # Health data architecture — Phase 2 proposal
 
-Status: **proposal; Harbir's decisions taken (§7), awaiting his go-ahead to build Phase 2.**
-Nothing here is built or migrated. Phase 1 (the UI
-prototype, `apps/mobile/src/health/preview`) was approved on 2026-11-27. Phases 3 (Apple Health),
-4 (Oura), 5 (unified data), 6 (recovery and baselines) and 7 (polish) each need their own
-approval; this document only plans the data they will share.
+Status: **Phase 2 approved ("Continue phase 2", 2026-11-27) and built** --
+`supabase/migrations/20261224100000_health_data.sql` and `apps/api/src/health-data`. It collects
+nothing: the import routes stay shut (`HEALTH_DATA_ENABLED`) until Phase 3 ships with its
+permission wording and the rewritten Privacy Policy. Phase 1 (the UI prototype,
+`apps/mobile/src/health/preview`) was approved on 2026-11-27. Phases 3 (Apple Health), 4 (Oura),
+5 (unified data), 6 (recovery and baselines) and 7 (polish) each need their own approval.
+
+### What was built differently from this proposal
+
+- **What someone said they use is `health_profiles`**, a table of its own (own rows only), not
+  `users.health_devices` / `health_setup_at`: an active trainer can read a client's `users` row,
+  and trainers never see a client's health data (decision 3).
+- **The metric list is a table, `health_metric_definitions`**, each with its unit, range, the
+  sources that measure it and whether it's overnight -- a trigger refuses a value out of range or
+  from a source that never measures it (Apple's HRV as RMSSD). The API's list is checked against
+  it by test.
+- **A sync is one database call, `import_health_data`**: values, cleared values, sleeps, cleared
+  sleeps, the connection and the run, in one transaction. A night's totals are worked out from
+  its sessions (naps aside), never sent on their own. A failed sync is recorded with
+  `record_health_sync_failure`. At most 30 syncs a person in 10 minutes.
+- **A run is written once finished** (`succeeded` / `failed`), so there's no "running" state.
+- **Deleting keeps the connections, marked disconnected**, so nothing syncs again until they
+  connect; a provider's tokens are revoked and removed by the API first (Phase 4).
+- **Values a source no longer has can be cleared** (Apple Health deletions), so nothing stale
+  stays.
+- There's no account export to extend yet (none exists).
 
 ## 1. What exists today (audit)
 
