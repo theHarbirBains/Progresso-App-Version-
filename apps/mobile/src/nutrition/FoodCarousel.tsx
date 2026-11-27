@@ -23,7 +23,7 @@ const MACRO_GLYPHS = [
   { key: 'fat', glyph: 'water-outline', of: (log: FoodLogRow) => log.fatG },
 ] as const;
 
-/** A quiet tile after the foods: Copy Yesterday, Save as Meal. */
+/** A quiet tile after the foods: Copy Yesterday, Log Food. */
 export interface FoodCarouselShortcut {
   key: string;
   testID: string;
@@ -66,7 +66,7 @@ export function logAmountText(log: FoodLogRow): string {
  * The day's foods as a row of cards, scrolled sideways either way, in the order they were logged:
  * each its picture, its name, its calories in the accent with the amount beside them, and its
  * protein, carbs and fat by their glyphs. A tap opens it (its amount, Delete). Copy Yesterday and
- * Save as Meal follow the foods as quiet tiles. A food logged while the row is on screen is scrolled
+ * Log Food follow the foods as quiet tiles. A food logged while the row is on screen is scrolled
  * into view.
  */
 export function FoodCarousel({
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textSecondary,
   },
-  // Copy Yesterday and Save as Meal: narrow outlined tiles, like Log Food's.
+  // Copy Yesterday and Log Food: narrow outlined tiles, like the Log Food card's.
   shortcut: {
     width: 84,
     alignItems: 'center',

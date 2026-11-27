@@ -17,8 +17,6 @@ import {
   logFood,
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
-import { fetchFoodsByIds } from '../nutrition/foodQueries';
-import { createSavedMeal } from '../nutrition/savedMealQueries';
 import {
   FoodLogProvider,
   useFoodLog,
@@ -53,10 +51,6 @@ jest.mock('../nutrition/foodQueries', () => ({
   fetchFoodsByIds: jest.fn(),
 }));
 
-jest.mock('../nutrition/savedMealQueries', () => ({
-  createSavedMeal: jest.fn(),
-}));
-
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn(),
 }));
@@ -70,8 +64,6 @@ const mockLogFood = logFood as jest.Mock;
 const mockFetchFoodLogsForDay = fetchFoodLogsForDay as jest.Mock;
 const mockFetchFoodLogsForRange = fetchFoodLogsForRange as jest.Mock;
 const mockCopyFoodLogs = copyFoodLogs as jest.Mock;
-const mockFetchFoodsByIds = fetchFoodsByIds as jest.Mock;
-const mockCreateSavedMeal = createSavedMeal as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -148,8 +140,6 @@ beforeEach(() => {
   mockFetchFoodLogsForDay.mockReset().mockResolvedValue([]);
   mockFetchFoodLogsForRange.mockReset().mockResolvedValue([]);
   mockCopyFoodLogs.mockReset();
-  mockFetchFoodsByIds.mockReset();
-  mockCreateSavedMeal.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -732,7 +722,7 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     );
   });
 
-  it('follows the foods with Copy Yesterday and Save as Meal tiles', async () => {
+  it('follows the foods with Copy Yesterday and Log Food tiles', async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockFetchFoodLogsForDay.mockResolvedValue([{ ...sampleLog, id: 'y-1' }]);
     renderScreen();
@@ -740,8 +730,24 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
 
     const row = screen.getByTestId('nutrition-today-foods-scroll');
     expect(await within(row).findByTestId('nutrition-today-copy-yesterday')).toBeTruthy();
-    expect(within(row).getByTestId('nutrition-today-save-meal')).toBeTruthy();
-    expect(row).toHaveTextContent(/Chicken Breast.*Copy\s*Yesterday.*Save as\s*Meal/s);
+    expect(row).toHaveTextContent(/Chicken Breast.*Copy\s*Yesterday.*Log\s*Food/s);
+    // No Save as Meal any more: Log Food is in its place.
+    expect(screen.queryByTestId('nutrition-today-save-meal')).toBeNull();
+
+    const logFood = within(row).getByTestId('nutrition-today-foods-log');
+    expect(logFood.props.accessibilityLabel).toBe('Log Food from your Food Library');
+    fireEvent.press(logFood);
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
+  });
+
+  it("offers Log Food after the foods without yesterday's to copy", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+
+    const row = screen.getByTestId('nutrition-today-foods-scroll');
+    expect(within(row).getByTestId('nutrition-today-foods-log')).toBeTruthy();
+    expect(within(row).queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
   });
 
   it('renders no bare text outside <Text>', async () => {
@@ -775,7 +781,6 @@ describe('NutritionTodayScreen -- Copy Yesterday', () => {
     yesterday.setDate(yesterday.getDate() - 1);
     expect((day as Date).toDateString()).toBe(yesterday.toDateString());
     expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
-    expect(screen.queryByTestId('nutrition-today-save-meal')).toBeNull();
   });
 
   it("logs yesterday's foods again, all ticked, leaving out any unticked", async () => {
@@ -822,60 +827,6 @@ describe('NutritionTodayScreen -- Copy Yesterday', () => {
     });
 
     expect(screen.getByTestId('copy-yesterday-error')).toHaveTextContent('network error');
-  });
-});
-
-describe('NutritionTodayScreen -- Save as Meal', () => {
-  const chicken = {
-    id: 'food-1',
-    name: 'Chicken Breast',
-    brand: null,
-    barcode: null,
-    imageUrl: null,
-    servingSize: 100,
-    servingUnit: 'g',
-    calories: 165,
-    proteinG: 31,
-    carbsG: 0,
-    fatG: 3.6,
-    isActive: true,
-  };
-
-  it("names today's foods and keeps them as a saved meal, at today's amounts", async () => {
-    mockFetchTodaysFoodLogs.mockResolvedValue([
-      { ...sampleLog, enteredAmount: 200, enteredUnit: 'g' },
-    ]);
-    mockFetchFoodsByIds.mockResolvedValue([chicken]);
-    mockCreateSavedMeal.mockResolvedValue({});
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('nutrition-today-save-meal'));
-    expect(screen.getByTestId('save-meal-submit').props.accessibilityState.disabled).toBe(true);
-    fireEvent.changeText(screen.getByTestId('save-meal-name'), ' Lunch ');
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('save-meal-submit'));
-    });
-
-    expect(mockFetchFoodsByIds).toHaveBeenCalledWith(['food-1']);
-    expect(mockCreateSavedMeal).toHaveBeenCalledWith('user-1', 'Lunch', [
-      { food: chicken, quantity: 2, entered: { amount: 200, unit: 'g' } },
-    ]);
-    expect(screen.getByTestId('save-meal-done')).toHaveTextContent('Lunch saved');
-  });
-
-  it("won't save a meal of foods no longer in the library", async () => {
-    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
-    mockFetchFoodsByIds.mockResolvedValue([{ ...chicken, isActive: false }]);
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('nutrition-today-save-meal'));
-    fireEvent.changeText(screen.getByTestId('save-meal-name'), 'Lunch');
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('save-meal-submit'));
-    });
-
-    expect(mockCreateSavedMeal).not.toHaveBeenCalled();
-    expect(screen.getByTestId('save-meal-error')).toHaveTextContent(/any more/);
   });
 });
 

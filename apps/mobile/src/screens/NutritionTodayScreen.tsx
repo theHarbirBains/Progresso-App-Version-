@@ -46,7 +46,7 @@ import {
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useDaySwipe } from '../nutrition/useDaySwipe';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
-import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
+import { CopyYesterdaySheet } from '../nutrition/TodayShortcutSheets';
 import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
 import { MicronutrientsWidget } from '../nutrition/MicronutrientsWidget';
@@ -82,10 +82,9 @@ const NO_LOGS: FoodLogRow[] = [];
 //   as a row of cards scrolled sideways, either way (FoodCarousel) -- each its picture, its name,
 //   its calories, amount and macros as snapshotted when it was logged; a tap opens it in a sheet
 //   (LoggedFoodSheet) to change the amount or delete it -- then two quiet tiles: Copy Yesterday
-//   (when yesterday has foods -- a sheet of them, all ticked, logged again now) and Save as Meal
-//   (when today has some -- a sheet to name them and keep them as a saved meal). With none yet,
-//   an empty state with the page's one filled button, Log Your First Meal, and Copy Yesterday
-//   under it.
+//   (when yesterday has foods -- a sheet of them, all ticked, logged again now) and Log Food (the
+//   Food Library, to log another). With none yet, an empty state with the page's one filled
+//   button, Log Your First Meal, and Copy Yesterday under it.
 // - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to Saturday --
 //   as a slim card: a bar, what's been eaten against it and what's left (WeeklyCalorieBudget
 //   summary); a tap opens the rest in a sheet.
@@ -192,7 +191,6 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const [copyOpen, setCopyOpen] = useState(false);
   // The week in full -- its unlogged days, how it sits with the goal, the estimate -- in a sheet.
   const [weekOpen, setWeekOpen] = useState(false);
-  const [saveMealOpen, setSaveMealOpen] = useState(false);
 
   // Yesterday's foods, for Copy Yesterday. Read each time Today opens -- it's opened fresh on
   // every visit -- and only a shortcut, so a failure just leaves it out.
@@ -417,10 +415,9 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     { key: 'fat', label: 'Fat', value: goals.fatG, unit: 'g' },
   ];
 
-  // Copy Yesterday (today, when yesterday has foods) and Save as Meal (when a food of the day's
-  // has a food behind it): tiles after the foods, or under the empty state.
+  // Copy Yesterday (today, when yesterday has foods) and Log Food: tiles after the foods; Copy
+  // Yesterday under the empty state too.
   const canCopyYesterday = isToday && yesterdayLogs.length > 0;
-  const canSaveMeal = logs.some((log) => log.foodId !== null);
   const carouselShortcuts: FoodCarouselShortcut[] = [
     ...(canCopyYesterday
       ? [
@@ -434,18 +431,14 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
           },
         ]
       : []),
-    ...(canSaveMeal
-      ? [
-          {
-            key: 'save-meal',
-            testID: 'nutrition-today-save-meal',
-            label: 'Save as\nMeal',
-            spoken: 'Save as Meal',
-            icon: 'bookmark' as const,
-            onPress: () => setSaveMealOpen(true),
-          },
-        ]
-      : []),
+    {
+      key: 'log-food',
+      testID: 'nutrition-today-foods-log',
+      label: 'Log\nFood',
+      spoken: 'Log Food from your Food Library',
+      icon: 'plus',
+      onPress: () => logVia('FoodLibrary'),
+    },
   ];
 
   // The ways to log, as four tiles: what each is, at a glance.
@@ -739,13 +732,6 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
             visible={copyOpen}
             onClose={() => setCopyOpen(false)}
             logs={yesterdayLogs}
-            accentColor={accent}
-            onAccentColor={nutritionTheme.onAccent}
-          />
-          <SaveAsMealSheet
-            visible={saveMealOpen}
-            onClose={() => setSaveMealOpen(false)}
-            logs={logs}
             accentColor={accent}
             onAccentColor={nutritionTheme.onAccent}
           />
