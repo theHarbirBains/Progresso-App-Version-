@@ -330,10 +330,14 @@ describe('TrainerClientDetailScreen -- Progress tab', () => {
     await screen.findByTestId('trainer-client-workout-w1');
     fireEvent.press(screen.getByText('Progress'));
 
-    expect(await screen.findByTestId('progress-overview-stat-workouts')).toHaveTextContent(/^2/);
-    expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/^3/);
+    // The lifetime counts are All Time's (never repeated on Overview).
+    fireEvent.press(await screen.findByTestId('trainer-client-progress-tabs-AllTime'));
+    expect(await screen.findByTestId('progress-all-time-stat-workouts')).toHaveTextContent(
+      /2Total Workouts/,
+    );
+    expect(screen.getByTestId('progress-all-time-stat-sets')).toHaveTextContent(/3Total Sets/);
     // One rep-count PR plus one true 1RM.
-    expect(screen.getByTestId('progress-overview-stat-prs')).toHaveTextContent(/^2/);
+    expect(screen.getByTestId('progress-all-time-stat-prs')).toHaveTextContent(/2Personal Records/);
 
     expect(fetchAllCompletedWorkouts).toHaveBeenCalledWith('client-1');
     expect(fetchAllExerciseHistory).toHaveBeenCalledWith('client-1');

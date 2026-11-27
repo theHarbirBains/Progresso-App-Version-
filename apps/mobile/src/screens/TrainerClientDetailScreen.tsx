@@ -497,9 +497,6 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 {progressSection === 'Overview' ? (
                   <OverviewSection
                     groups={progressGroups}
-                    lifetimeStats={lifetimeStats}
-                    totalCompletedSets={workingSets(data?.allSetHistory ?? []).length}
-                    totalPRs={totalPRs}
                     repPRs={data?.repPRs ?? []}
                     oneRepMaxes={data?.oneRepMaxes ?? []}
                     exerciseRecords={data?.exerciseRecords}

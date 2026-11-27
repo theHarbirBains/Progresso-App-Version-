@@ -39,6 +39,9 @@ type Props = RootStackScreenProps<'ProgressOverview'>;
 /** The section Progress opens on unless asked for another: the Muscles heat map (Harbir's call). */
 const DEFAULT_SECTION: ProgressSection = 'Muscles';
 
+/** Overview's three views: this week, all time (what was the All Time tab), nutrition. */
+type OverviewView = 'week' | 'allTime' | 'nutrition';
+
 // What the shared history works out to, kept for as long as the history itself is the same
 // object. Progress opens fresh on every visit (a section page), but the history only changes
 // when a workout is completed -- so a visit reuses these instead of working them out again in
@@ -95,17 +98,22 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
 
   // Opened on the section asked for (Feed's Daily Steps widget asks for Steps), else the Muscles
   // heat map (Harbir's call) -- only one this person has (no Steps off iPhone).
-  const asked = route?.params?.section;
+  // All Time is part of Overview now: asked for, it's Overview on All Time.
+  const askedFor = route?.params?.section;
+  const asked: ProgressSection | undefined = askedFor === 'AllTime' ? 'Overview' : askedFor;
   const offered = (section: ProgressSection | undefined) =>
     section !== undefined && ownProgressSections().some((s) => s.key === section);
   const [activeSection, setActiveSection] = useState<ProgressSection>(
     offered(asked) ? asked! : offered(DEFAULT_SECTION) ? DEFAULT_SECTION : 'Overview',
   );
+  // Overview's view -- this week, all time, or nutrition -- kept while other sections are visited.
+  const [overviewView, setOverviewView] = useState<OverviewView>(
+    askedFor === 'AllTime' ? 'allTime' : 'week',
+  );
   useEffect(() => {
     if (asked && offered(asked)) setActiveSection(asked);
-  }, [asked]);
-  // All Time's tab -- its workouts or its nutrition -- kept while other sections are visited.
-  const [allTimeView, setAllTimeView] = useState<'workouts' | 'nutrition'>('workouts');
+    if (askedFor === 'AllTime') setOverviewView('allTime');
+  }, [asked, askedFor]);
   const membership = useMembership();
   const { profile } = useProfile();
   // A top set opened to fix it (Top Sets' pencil); saving reads the history and PRs again.
@@ -181,40 +189,78 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
               <SkeletonCards testID="progress-section-loading" heights={[132, 168, 112]} />
             ) : null}
 
+            {/* Overview: this week, all time, or nutrition -- one switch, one page. */}
             {sectionReady && activeSection === 'Overview' ? (
-              <OverviewSection
-                groups={groups}
-                lifetimeStats={lifetimeStats}
-                totalCompletedSets={workingSets(history).length}
-                totalPRs={totalPRs}
-                repPRs={repPRs}
-                oneRepMaxes={oneRepMaxes}
-                exerciseRecords={exerciseRecords}
-                weightUnit={weightUnit}
-                accentColor={theme.accent}
-                navigation={navigation}
-                onViewAllMilestones={() => {
-                  setAllTimeView('workouts');
-                  setActiveSection('AllTime');
-                }}
-                top={
-                  <>
-                    <WeeklySummaryBlock
-                      summaries={weekSummaries}
-                      error={weekError}
-                      weightUnit={weightUnit}
-                      accentColor={theme.accent}
-                      onAccentColor={theme.onAccent}
-                    />
-                    <ConsistencyBlock
-                      workouts={completedWorkouts}
-                      weeklyGoal={profile?.workoutFrequencyDays ?? null}
-                      accentColor={theme.accent}
-                      onOpenHistory={() => navigation.navigate('WorkoutHistory')}
-                    />
-                  </>
-                }
-              />
+              <View style={styles.allTimeTabs}>
+                <SegmentedControl<OverviewView>
+                  testID="progress-overview-view"
+                  options={[
+                    { label: 'This Week', value: 'week' },
+                    { label: 'All Time', value: 'allTime' },
+                    // Nutrition only with a membership that includes it.
+                    ...(membership.nutrition
+                      ? [{ label: 'Nutrition', value: 'nutrition' as const }]
+                      : []),
+                  ]}
+                  value={
+                    overviewView === 'nutrition' && !membership.nutrition ? 'week' : overviewView
+                  }
+                  onChange={setOverviewView}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                  stretch
+                />
+                {overviewView === 'allTime' ? (
+                  <AllTimeSection
+                    groups={groups}
+                    history={history}
+                    completedWorkouts={completedWorkouts}
+                    lifetimeStats={lifetimeStats}
+                    totalCompletedSets={workingSets(history).length}
+                    totalPRs={totalPRs}
+                    repPRs={repPRs}
+                    oneRepMaxes={oneRepMaxes}
+                    weightUnit={weightUnit}
+                    accentColor={theme.accent}
+                    navigation={navigation}
+                  />
+                ) : overviewView === 'nutrition' && membership.nutrition ? (
+                  <NutritionProgressSection
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                    onOpenDay={(date) => navigation.navigate('NutritionHistory', { date })}
+                    onOpenHistory={() => navigation.navigate('NutritionHistory')}
+                  />
+                ) : (
+                  <OverviewSection
+                    groups={groups}
+                    repPRs={repPRs}
+                    oneRepMaxes={oneRepMaxes}
+                    exerciseRecords={exerciseRecords}
+                    weightUnit={weightUnit}
+                    accentColor={theme.accent}
+                    navigation={navigation}
+                    onViewAllMilestones={() => setOverviewView('allTime')}
+                    top={
+                      <>
+                        <WeeklySummaryBlock
+                          summaries={weekSummaries}
+                          error={weekError}
+                          weightUnit={weightUnit}
+                          accentColor={theme.accent}
+                          onAccentColor={theme.onAccent}
+                        />
+                        <ConsistencyBlock
+                          workouts={completedWorkouts}
+                          weeklyGoal={profile?.workoutFrequencyDays ?? null}
+                          accentColor={theme.accent}
+                          onOpenHistory={() => navigation.navigate('WorkoutHistory')}
+                        />
+                      </>
+                    }
+                  />
+                )}
+              </View>
             ) : null}
 
             {contentReady && activeSection === 'TopSets' ? (
@@ -262,48 +308,6 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
                   navigation.navigate('HealthPreview', { page, metric, onboarding })
                 }
               />
-            ) : null}
-
-            {/* All Time: the workouts' all-time figures, or nutrition's -- two tabs of one section. */}
-            {contentReady && activeSection === 'AllTime' ? (
-              <View style={styles.allTimeTabs}>
-                {/* Nutrition's tab only with a membership that includes it. */}
-                {membership.nutrition ? (
-                  <SegmentedControl
-                    testID="progress-all-time-view"
-                    options={[
-                      { label: 'Workouts', value: 'workouts' },
-                      { label: 'Nutrition', value: 'nutrition' },
-                    ]}
-                    value={allTimeView}
-                    onChange={setAllTimeView}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                  />
-                ) : null}
-                {allTimeView === 'workouts' || !membership.nutrition ? (
-                  <AllTimeSection
-                    groups={groups}
-                    history={history}
-                    completedWorkouts={completedWorkouts}
-                    lifetimeStats={lifetimeStats}
-                    totalCompletedSets={workingSets(history).length}
-                    totalPRs={totalPRs}
-                    repPRs={repPRs}
-                    oneRepMaxes={oneRepMaxes}
-                    weightUnit={weightUnit}
-                    accentColor={theme.accent}
-                    navigation={navigation}
-                  />
-                ) : (
-                  <NutritionProgressSection
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                    onOpenDay={(date) => navigation.navigate('NutritionHistory', { date })}
-                    onOpenHistory={() => navigation.navigate('NutritionHistory')}
-                  />
-                )}
-              </View>
             ) : null}
           </AppCard>
         </RiseIn>

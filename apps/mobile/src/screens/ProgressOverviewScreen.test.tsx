@@ -136,6 +136,12 @@ function goToSection(section: string) {
   fireEvent.press(screen.getByTestId(`progress-tabs-${section}`));
 }
 
+/** All Time is Overview's second view, not a tab. */
+function goToAllTime() {
+  goToSection('Overview');
+  fireEvent.press(screen.getByTestId('progress-overview-view-allTime'));
+}
+
 const benchHistory = [
   {
     weightKg: 100,
@@ -263,7 +269,7 @@ describe('ProgressOverviewScreen shell', () => {
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
 
-    goToSection('AllTime');
+    goToAllTime();
     expect(screen.queryByText('PROGRESS')).toBeNull();
     expect(screen.queryByText('Track Your Growth')).toBeNull();
     expect(screen.queryByTestId('progress-header-subtitle')).toBeNull();
@@ -298,7 +304,7 @@ describe('ProgressOverviewScreen shell', () => {
     await screen.findByTestId('progress-overview-scroll');
 
     expect(screen.queryByTestId('progress-nutrition-coming-soon')).toBeNull();
-    for (const section of ['Overview', 'TopSets', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Muscles']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
   });
@@ -319,7 +325,7 @@ describe('ProgressOverviewScreen shell', () => {
     });
   });
 
-  it('lists its sections (Overview, Top Sets, Muscles, Cardio, All Time, Steps), opening on Muscles', async () => {
+  it('lists its sections (Overview, Top Sets, Muscles, Cardio, Steps), opening on Muscles', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     route = {} as never;
     renderScreen();
@@ -331,12 +337,12 @@ describe('ProgressOverviewScreen shell', () => {
     });
     route = OVERVIEW;
 
-    for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'AllTime', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'Steps']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
-    // Nutrition is All Time's second tab, not a section of its own.
+    // All Time and Nutrition are Overview's views, not sections of their own.
+    expect(screen.queryByTestId('progress-tabs-AllTime')).toBeNull();
     expect(screen.queryByTestId('progress-tabs-Nutrition')).toBeNull();
-    expect(screen.getByText('All Time')).toBeTruthy();
     for (const removed of ['Strength', 'PRs', 'Exercises', 'OneRepMax']) {
       expect(screen.queryByTestId(`progress-tabs-${removed}`)).toBeNull();
     }
@@ -362,32 +368,32 @@ describe('ProgressOverviewScreen shell', () => {
     }
   });
 
-  it('shows the All Time section when its tab is selected', async () => {
+  it('shows All Time from Overview’s switch', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
 
-    goToSection('AllTime');
+    goToAllTime();
 
     expect(await screen.findByTestId('progress-all-time-scroll')).toBeTruthy();
   });
 
-  it('gives All Time two tabs: its workouts, then its nutrition, kept while other sections are visited', async () => {
+  it('switches Overview between This Week, All Time and Nutrition, kept while other sections are visited', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
-    goToSection('AllTime');
 
     expect(
-      screen.getByTestId('progress-all-time-view-workouts').props.accessibilityState.selected,
+      screen.getByTestId('progress-overview-view-week').props.accessibilityState.selected,
     ).toBe(true);
+    fireEvent.press(screen.getByTestId('progress-overview-view-allTime'));
     expect(await screen.findByTestId('progress-all-time-scroll')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('progress-all-time-view-nutrition'));
+    fireEvent.press(screen.getByTestId('progress-overview-view-nutrition'));
     expect(await screen.findByTestId('progress-nutrition-scroll')).toBeTruthy();
     expect(screen.queryByTestId('progress-all-time-scroll')).toBeNull();
 
+    goToSection('TopSets');
     goToSection('Overview');
-    goToSection('AllTime');
     expect(await screen.findByTestId('progress-nutrition-scroll')).toBeTruthy();
   });
 
@@ -427,16 +433,20 @@ describe('ProgressOverviewScreen shell', () => {
     expect(await screen.findByTestId('progress-topsets-search')).toBeTruthy();
   });
 
-  it('shows real overview stats by default, reusing the same completed-workouts data as Dashboard/Profile', async () => {
+  it('shows the lifetime counts once, on All Time, from the same completed workouts as Profile', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     mockFetchAllCompletedWorkouts.mockResolvedValue([
       { performedAt: '2026-01-01T00:00:00Z', completedAt: '2026-01-01T01:00:00Z' },
     ]);
     renderScreen();
+    await screen.findByTestId('progress-overview-scroll');
+    // Not repeated on This Week.
+    expect(screen.queryByTestId('progress-overview-stat-workouts')).toBeNull();
 
-    expect(await screen.findByTestId('progress-overview-stat-workouts')).toHaveTextContent(/1/);
-    expect(screen.getByTestId('progress-overview-stat-exercises')).toHaveTextContent(/1/);
-    expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/2/);
+    goToAllTime();
+    expect(await screen.findByTestId('progress-all-time-stat-workouts')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('progress-all-time-stat-exercises')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('progress-all-time-stat-sets')).toHaveTextContent(/2/);
   });
 
   it('draws no line graph anywhere on Overview', async () => {
@@ -543,7 +553,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('puts the active section in its own widget, on every tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'Cardio', 'AllTime', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps']) {
       goToSection(section);
       expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
       expect(screen.getByTestId('progress-section-card')).toBeTruthy();
@@ -559,11 +569,13 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('renders no bare text outside <Text> on any tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps']) {
       goToSection(section);
       expectNoBareText();
     }
-    fireEvent.press(screen.getByTestId('progress-all-time-view-nutrition'));
+    goToAllTime();
+    expectNoBareText();
+    fireEvent.press(screen.getByTestId('progress-overview-view-nutrition'));
     expectNoBareText();
   });
 });

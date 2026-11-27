@@ -170,7 +170,6 @@ export function AllTimeSection({
             icon="award"
             accentColor={accentColor}
             title="All Time Personal Records"
-            subtitle="See your strongest lifts"
           />
           <View style={styles.allTimePrGrid}>
             {topRecords.map((record) => {
@@ -225,7 +224,6 @@ export function AllTimeSection({
             icon="activity"
             accentColor={accentColor}
             title="Muscle Group Volume"
-            subtitle="All time total volume by muscle group"
           />
           {muscleGroupVolume.map((mg) => {
             const percent = maxMuscleGroupVolumeKg > 0 ? mg.volumeKg / maxMuscleGroupVolumeKg : 0;
@@ -302,12 +300,7 @@ export function AllTimeSection({
 
       {milestones.length > 0 ? (
         <AppCard testID="progress-all-time-milestones" style={styles.overviewCard}>
-          <ProgressCardHeader
-            icon="flag"
-            accentColor={accentColor}
-            title="Progress Highlights"
-            subtitle="All time milestones"
-          />
+          <ProgressCardHeader icon="flag" accentColor={accentColor} title="Progress Highlights" />
           {milestones.map((milestone, index) => (
             <View
               key={milestone.key}

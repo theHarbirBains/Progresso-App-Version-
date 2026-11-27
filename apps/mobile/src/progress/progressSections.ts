@@ -26,12 +26,15 @@ export const PROGRESS_SECTIONS = [
 export type ProgressSection = (typeof PROGRESS_SECTIONS)[number]['key'];
 
 /**
- * The person's own Progress tabs: Steps only where Apple Health can be (iPhone), and Health -- a
- * prototype for now -- only in development builds.
+ * The person's own Progress tabs: Steps only where Apple Health can be (iPhone), Health -- a
+ * prototype for now -- only in development builds, and no All Time tab: All Time is part of
+ * Overview (its This Week / All Time / Nutrition switch -- Harbir asked for a leaner Progress,
+ * November 2026). A trainer's view of a client keeps its own tabs.
  */
 export function ownProgressSections(healthPreview = HEALTH_PREVIEW_ENABLED) {
   return PROGRESS_SECTIONS.filter(
     (section) =>
+      section.key !== 'AllTime' &&
       (section.key !== 'Steps' || Platform.OS === 'ios') &&
       (section.key !== 'Health' || healthPreview),
   );

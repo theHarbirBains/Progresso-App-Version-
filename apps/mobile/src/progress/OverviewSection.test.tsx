@@ -1,20 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { ExerciseHistoryGroup } from '../workouts/allExerciseHistoryQueries';
 import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
-import type { LifetimeStats } from './lifetimeStats';
 import { OverviewSection } from './OverviewSection';
 
 const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = { navigate: mockNavigate };
-
-const lifetimeStats: LifetimeStats = {
-  totalWorkouts: 18,
-  totalMinutes: 540,
-  workoutsThisMonth: 6,
-  avgWorkoutsPerWeek: 3.5,
-  firstWorkoutAt: '2026-01-01T00:00:00Z',
-};
 
 const groups: ExerciseHistoryGroup[] = [
   { exerciseId: 'ex-1', exerciseName: 'Bench Press', sets: [] },
@@ -49,9 +40,6 @@ function renderOverview(overrides: Partial<Parameters<typeof OverviewSection>[0]
   return render(
     <OverviewSection
       groups={groups}
-      lifetimeStats={lifetimeStats}
-      totalCompletedSets={120}
-      totalPRs={2}
       repPRs={repPRs}
       oneRepMaxes={oneRepMaxes}
       weightUnit="kg"
@@ -75,13 +63,12 @@ describe('OverviewSection', () => {
     expect(screen.getByTestId('progress-overview-empty')).toBeTruthy();
   });
 
-  it('shows real lifetime stats, never fabricated values', () => {
+  it('leaves the lifetime counts to All Time -- never the same figures twice', () => {
     renderOverview();
 
-    expect(screen.getByTestId('progress-overview-stat-workouts')).toHaveTextContent(/18/);
-    expect(screen.getByTestId('progress-overview-stat-prs')).toHaveTextContent(/2/);
-    expect(screen.getByTestId('progress-overview-stat-exercises')).toHaveTextContent(/2/);
-    expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/120/);
+    for (const stat of ['workouts', 'prs', 'exercises', 'sets']) {
+      expect(screen.queryByTestId(`progress-overview-stat-${stat}`)).toBeNull();
+    }
   });
 
   it('has no "View Details" link', () => {

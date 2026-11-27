@@ -139,7 +139,6 @@ describe('AllTimeSection', () => {
 
     const card = screen.getByTestId('progress-all-time-prs');
     expect(card).toHaveTextContent(/All Time Personal Records/);
-    expect(card).toHaveTextContent(/See your strongest lifts/);
     expect(screen.getByTestId('progress-all-time-pr-ex-2')).toHaveTextContent(/Barbell Squat/);
     expect(screen.getByTestId('progress-all-time-pr-ex-2')).toHaveTextContent(/140/);
   });
@@ -172,7 +171,6 @@ describe('AllTimeSection', () => {
 
     const card = screen.getByTestId('progress-all-time-muscle-volume');
     expect(card).toHaveTextContent(/Muscle Group Volume/);
-    expect(card).toHaveTextContent(/All time total volume by muscle group/);
     expect(screen.getByTestId('progress-all-time-muscle-quadriceps')).toHaveTextContent(/700 kg/);
     expect(screen.getByTestId('progress-all-time-muscle-chest')).toHaveTextContent(/500 kg/);
   });
@@ -201,7 +199,6 @@ describe('AllTimeSection', () => {
 
     const card = screen.getByTestId('progress-all-time-milestones');
     expect(card).toHaveTextContent(/Progress Highlights/);
-    expect(card).toHaveTextContent(/All time milestones/);
     expect(screen.getByTestId('progress-all-time-milestone-workouts-1')).toHaveTextContent(
       /First Workout/,
     );
