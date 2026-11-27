@@ -42,6 +42,12 @@ describe('LINK_CONFIG', () => {
     });
   });
 
+  it("opens a comment's workout at its comments", () => {
+    expect(
+      getStateFromPath('workouts/w-1?focusComments=true', LINK_CONFIG)?.routes[1]?.params,
+    ).toEqual({ workoutId: 'w-1', focusComments: true });
+  });
+
   it('opens nothing for a path that names no screen', () => {
     expect(getStateFromPath('somewhere/else', LINK_CONFIG)).toBeUndefined();
   });

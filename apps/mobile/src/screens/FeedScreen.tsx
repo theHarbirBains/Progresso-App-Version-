@@ -16,7 +16,7 @@ import { SkeletonCards } from '../design/Skeleton';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import {
   fetchFriendsFeed,
-  listFollowNotifications,
+  fetchUnreadNotificationCount,
   listGroups,
   type FollowUser,
   type FriendsFeedItem,
@@ -191,7 +191,7 @@ export function FeedScreen({ navigation }: Props) {
   const [friendsError, setFriendsError] = useState<string | null>(null);
 
   // The header bell's badge -- the same count of things NotificationsScreen
-  // itself would show right now: incoming follow requests plus its two
+  // itself would show right now: their unread notifications plus its two
   // setup reminders (no active split, no nutrition goals saved -- see that
   // screen's own comment). Not folded into the friends-feed error/loading
   // state above: a failure here is silently a missing badge, never a
@@ -278,10 +278,11 @@ export function FeedScreen({ navigation }: Props) {
     if (!accessToken || !userId) return;
     try {
       const [notifications, goals] = await Promise.all([
-        listFollowNotifications(accessToken),
+        fetchUnreadNotificationCount(accessToken),
         fetchNutritionGoals(userId),
       ]);
-      setPendingRequestCount(notifications.filter((n) => n.kind === 'request').length);
+      // Their unread notifications (follow requests, likes, comments, invitations...).
+      setPendingRequestCount(notifications.unread);
       setNutritionGoalsMissing(goals.calories === null);
       lastBadgeLoadAtRef.current = Date.now();
     } catch {

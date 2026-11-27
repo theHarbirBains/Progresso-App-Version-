@@ -93,10 +93,7 @@ const GROUP = '55555555-5555-4555-8555-555555555555';
 function setup() {
   const mock = createMockClient();
   const supabase = { getClient: () => mock.client } as unknown as SupabaseService;
-  const push = {
-    nameOf: jest.fn().mockResolvedValue('Sam'),
-    notify: jest.fn().mockResolvedValue(undefined),
-  };
+  const push = { record: jest.fn().mockResolvedValue(undefined) };
   return {
     mock,
     push,
@@ -202,7 +199,7 @@ describe('GroupsService', () => {
     it('invites a friend, who then has to accept -- and tells them', async () => {
       const { mock, push, service } = setup();
       mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
-      mock.queue('workout_group_members', joined(HOST, 'host'), ok(null), ok());
+      mock.queue('workout_group_members', joined(HOST, 'host'), ok(null), ok({ id: 'invite-1' }));
       mock.queue('users', ok({ id: TARGET }), ok({ id: TARGET }));
       mock.queue('follows', ok({ id: 'f1' }), ok(null));
       mock.queue('trainer_clients', ok(null), ok(null));
@@ -222,10 +219,12 @@ describe('GroupsService', () => {
         invited_at: expect.any(String),
       });
       await settle();
-      expect(push.notify).toHaveBeenCalledWith(TARGET, 'groupInvites', {
-        title: 'Live workout invite',
-        body: 'Sam wants to start a live workout with you: Thursday legs.',
-        path: 'groups',
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'workout_invite',
+        recipientId: TARGET,
+        actorId: HOST,
+        groupId: GROUP,
+        inviteId: 'invite-1',
       });
     });
 
@@ -402,7 +401,11 @@ describe('GroupsService', () => {
 
     it('declining says so -- not as if they joined and left -- and tells whoever sent it', async () => {
       const { mock, push, service } = setup();
-      mock.queue('workout_group_members', invitedRow({ user_id: MEMBER }), ok());
+      mock.queue(
+        'workout_group_members',
+        invitedRow({ user_id: MEMBER }),
+        ok([{ id: 'm-target' }]),
+      );
       mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
 
       await service.respondToInvite(MEMBER, GROUP, 'decline');
@@ -412,26 +415,38 @@ describe('GroupsService', () => {
         (c) => c.target === 'workout_group_members' && c.method === 'update',
       );
       expect(update?.args[0]).toEqual({ status: 'declined', responded_at: expect.any(String) });
-      expect(push.notify).toHaveBeenCalledWith(HOST, 'groupInvites', {
-        title: 'Invite declined',
-        body: "Sam can't join your live workout: Thursday legs.",
-        path: `groups/${GROUP}`,
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'invite_answer',
+        recipientId: HOST,
+        actorId: MEMBER,
+        groupId: GROUP,
+        inviteId: 'm-target',
+        answer: 'declined',
+        groupName: 'Thursday legs',
       });
     });
 
     it('tells whoever sent it when it’s accepted', async () => {
       const { mock, push, service } = setup();
-      mock.queue('workout_group_members', invitedRow({ user_id: MEMBER }), ok());
+      mock.queue(
+        'workout_group_members',
+        invitedRow({ user_id: MEMBER }),
+        ok([{ id: 'm-target' }]),
+      );
       mock.queue('workouts', ok({ id: 'w-member' }));
       mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
 
       await service.respondToInvite(MEMBER, GROUP, 'accept');
       await settle();
 
-      expect(push.notify).toHaveBeenCalledWith(HOST, 'groupInvites', {
-        title: 'Invite accepted',
-        body: 'Sam is joining your live workout: Thursday legs.',
-        path: `groups/${GROUP}`,
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'invite_answer',
+        recipientId: HOST,
+        actorId: MEMBER,
+        groupId: GROUP,
+        inviteId: 'm-target',
+        answer: 'accepted',
+        groupName: 'Thursday legs',
       });
       // Already had a workout in the group: none made, nobody else touched.
       expect(mock.calls.filter((c) => c.method === 'insert')).toEqual([]);

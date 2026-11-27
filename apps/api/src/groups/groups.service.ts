@@ -445,13 +445,21 @@ export class GroupsService {
       invited_at: new Date().toISOString(),
       responded_at: null,
     };
-    const { error: writeError } = existing
-      ? await client.from('workout_group_members').update(row).eq('id', existing.id)
+    const { data: written, error: writeError } = existing
+      ? await client
+          .from('workout_group_members')
+          .update(row)
+          .eq('id', existing.id)
+          .select('id')
+          .maybeSingle()
       : await client
           .from('workout_group_members')
-          .insert({ group_id: groupId, user_id: targetId, ...row });
+          .insert({ group_id: groupId, user_id: targetId, ...row })
+          .select('id')
+          .maybeSingle();
     if (writeError) throw new InternalServerErrorException('Failed to send the invite');
-    void this.pushInvite(userId, targetId, groupId);
+    const inviteId = (written as { id: string } | null)?.id ?? existing?.id;
+    if (inviteId) void this.pushInvite(userId, targetId, groupId, inviteId);
     return { userId: targetId, status: 'invited' };
   }
 
@@ -559,24 +567,31 @@ export class GroupsService {
     const respondedAt = new Date().toISOString();
 
     if (action === 'decline') {
-      const { error } = await client
+      const { data: declined, error } = await client
         .from('workout_group_members')
         .update({ status: 'declined', responded_at: respondedAt })
         .eq('id', member.id)
-        .eq('status', 'invited');
+        .eq('status', 'invited')
+        .select('id');
       if (error) throw new InternalServerErrorException('Failed to decline the invite');
-      void this.pushAnswer(userId, member.added_by ?? null, groupId, 'declined');
+      // Answered by this call (not a retry of one already answered): the sender hears once.
+      if ((declined ?? []).length > 0) {
+        void this.pushAnswer(userId, member.added_by ?? null, groupId, member.id, 'declined');
+      }
       return;
     }
 
     // Only this invite's own row changes: nobody else in the group is touched.
-    const { error } = await client
+    const { data: accepted, error } = await client
       .from('workout_group_members')
       .update({ status: 'joined', responded_at: respondedAt })
       .eq('id', member.id)
-      .eq('status', 'invited');
+      .eq('status', 'invited')
+      .select('id');
     if (error) throw new InternalServerErrorException('Failed to accept the invite');
-    void this.pushAnswer(userId, member.added_by ?? null, groupId, 'accepted');
+    if ((accepted ?? []).length > 0) {
+      void this.pushAnswer(userId, member.added_by ?? null, groupId, member.id, 'accepted');
+    }
 
     const { data: existing, error: existingError } = await client
       .from('workouts')
@@ -734,13 +749,21 @@ export class GroupsService {
       invited_at: joinsNow ? null : new Date().toISOString(),
       responded_at: null,
     };
-    const { error: writeError } = existing
-      ? await client.from('workout_group_members').update(row).eq('id', existing.id)
+    const { data: written, error: writeError } = existing
+      ? await client
+          .from('workout_group_members')
+          .update(row)
+          .eq('id', existing.id)
+          .select('id')
+          .maybeSingle()
       : await client
           .from('workout_group_members')
-          .insert({ group_id: groupId, user_id: clientId, ...row });
+          .insert({ group_id: groupId, user_id: clientId, ...row })
+          .select('id')
+          .maybeSingle();
     if (writeError) throw new InternalServerErrorException('Failed to add the client');
-    if (!joinsNow) void this.pushInvite(userId, clientId, groupId);
+    const inviteId = (written as { id: string } | null)?.id ?? existing?.id;
+    if (!joinsNow && inviteId) void this.pushInvite(userId, clientId, groupId, inviteId);
 
     if (joinsNow) {
       const name = await this.loadGroupName(groupId);
@@ -868,22 +891,21 @@ export class GroupsService {
     return member;
   }
 
-  /** "Sam wants to start a live workout with you." -- to the invitee, opening their invites. */
-  private async pushInvite(fromId: string, toId: string, groupId: string): Promise<void> {
+  /** "Sam wants to train with you!" -- recorded for the invitee and pushed, opening their invites. */
+  private async pushInvite(
+    fromId: string,
+    toId: string,
+    groupId: string,
+    inviteId: string,
+  ): Promise<void> {
     if (!this.socialPush) return;
-    try {
-      const [name, group] = await Promise.all([
-        this.socialPush.nameOf(fromId),
-        this.loadGroupName(groupId),
-      ]);
-      await this.socialPush.notify(toId, 'groupInvites', {
-        title: 'Live workout invite',
-        body: `${name} wants to start a live workout with you: ${group}.`,
-        path: 'groups',
-      });
-    } catch (err) {
-      this.logger.warn(`Invite push failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    await this.socialPush.record({
+      type: 'workout_invite',
+      recipientId: toId,
+      actorId: fromId,
+      groupId,
+      inviteId,
+    });
   }
 
   /** The answer, to whoever sent the invite, opening the group. */
@@ -891,29 +913,21 @@ export class GroupsService {
     fromId: string,
     toId: string | null,
     groupId: string,
+    inviteId: string,
     answer: 'accepted' | 'declined',
   ): Promise<void> {
     if (!this.socialPush || !toId || toId === fromId) return;
     try {
-      const [name, group] = await Promise.all([
-        this.socialPush.nameOf(fromId),
-        this.loadGroupName(groupId),
-      ]);
-      await this.socialPush.notify(
-        toId,
-        'groupInvites',
-        answer === 'accepted'
-          ? {
-              title: 'Invite accepted',
-              body: `${name} is joining your live workout: ${group}.`,
-              path: `groups/${groupId}`,
-            }
-          : {
-              title: 'Invite declined',
-              body: `${name} can't join your live workout: ${group}.`,
-              path: `groups/${groupId}`,
-            },
-      );
+      const groupName = await this.loadGroupName(groupId);
+      await this.socialPush.record({
+        type: 'invite_answer',
+        recipientId: toId,
+        actorId: fromId,
+        groupId,
+        inviteId,
+        answer,
+        groupName,
+      });
     } catch (err) {
       this.logger.warn(`Answer push failed: ${err instanceof Error ? err.message : String(err)}`);
     }

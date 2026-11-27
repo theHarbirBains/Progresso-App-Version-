@@ -6,7 +6,7 @@ import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
-import { fetchFriendsFeed, listFollowNotifications } from '../lib/api';
+import { fetchFriendsFeed, fetchUnreadNotificationCount } from '../lib/api';
 import { blockUser } from '../lib/safetyApi';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
@@ -46,7 +46,7 @@ jest.mock('../lib/safetyApi', () => ({
 
 jest.mock('../lib/api', () => ({
   fetchFriendsFeed: jest.fn(),
-  listFollowNotifications: jest.fn(),
+  fetchUnreadNotificationCount: jest.fn(),
   listGroups: jest.fn().mockResolvedValue([]),
   getSocialSummary: jest.fn().mockResolvedValue({}),
   likeWorkout: jest.fn().mockResolvedValue(null),
@@ -83,7 +83,7 @@ const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
-const mockListFollowNotifications = listFollowNotifications as jest.Mock;
+const mockUnreadCount = fetchUnreadNotificationCount as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
 const mockFetchLastWorkoutSplitDayId = fetchLastWorkoutSplitDayId as jest.Mock;
@@ -194,7 +194,7 @@ beforeEach(() => {
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
-  mockListFollowNotifications.mockReset().mockResolvedValue([]);
+  mockUnreadCount.mockReset().mockResolvedValue({ unread: 0 });
   mockFetchNutritionGoals
     .mockReset()
     .mockResolvedValue({ calories: 2400, proteinG: 180, carbsG: 250, fatG: 70 });
@@ -360,27 +360,8 @@ describe('FeedScreen', () => {
     expect(screen.queryByTestId('feed-notifications-badge')).toBeNull();
   });
 
-  it('badges the notifications bell with the pending request count (ignoring accepted items), and opens Notifications on tap', async () => {
-    mockListFollowNotifications.mockResolvedValue([
-      {
-        kind: 'request',
-        followId: 'f1',
-        at: '2026-01-01',
-        user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null },
-      },
-      {
-        kind: 'request',
-        followId: 'f2',
-        at: '2026-01-01',
-        user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null },
-      },
-      {
-        kind: 'accepted',
-        followId: 'f3',
-        at: '2026-01-01',
-        user: { id: 'u4', username: 'c', displayName: null, avatarUrl: null },
-      },
-    ]);
+  it('badges the notifications bell with the unread notification count, and opens Notifications on tap', async () => {
+    mockUnreadCount.mockResolvedValue({ unread: 2 });
     renderScreen();
 
     expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('2');
@@ -438,14 +419,7 @@ describe('FeedScreen', () => {
       carbsG: null,
       fatG: null,
     });
-    mockListFollowNotifications.mockResolvedValue([
-      {
-        kind: 'request',
-        followId: 'f1',
-        at: '2026-01-01',
-        user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null },
-      },
-    ]);
+    mockUnreadCount.mockResolvedValue({ unread: 1 });
     renderScreen();
 
     expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('3');
@@ -523,7 +497,7 @@ describe('FeedScreen', () => {
     // one additional focus, at the same real-world moment as the one before it, adds
     // another call or not.
     const friendsBefore = mockFetchFriendsFeed.mock.calls.length;
-    const badgeBefore = mockListFollowNotifications.mock.calls.length;
+    const badgeBefore = mockUnreadCount.mock.calls.length;
     const nextWorkoutBefore = mockFetchWorkoutSplitDetail.mock.calls.length;
     const ownFeedBefore = mockFetchFeedItems.mock.calls.length;
     const liveBefore = mockFetchActiveWorkout.mock.calls.length;
@@ -536,7 +510,7 @@ describe('FeedScreen', () => {
 
     // Well inside the stale window -- skipped.
     expect(mockFetchFriendsFeed.mock.calls.length).toBe(friendsBefore);
-    expect(mockListFollowNotifications.mock.calls.length).toBe(badgeBefore);
+    expect(mockUnreadCount.mock.calls.length).toBe(badgeBefore);
     expect(mockFetchWorkoutSplitDetail.mock.calls.length).toBe(nextWorkoutBefore);
     // Your own feed and the live-workout check have no staleness window at all.
     expect(mockFetchFeedItems.mock.calls.length).toBeGreaterThan(ownFeedBefore);
@@ -550,7 +524,7 @@ describe('FeedScreen', () => {
     await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledTimes(1));
 
     const friendsBefore = mockFetchFriendsFeed.mock.calls.length;
-    const badgeBefore = mockListFollowNotifications.mock.calls.length;
+    const badgeBefore = mockUnreadCount.mock.calls.length;
     const nextWorkoutBefore = mockFetchWorkoutSplitDetail.mock.calls.length;
 
     const calls = navigation.addListener.mock.calls;
@@ -563,7 +537,7 @@ describe('FeedScreen', () => {
     now.mockRestore();
 
     expect(mockFetchFriendsFeed.mock.calls.length).toBeGreaterThan(friendsBefore);
-    expect(mockListFollowNotifications.mock.calls.length).toBeGreaterThan(badgeBefore);
+    expect(mockUnreadCount.mock.calls.length).toBeGreaterThan(badgeBefore);
     expect(mockFetchWorkoutSplitDetail.mock.calls.length).toBeGreaterThan(nextWorkoutBefore);
   });
 

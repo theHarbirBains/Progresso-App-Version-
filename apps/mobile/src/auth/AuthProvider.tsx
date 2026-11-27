@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { forgetThisDevice } from '../lib/pushNotifications';
 import { clearSentryUser, setSentryUser } from '../lib/sentry';
 import { signInWithOAuthProvider, type OAuthProvider } from './oauth';
 import { parseTokensFromUrl } from './parseSessionUrl';
@@ -154,6 +155,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         };
       },
       signOut: async () => {
+        // This phone stops getting their pushes first, while the session can still say so.
+        await forgetThisDevice(session?.access_token);
         await supabase.auth.signOut();
       },
       requestPasswordReset: async (email) => {

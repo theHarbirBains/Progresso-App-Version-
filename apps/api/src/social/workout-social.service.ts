@@ -17,8 +17,6 @@ import {
 } from '../feed/workout-cardio';
 
 const UNIQUE_VIOLATION = '23505';
-/** How much of a comment its push shows. */
-const PUSH_EXCERPT = 80;
 
 interface WorkoutRow {
   id: string;
@@ -431,11 +429,11 @@ export class WorkoutSocialService {
     if (error?.code === UNIQUE_VIOLATION) return;
     if (error) throw new InternalServerErrorException('Failed to like the workout');
     if (workout.user_id !== viewerId) {
-      const name = await this.socialPush.nameOf(viewerId);
-      void this.socialPush.notify(workout.user_id, 'likes', {
-        title: 'New like',
-        body: `${name} liked your workout ${workout.name}.`,
-        path: `workouts/${workoutId}`,
+      void this.socialPush.record({
+        type: 'workout_like',
+        recipientId: workout.user_id,
+        actorId: viewerId,
+        workoutId,
       });
     }
   }
@@ -463,15 +461,17 @@ export class WorkoutSocialService {
     if (error || !data) throw new InternalServerErrorException('Failed to post the comment');
     const users = await this.followsService.getUserSummaries([viewerId]);
     const user = users.get(viewerId) ?? unknownUser(viewerId);
+    const row = data as { id: string; created_at: string };
     if (workout.user_id !== viewerId) {
-      const name = user.displayName ?? (user.username ? `@${user.username}` : 'Someone');
-      void this.socialPush.notify(workout.user_id, 'comments', {
-        title: `${name} commented`,
-        body: text.length > PUSH_EXCERPT ? `${text.slice(0, PUSH_EXCERPT - 1)}…` : text,
-        path: `workouts/${workoutId}`,
+      void this.socialPush.record({
+        type: 'workout_comment',
+        recipientId: workout.user_id,
+        actorId: viewerId,
+        workoutId,
+        commentId: row.id,
+        text,
       });
     }
-    const row = data as { id: string; created_at: string };
     return {
       id: row.id,
       workoutId,

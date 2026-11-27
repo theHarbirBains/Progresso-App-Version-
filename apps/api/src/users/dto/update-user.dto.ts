@@ -345,6 +345,11 @@ export class UpdateUserDto {
   @IsBoolean()
   notifyGroupInvites?: boolean;
 
+  /** Settings > Notifications > Social: one of their follow requests accepted. */
+  @IsOptional()
+  @IsBoolean()
+  notifyFollowAccepted?: boolean;
+
   /** Settings > Account & Security > Privacy: a private profile (the default) or a public one. */
   @IsOptional()
   @IsIn(['private', 'public'])

@@ -1,7 +1,14 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { listFollowNotifications, respondToFollowRequest, sendFollowRequest } from '../lib/api';
+import {
+  listNotifications,
+  markNotificationsRead,
+  respondToFollowRequest,
+  sendFollowRequest,
+  type AppNotification,
+} from '../lib/api';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
@@ -13,9 +20,14 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  listFollowNotifications: jest.fn(),
+  listNotifications: jest.fn(),
+  markNotificationsRead: jest.fn(),
   respondToFollowRequest: jest.fn(),
   sendFollowRequest: jest.fn(),
+}));
+
+jest.mock('../lib/pushNotifications', () => ({
+  setAppBadge: jest.fn(async () => undefined),
 }));
 
 jest.mock('../profile/profileQueries', () => ({
@@ -32,7 +44,8 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
-const mockListFollowNotifications = listFollowNotifications as jest.Mock;
+const mockListNotifications = listNotifications as jest.Mock;
+const mockMarkRead = markNotificationsRead as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
@@ -79,20 +92,50 @@ function staleSet(daysAgo: number, muscleGroup: 'chest' | 'back' = 'chest') {
   };
 }
 
-const janeRequest = {
-  kind: 'request' as const,
-  followId: 'follow-1',
-  at: '2026-01-01T00:00:00Z',
-  user: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
-  followingBack: 'none' as const,
-};
+/** A notification as the server lists it. */
+function note(
+  extra: Partial<AppNotification> & Pick<AppNotification, 'id' | 'type'>,
+): AppNotification {
+  return {
+    title: 'New follow request',
+    body: 'Jane Doe wants to follow you. Check out their profile!',
+    at: '2026-01-01T00:00:00Z',
+    read: false,
+    actor: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+    actorCount: 1,
+    path: 'notifications',
+    followId: null,
+    workoutId: null,
+    commentId: null,
+    groupId: null,
+    available: true,
+    ...extra,
+  };
+}
 
-const bobAccepted = {
-  kind: 'accepted' as const,
+const janeRequest = note({
+  id: 'n-request',
+  type: 'follow_request',
+  followId: 'follow-1',
+  followStatus: 'pending',
+  followingBack: 'none',
+});
+
+const bobAccepted = note({
+  id: 'n-accepted',
+  type: 'follow_accepted',
+  title: 'Follow request accepted',
+  body: "Bob Smith accepted your follow request. You're now connected!",
   followId: 'follow-2',
-  at: '2026-01-02T00:00:00Z',
-  user: { id: 'user-3', username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
-};
+  read: true,
+  actor: { id: 'user-3', username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
+  path: 'people/user-3',
+});
+
+const listed = (notifications: AppNotification[]) => ({
+  notifications,
+  unread: notifications.filter((n) => !n.read).length,
+});
 
 function renderScreen() {
   return render(
@@ -111,7 +154,8 @@ beforeEach(() => {
   // saved goals already -- so existing insight/activity tests, which don't
   // care about either, see the same behavior as before these were added.
   mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
-  mockListFollowNotifications.mockReset().mockResolvedValue([]);
+  mockListNotifications.mockReset().mockResolvedValue(listed([]));
+  mockMarkRead.mockReset().mockResolvedValue({ unread: 0 });
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
   mockFetchNutritionGoals.mockReset().mockResolvedValue(setGoals);
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([]);
@@ -205,88 +249,99 @@ describe('NotificationsScreen -- setup reminders', () => {
 });
 
 describe('NotificationsScreen -- activity', () => {
-  it('shows a pending request with Accept/Reject', async () => {
-    mockListFollowNotifications.mockResolvedValue([janeRequest]);
+  it('shows a pending request, unread, in its push’s own words, with Accept/Reject', async () => {
+    mockListNotifications.mockResolvedValue(listed([janeRequest]));
     renderScreen();
 
-    const row = within(await screen.findByTestId('notifications-activity-request-follow-1'));
-    expect(row.getByText(/Jane Doe wants to follow you/)).toBeTruthy();
-    expect(screen.getByTestId('notifications-activity-request-follow-1-accept')).toBeTruthy();
-    expect(screen.getByTestId('notifications-activity-request-follow-1-reject')).toBeTruthy();
+    const card = await screen.findByTestId('notifications-activity-n-request');
+    expect(card).toHaveTextContent(/New follow request/);
+    expect(card).toHaveTextContent(/Jane Doe wants to follow you\. Check out their profile!/);
+    expect(screen.getByTestId('notifications-activity-n-request-unread')).toBeTruthy();
+    expect(screen.getByTestId('notifications-activity-n-request-accept')).toBeTruthy();
+    expect(screen.getByTestId('notifications-activity-n-request-reject')).toBeTruthy();
   });
 
-  it('shows a recently-accepted item with no action buttons', async () => {
-    mockListFollowNotifications.mockResolvedValue([bobAccepted]);
+  it('shows a read item with no dot and no buttons', async () => {
+    mockListNotifications.mockResolvedValue(listed([bobAccepted]));
     renderScreen();
 
-    const row = within(await screen.findByTestId('notifications-activity-accepted-follow-2'));
-    expect(row.getByText(/Bob Smith accepted your follow request/)).toBeTruthy();
-    expect(screen.queryByTestId('notifications-activity-request-follow-2-accept')).toBeNull();
+    const card = await screen.findByTestId('notifications-activity-n-accepted');
+    expect(card).toHaveTextContent(/Bob Smith accepted your follow request/);
+    expect(screen.queryByTestId('notifications-activity-n-accepted-unread')).toBeNull();
+    expect(within(card).queryByText('Accept')).toBeNull();
   });
 
-  it('accepting keeps the item as a new follower, to follow back right there', async () => {
-    mockListFollowNotifications.mockResolvedValue([janeRequest]);
-    jest.mocked(sendFollowRequest).mockResolvedValue({ status: 'pending' });
+  it('accepting keeps the request, now to follow back right there', async () => {
+    mockListNotifications.mockResolvedValue(listed([janeRequest]));
+    (sendFollowRequest as jest.Mock).mockResolvedValue({ status: 'pending' });
     renderScreen();
-    await screen.findByTestId('notifications-activity-request-follow-1');
 
-    fireEvent.press(screen.getByTestId('notifications-activity-request-follow-1-accept'));
-
+    const target = await screen.findByTestId('notifications-activity-n-request-accept');
+    await act(async () => {
+      fireEvent.press(target);
+    });
     expect(mockRespondToFollowRequest).toHaveBeenCalledWith('token-123', 'follow-1', 'accept');
-    const follower = await screen.findByTestId('notifications-activity-follower-follow-1');
-    expect(follower).toHaveTextContent(/Jane Doe started following you/);
-    expect(screen.queryByTestId('notifications-activity-request-follow-1')).toBeNull();
+    expect(mockMarkRead).toHaveBeenCalledWith('token-123', ['n-request']);
 
-    fireEvent.press(screen.getByTestId('notifications-activity-follower-follow-1-follow-back'));
-
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('notifications-activity-n-request-follow-back'));
+    });
     expect(sendFollowRequest).toHaveBeenCalledWith('token-123', 'user-2');
-    expect(
-      await screen.findByTestId('notifications-activity-follower-follow-1-requested'),
-    ).toHaveTextContent('Requested');
+    expect(screen.getByTestId('notifications-activity-n-request-requested')).toBeTruthy();
   });
 
   it('a new follower you already follow has no Follow Back', async () => {
-    mockListFollowNotifications.mockResolvedValue([
-      { ...janeRequest, kind: 'follower', followingBack: 'accepted' },
-    ]);
+    mockListNotifications.mockResolvedValue(
+      listed([
+        note({ id: 'n-new', type: 'new_follower', followId: 'f', followingBack: 'accepted' }),
+      ]),
+    );
     renderScreen();
-
-    await screen.findByTestId('notifications-activity-follower-follow-1');
-    expect(screen.queryByTestId('notifications-activity-follower-follow-1-follow-back')).toBeNull();
-    expect(screen.queryByTestId('notifications-activity-follower-follow-1-requested')).toBeNull();
+    await screen.findByTestId('notifications-activity-n-new');
+    expect(screen.queryByTestId('notifications-activity-n-new-follow-back')).toBeNull();
   });
 
   it('rejecting removes the item and calls the backend with "reject"', async () => {
-    mockListFollowNotifications.mockResolvedValue([janeRequest]);
+    mockListNotifications.mockResolvedValue(listed([janeRequest]));
     renderScreen();
-    await screen.findByTestId('notifications-activity-request-follow-1');
 
-    fireEvent.press(screen.getByTestId('notifications-activity-request-follow-1-reject'));
+    const target = await screen.findByTestId('notifications-activity-n-request-reject');
+    await act(async () => {
+      fireEvent.press(target);
+    });
 
     expect(mockRespondToFollowRequest).toHaveBeenCalledWith('token-123', 'follow-1', 'reject');
+    expect(screen.queryByTestId('notifications-activity-n-request')).toBeNull();
+  });
+
+  it('marks every one read with Mark All as Read, shown only while some are unread', async () => {
+    mockListNotifications.mockResolvedValue(listed([janeRequest, bobAccepted]));
+    renderScreen();
+
+    const target = await screen.findByTestId('notifications-mark-all-read');
     await act(async () => {
-      await Promise.resolve();
+      fireEvent.press(target);
     });
-    expect(screen.queryByTestId('notifications-activity-request-follow-1')).toBeNull();
+    expect(mockMarkRead).toHaveBeenCalledWith('token-123');
+    expect(screen.queryByTestId('notifications-activity-n-request-unread')).toBeNull();
+    expect(screen.queryByTestId('notifications-mark-all-read')).toBeNull();
   });
 
   it('shows an error state with a working retry', async () => {
-    mockListFollowNotifications.mockRejectedValueOnce(new Error('network error'));
+    mockListNotifications.mockRejectedValueOnce(new Error('network error'));
     renderScreen();
 
-    expect(await screen.findByTestId('notifications-activity-error')).toHaveTextContent(
-      'network error',
-    );
-
-    mockListFollowNotifications.mockResolvedValue([janeRequest]);
-    fireEvent.press(screen.getByTestId('notifications-activity-error-retry'));
-
-    expect(await screen.findByTestId('notifications-activity-request-follow-1')).toBeTruthy();
+    expect(await screen.findByTestId('notifications-activity-error')).toBeTruthy();
+    mockListNotifications.mockResolvedValue(listed([janeRequest]));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('notifications-activity-error-retry'));
+    });
+    expect(await screen.findByTestId('notifications-activity-n-request')).toBeTruthy();
   });
 
   it('still shows insights when activity fails to load -- one section failing does not block the other', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue([staleSet(15)]);
-    mockListFollowNotifications.mockRejectedValue(new Error('network error'));
+    mockListNotifications.mockRejectedValue(new Error('network error'));
     renderScreen();
 
     expect(await screen.findByTestId('notifications-insight-chest')).toBeTruthy();
@@ -306,58 +361,100 @@ describe('NotificationsScreen -- misc', () => {
 
   it('renders no bare text outside <Text>', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue([staleSet(15)]);
-    mockListFollowNotifications.mockResolvedValue([janeRequest, bobAccepted]);
+    mockListNotifications.mockResolvedValue(listed([janeRequest, bobAccepted]));
     renderScreen();
     await screen.findByTestId('notifications-insight-chest');
-    await screen.findByTestId('notifications-activity-accepted-follow-2');
+    await screen.findByTestId('notifications-activity-n-accepted');
 
     expectNoBareText();
   });
 });
 
-describe('NotificationsScreen -- likes and comments', () => {
-  it('lists likes and comments on your workouts, each opening the workout at its comments', async () => {
-    (listFollowNotifications as jest.Mock).mockResolvedValue([
-      {
-        kind: 'comment',
-        id: 'c1',
-        user: { id: 'user-3', username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
-        workoutId: 'w9',
-        workoutName: 'Push Day',
-        body: 'Strong!',
-        at: '2026-01-03T00:00:00Z',
-      },
-      {
-        kind: 'like',
-        id: 'w9:user-2',
-        user: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
-        workoutId: 'w9',
-        workoutName: 'Push Day',
-        at: '2026-01-02T00:00:00Z',
-      },
-    ]);
+describe('NotificationsScreen -- opening one', () => {
+  const comment = note({
+    id: 'n-comment',
+    type: 'workout_comment',
+    title: 'New workout comment',
+    body: 'Bob Smith commented on your workout: "Strong!"',
+    workoutId: 'w9',
+    path: 'workouts/w9?focusComments=true',
+  });
+  const like = note({
+    id: 'n-like',
+    type: 'workout_like',
+    title: 'New workout like',
+    body: 'Jane Doe and 2 others liked your workout. Keep up the great work!',
+    workoutId: 'w9',
+    actorCount: 3,
+  });
+
+  it('opens a comment at the workout’s comments, a like at the workout, and marks each read', async () => {
+    mockListNotifications.mockResolvedValue(listed([comment, like]));
     renderScreen();
 
-    expect(await screen.findByTestId('notifications-activity-comment-c1')).toHaveTextContent(
-      /Bob Smith commented on Push Day.*Strong!/,
+    expect(await screen.findByTestId('notifications-activity-n-like')).toHaveTextContent(
+      /Jane Doe and 2 others liked your workout/,
     );
-    expect(screen.getByTestId('notifications-activity-like-w9:user-2')).toHaveTextContent(
-      /Jane Doe liked your workout Push Day/,
-    );
-
-    fireEvent.press(screen.getByTestId('notifications-activity-comment-c1'));
+    fireEvent.press(screen.getByTestId('notifications-activity-n-comment'));
     expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', {
       workoutId: 'w9',
       focusComments: true,
     });
+    expect(mockMarkRead).toHaveBeenCalledWith('token-123', ['n-comment']);
+    fireEvent.press(screen.getByTestId('notifications-activity-n-like'));
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', {
+      workoutId: 'w9',
+      focusComments: false,
+    });
   });
 
   it('opens the profile of someone who asked to follow you', async () => {
-    (listFollowNotifications as jest.Mock).mockResolvedValue([janeRequest]);
+    mockListNotifications.mockResolvedValue(listed([janeRequest]));
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('notifications-activity-request-follow-1'));
+    fireEvent.press(await screen.findByTestId('notifications-activity-n-request'));
 
     expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-2' });
+  });
+
+  it('opens Groups for an invitation, to accept or decline it', async () => {
+    mockListNotifications.mockResolvedValue(
+      listed([
+        note({ id: 'n-invite', type: 'workout_invite', groupId: 'g1', inviteStatus: 'invited' }),
+      ]),
+    );
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('notifications-activity-n-invite'));
+    expect(mockNavigate).toHaveBeenCalledWith('Groups');
+  });
+
+  it('says so, and opens nothing, for a deleted workout or an expired invitation', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockListNotifications.mockResolvedValue(
+      listed([
+        { ...like, available: false },
+        note({
+          id: 'n-expired',
+          type: 'workout_invite',
+          groupId: 'g1',
+          inviteStatus: 'expired',
+          available: false,
+        }),
+      ]),
+    );
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('notifications-activity-n-like'));
+    expect(alert).toHaveBeenLastCalledWith(
+      'Not available',
+      'This workout has been deleted, or is no longer shared with you.',
+    );
+    fireEvent.press(screen.getByTestId('notifications-activity-n-expired'));
+    expect(alert).toHaveBeenLastCalledWith(
+      'Not available',
+      'This invitation has expired: the workout has finished.',
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+    alert.mockRestore();
   });
 });

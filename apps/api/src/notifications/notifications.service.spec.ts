@@ -17,6 +17,7 @@ function createQueryBuilder(result: Result) {
   const methods = [
     'select',
     'eq',
+    'neq',
     'in',
     'not',
     'is',
@@ -47,7 +48,9 @@ function mockTables(byTable: Record<string, Result>) {
 }
 
 function mockExpoPush(): ExpoPushProvider {
-  return { sendAll: jest.fn().mockResolvedValue(undefined) } as unknown as ExpoPushProvider;
+  return {
+    sendAll: jest.fn().mockResolvedValue({ invalidTokens: [] }),
+  } as unknown as ExpoPushProvider;
 }
 
 describe('NotificationsService -- token registration', () => {
@@ -59,7 +62,12 @@ describe('NotificationsService -- token registration', () => {
 
     await service.registerToken('user-1', 'ExponentPushToken[a]', 'ios');
 
-    const builder = from.mock.results[0]!.value;
+    // The same phone, signed in to someone else before, is theirs no longer.
+    const moved = from.mock.results[0]!.value;
+    expect(moved.delete).toHaveBeenCalled();
+    expect(moved.eq).toHaveBeenCalledWith('expo_push_token', 'ExponentPushToken[a]');
+    expect(moved.neq).toHaveBeenCalledWith('user_id', 'user-1');
+    const builder = from.mock.results[1]!.value;
     expect(from).toHaveBeenCalledWith('device_push_tokens');
     expect(builder.upsert).toHaveBeenCalledWith(
       { user_id: 'user-1', expo_push_token: 'ExponentPushToken[a]', platform: 'ios' },

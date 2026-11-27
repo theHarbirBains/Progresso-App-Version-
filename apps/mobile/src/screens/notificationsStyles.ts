@@ -18,6 +18,32 @@ export const notificationsStyles = StyleSheet.create({
   sectionHeaderWrap: {
     paddingHorizontal: 6,
   },
+  // Activity's heading, with Mark All as Read on the right.
+  activityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  // An unread notification: a dot of the accent on its avatar's corner.
+  unreadDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  // Its push's title, small, over what happened.
+  itemKicker: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  itemTitleRead: {
+    color: colors.textSecondaryBright,
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',

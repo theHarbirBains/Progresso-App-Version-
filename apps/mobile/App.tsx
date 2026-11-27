@@ -140,6 +140,7 @@ import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
 import { SplitDayPlanScreen } from './src/screens/SplitDayPlanScreen';
 import { WidgetSync } from './src/widgets/WidgetSync';
 import { RemindersProvider } from './src/notifications/RemindersProvider';
+import { PushSync } from './src/notifications/PushSync';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -700,6 +701,7 @@ function App() {
                       <AppThemeProvider>
                         <AppShell fontsLoaded={fontsLoaded} />
                         <WidgetSync />
+                        <PushSync />
                       </AppThemeProvider>
                     </RemindersProvider>
                   </AchievementsProvider>

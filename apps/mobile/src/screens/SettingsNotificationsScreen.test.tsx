@@ -195,6 +195,15 @@ describe('SettingsNotificationsScreen', () => {
         notifyGroupInvites: false,
       }),
     );
+
+    // Accepted requests have a switch of their own.
+    expect(screen.getByTestId('notif-social-follow-accepted-toggle').props.value).toBe(true);
+    fireEvent(screen.getByTestId('notif-social-follow-accepted-toggle'), 'valueChange', false);
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith(expect.any(String), {
+        notifyFollowAccepted: false,
+      }),
+    );
   });
 
   it('asks the phone again once push is turned on, so the reminders can start', async () => {

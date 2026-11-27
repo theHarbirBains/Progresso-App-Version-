@@ -310,7 +310,7 @@ describe('ProgressOverviewScreen shell', () => {
     goToSection('Muscles');
     expect(await screen.findByTestId('muscle-activity-map')).toBeTruthy();
     expect(screen.getByTestId('muscle-activity-figure-front')).toBeTruthy();
-    expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(/1 set/);
+    expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(/1set/);
     fireEvent.press(screen.getByTestId('muscle-activity-row-chest'));
     fireEvent.press(screen.getByTestId('muscle-activity-exercise-bench'));
     expect(mockNavigate).toHaveBeenCalledWith('ProgressExerciseDetail', {

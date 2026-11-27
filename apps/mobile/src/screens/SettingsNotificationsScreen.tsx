@@ -134,6 +134,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
   // Social pushes, each on unless turned off -- saved to the account, since the server sends them.
   const [social, setSocial] = useState({
     notifyFollows: profile?.notifyFollows ?? true,
+    notifyFollowAccepted: profile?.notifyFollowAccepted ?? true,
     notifyLikes: profile?.notifyLikes ?? true,
     notifyComments: profile?.notifyComments ?? true,
     notifyGroupInvites: profile?.notifyGroupInvites ?? true,
@@ -142,6 +143,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
     if (!profile) return;
     setSocial({
       notifyFollows: profile.notifyFollows ?? true,
+      notifyFollowAccepted: profile.notifyFollowAccepted ?? true,
       notifyLikes: profile.notifyLikes ?? true,
       notifyComments: profile.notifyComments ?? true,
       notifyGroupInvites: profile.notifyGroupInvites ?? true,
@@ -303,7 +305,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
           testID="notif-social-follows"
           icon="user-plus"
           title="Follow Requests"
-          subtitle="When someone asks to follow you, or accepts your request."
+          subtitle="When someone asks to follow you, or starts following your public profile."
           trailing={
             <Toggle
               testID="notif-social-follows-toggle"
@@ -312,6 +314,23 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
               disabled={saving}
               accentColor={theme.accent}
               accessibilityLabel="Follow Requests"
+            />
+          }
+        />
+        <ListRow
+          testID="notif-social-follow-accepted"
+          icon="user-check"
+          title="Accepted Requests"
+          subtitle="When someone accepts your follow request."
+          divider
+          trailing={
+            <Toggle
+              testID="notif-social-follow-accepted-toggle"
+              value={social.notifyFollowAccepted}
+              onValueChange={(value) => void handleToggleSocial('notifyFollowAccepted', value)}
+              disabled={saving}
+              accentColor={theme.accent}
+              accessibilityLabel="Accepted Requests"
             />
           }
         />
@@ -352,7 +371,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
         <ListRow
           testID="notif-social-group-invites"
           icon="users"
-          title="Live Workout Invites"
+          title="Workout Invitations"
           subtitle="When a friend invites you to work out together, and the answer to one you sent."
           divider
           trailing={
@@ -362,7 +381,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
               onValueChange={(value) => void handleToggleSocial('notifyGroupInvites', value)}
               disabled={saving}
               accentColor={theme.accent}
-              accessibilityLabel="Live Workout Invites"
+              accessibilityLabel="Workout Invitations"
             />
           }
         />

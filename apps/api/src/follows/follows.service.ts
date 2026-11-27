@@ -158,17 +158,22 @@ export class FollowsService {
     const { data: inserted, error: insertError } = await client
       .from('follows')
       .insert({ follower_id: followerId, followee_id: followeeId, status: 'pending' })
-      .select('status')
+      .select('id, status')
       .maybeSingle();
     if (insertError) {
       throw new InternalServerErrorException('Failed to send follow request');
     }
-    const status: FollowStatus =
-      (inserted as { status?: FollowStatus } | null)?.status === 'accepted'
-        ? 'accepted'
-        : 'pending';
+    const insertedRow = inserted as { id?: string; status?: FollowStatus } | null;
+    const status: FollowStatus = insertedRow?.status === 'accepted' ? 'accepted' : 'pending';
 
-    void this.pushFollow(followerId, followeeId, status === 'accepted' ? 'follower' : 'request');
+    if (insertedRow?.id) {
+      void this.pushFollow(
+        followerId,
+        followeeId,
+        status === 'accepted' ? 'follower' : 'request',
+        insertedRow.id,
+      );
+    }
     return { status };
   }
 
@@ -205,7 +210,7 @@ export class FollowsService {
         .update({ status: 'accepted', responded_at: new Date().toISOString() })
         .eq('id', followId);
       if (error) throw new InternalServerErrorException('Failed to accept follow request');
-      void this.pushFollow(userId, row.follower_id as string, 'accepted');
+      void this.pushFollow(userId, row.follower_id as string, 'accepted', followId);
       return;
     }
 
@@ -384,36 +389,26 @@ export class FollowsService {
     ];
   }
 
-  /** A follow request, a request accepted, or a new follower of a public profile, pushed to the
-   * other person. */
+  /** A follow request, a request accepted, or a new follower of a public profile: recorded for
+   * the other person and pushed to them (SocialPushService). */
   private async pushFollow(
     fromId: string,
     toId: string,
     what: 'request' | 'accepted' | 'follower',
+    followId: string,
   ) {
     if (!this.socialPush) return;
-    const name = await this.socialPush.nameOf(fromId);
-    await this.socialPush.notify(
-      toId,
-      'follows',
-      what === 'request'
-        ? {
-            title: 'New follow request',
-            body: `${name} wants to follow you.`,
-            path: 'notifications',
-          }
-        : what === 'follower'
-          ? {
-              title: 'New follower',
-              body: `${name} started following you.`,
-              path: `people/${fromId}`,
-            }
-          : {
-              title: 'Follow request accepted',
-              body: `${name} accepted your follow request.`,
-              path: `people/${fromId}`,
-            },
-    );
+    await this.socialPush.record({
+      type:
+        what === 'request'
+          ? 'follow_request'
+          : what === 'follower'
+            ? 'new_follower'
+            : 'follow_accepted',
+      recipientId: toId,
+      actorId: fromId,
+      followId,
+    });
   }
 
   /** The people whose requests this user accepted recently -- their newest followers. */

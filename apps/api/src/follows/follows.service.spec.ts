@@ -147,11 +147,8 @@ describe('FollowsService', () => {
       const client = createMockClient();
       client.queue('users', { data: { id: 'user-2' }, error: null });
       client.queue('follows', { data: null, error: null });
-      client.queue('follows', { data: null, error: null });
-      const push = {
-        nameOf: jest.fn().mockResolvedValue('Harbir'),
-        notify: jest.fn().mockResolvedValue(undefined),
-      };
+      client.queue('follows', { data: { id: 'f-1', status: 'pending' }, error: null });
+      const push = { record: jest.fn().mockResolvedValue(undefined) };
       const service = new FollowsService(
         { getClient: () => client } as unknown as SupabaseService,
         push as unknown as SocialPushService,
@@ -160,10 +157,11 @@ describe('FollowsService', () => {
       await service.sendRequest('user-1', 'user-2');
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(push.notify).toHaveBeenCalledWith('user-2', 'follows', {
-        title: 'New follow request',
-        body: 'Harbir wants to follow you.',
-        path: 'notifications',
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'follow_request',
+        recipientId: 'user-2',
+        actorId: 'user-1',
+        followId: 'f-1',
       });
     });
 
@@ -171,11 +169,8 @@ describe('FollowsService', () => {
       const client = createMockClient();
       client.queue('users', { data: { id: 'user-2' }, error: null });
       client.queue('follows', { data: null, error: null }); // no existing row
-      client.queue('follows', { data: { status: 'accepted' }, error: null }); // as written
-      const push = {
-        nameOf: jest.fn().mockResolvedValue('Harbir'),
-        notify: jest.fn().mockResolvedValue(undefined),
-      };
+      client.queue('follows', { data: { id: 'f-1', status: 'accepted' }, error: null }); // as written
+      const push = { record: jest.fn().mockResolvedValue(undefined) };
       const service = new FollowsService(
         { getClient: () => client } as unknown as SupabaseService,
         push as unknown as SocialPushService,
@@ -186,10 +181,11 @@ describe('FollowsService', () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(push.notify).toHaveBeenCalledWith('user-2', 'follows', {
-        title: 'New follower',
-        body: 'Harbir started following you.',
-        path: 'people/user-1',
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'new_follower',
+        recipientId: 'user-2',
+        actorId: 'user-1',
+        followId: 'f-1',
       });
     });
 

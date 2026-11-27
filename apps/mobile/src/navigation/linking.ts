@@ -17,7 +17,11 @@ export const LINK_CONFIG: NonNullable<LinkingOptions<RootStackParamList>['config
     Nutrition: 'nutrition',
     ProgressOverview: 'progress',
     NewWorkout: 'workouts/new',
-    WorkoutDetail: 'workouts/:workoutId',
+    // A comment's push opens the workout at its comments (?focusComments=true).
+    WorkoutDetail: {
+      path: 'workouts/:workoutId',
+      parse: { focusComments: (value: string) => value === 'true' },
+    },
     ActiveWorkout: 'workouts/:workoutId/live',
     Groups: 'groups',
     GroupSession: 'groups/:groupId',

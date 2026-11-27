@@ -77,7 +77,45 @@ describe('ExpoPushProvider', () => {
 
     await expect(
       provider.sendAll([{ to: 'ExponentPushToken[a]', title: 't', body: 'b' }]),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ invalidTokens: [] });
+  });
+
+  it("reports the tokens Expo's tickets say no longer reach a device", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          data: [
+            { status: 'ok', id: 't1' },
+            { status: 'error', details: { error: 'DeviceNotRegistered' } },
+            { status: 'error', details: { error: 'MessageRateExceeded' } },
+          ],
+        }),
+    });
+
+    await expect(
+      provider.sendAll([
+        { to: 'ExponentPushToken[a]', title: 't', body: 'b' },
+        { to: 'ExponentPushToken[b]', title: 't', body: 'b' },
+        { to: 'ExponentPushToken[c]', title: 't', body: 'b' },
+      ]),
+    ).resolves.toEqual({ invalidTokens: ['ExponentPushToken[b]'] });
+  });
+
+  it('carries the badge and the data a tap needs', async () => {
+    mockFetchOnce();
+    await provider.sendAll([
+      {
+        to: 'ExponentPushToken[a]',
+        title: 'New workout like',
+        body: 'Sam liked your workout.',
+        badge: 2,
+        data: { url: 'progresso://workouts/w1', notificationId: 'n1' },
+      },
+    ]);
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+    expect(body[0]).toMatchObject({ badge: 2, data: { notificationId: 'n1' } });
   });
 
   it('sends nothing (no request at all) for an empty message list', async () => {

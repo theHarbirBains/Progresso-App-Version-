@@ -49,13 +49,24 @@ export class NotificationsService {
     private readonly expoPush: ExpoPushProvider,
   ) {}
 
+  /**
+   * This device's token, for this person -- and only them: a phone signed in to another account
+   * since (a shared phone, a second account) stops getting the last person's pushes. Registering
+   * again (every app open, a refreshed token) is the same row.
+   */
   async registerToken(
     userId: string,
     expoPushToken: string,
     platform: PushTokenPlatform,
   ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
+    const client = this.supabaseService.getClient();
+    const { error: movedError } = await client
+      .from('device_push_tokens')
+      .delete()
+      .eq('expo_push_token', expoPushToken)
+      .neq('user_id', userId);
+    if (movedError) throw new InternalServerErrorException('Failed to register push token');
+    const { error } = await client
       .from('device_push_tokens')
       .upsert(
         { user_id: userId, expo_push_token: expoPushToken, platform },
@@ -122,7 +133,15 @@ export class NotificationsService {
 
     if (sent.length > 0) await this.logSent(sent);
     if (messages.length > 0) {
-      await this.expoPush.sendAll(messages);
+      const { invalidTokens } = await this.expoPush.sendAll(messages);
+      // Devices Expo says are gone are forgotten, so nothing is sent to them again.
+      if (invalidTokens.length > 0) {
+        await this.supabaseService
+          .getClient()
+          .from('device_push_tokens')
+          .delete()
+          .in('expo_push_token', invalidTokens);
+      }
     }
 
     return { workoutRemindersSent, foodRemindersSent };

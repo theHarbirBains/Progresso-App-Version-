@@ -178,6 +178,9 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   getLastNotificationResponse: jest.fn(() => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  // Push notifications (notifications/PushSync.tsx): a refreshed token, and the icon's badge.
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
+  setBadgeCountAsync: jest.fn().mockResolvedValue(true),
 }));
 
 // expo-status-bar draws nothing in a test, and loading the real one pulls in

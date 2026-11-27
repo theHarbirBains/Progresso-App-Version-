@@ -1,17 +1,65 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { MarkNotificationsReadDto } from './dto/mark-notifications-read.dto';
 import { RegisterPushTokenDto } from './dto/register-push-token.dto';
 import { UnregisterPushTokenDto } from './dto/unregister-push-token.dto';
 import { InternalTriggerGuard } from './internal-trigger.guard';
+import { NotificationCentreService, type NotificationItem } from './notification-centre.service';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly centre: NotificationCentreService,
+  ) {}
+
+  // The in-app Notifications screen: their own notifications, newest first, with how many are
+  // unread (the Feed bell and the app icon's badge).
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get()
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('limit') limit?: string,
+  ): Promise<{ notifications: NotificationItem[]; unread: number }> {
+    const parsed = Number.parseInt(limit ?? '', 10);
+    const [notifications, unread] = await Promise.all([
+      this.centre.list(user.id, Number.isFinite(parsed) ? parsed : undefined),
+      this.centre.unreadCount(user.id),
+    ]);
+    return { notifications, unread };
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get('unread-count')
+  async unreadCount(@CurrentUser() user: AuthenticatedUser): Promise<{ unread: number }> {
+    return { unread: await this.centre.unreadCount(user.id) };
+  }
+
+  // Marks their own notifications read: the ids given, or every one with none given.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('read')
+  @HttpCode(HttpStatus.OK)
+  async markRead(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: MarkNotificationsReadDto,
+  ): Promise<{ unread: number }> {
+    return { unread: await this.centre.markRead(user.id, dto.ids) };
+  }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Post('push-token')

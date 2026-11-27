@@ -73,8 +73,7 @@ function setup() {
   const client = createMockClient();
   const supabaseService = { getClient: () => client } as unknown as SupabaseService;
   const push = {
-    nameOf: jest.fn().mockResolvedValue('Harbir'),
-    notify: jest.fn().mockResolvedValue(undefined),
+    record: jest.fn().mockResolvedValue(undefined),
   };
   const service = new WorkoutSocialService(
     supabaseService,
@@ -113,10 +112,12 @@ describe('WorkoutSocialService', () => {
         method: 'insert',
         args: [{ workout_id: W, user_id: ME }],
       });
-      expect(push.notify).toHaveBeenCalledWith(SAM, 'likes', {
-        title: 'New like',
-        body: 'Harbir liked your workout Pull Day.',
-        path: `workouts/${W}`,
+      // Recorded for them and pushed -- never the workout's name on a lock screen.
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'workout_like',
+        recipientId: SAM,
+        actorId: ME,
+        workoutId: W,
       });
     });
 
@@ -145,7 +146,7 @@ describe('WorkoutSocialService', () => {
 
       await service.like(ME, W);
 
-      expect(push.notify).not.toHaveBeenCalled();
+      expect(push.record).not.toHaveBeenCalled();
     });
 
     it('never pushes a like of your own workout', async () => {
@@ -155,7 +156,7 @@ describe('WorkoutSocialService', () => {
 
       await service.like(ME, W);
 
-      expect(push.notify).not.toHaveBeenCalled();
+      expect(push.record).not.toHaveBeenCalled();
     });
 
     it("can't reach a workout a trainer logged, or one of someone you don't follow", async () => {
@@ -171,7 +172,7 @@ describe('WorkoutSocialService', () => {
   });
 
   describe('comment', () => {
-    it("posts a comment, trimmed, and pushes a short excerpt of it to the workout's owner", async () => {
+    it("posts a comment, trimmed, and records it for the workout's owner", async () => {
       const { client, push, service } = setup();
       client.queue('workouts', { data: workout(), error: null });
       queueFollowing(client);
@@ -188,14 +189,14 @@ describe('WorkoutSocialService', () => {
       const comment = await service.comment(ME, W, `  ${long}  `);
 
       expect(comment).toMatchObject({ id: 'c1', body: long.trim(), canDelete: true });
-      expect(push.notify).toHaveBeenCalledWith(
-        SAM,
-        'comments',
-        expect.objectContaining({ title: 'Harbir commented', path: `workouts/${W}` }),
-      );
-      const sent = push.notify.mock.calls[0][2] as { body: string };
-      expect(sent.body.length).toBeLessThanOrEqual(80);
-      expect(sent.body.endsWith('…')).toBe(true);
+      expect(push.record).toHaveBeenCalledWith({
+        type: 'workout_comment',
+        recipientId: SAM,
+        actorId: ME,
+        workoutId: W,
+        commentId: 'c1',
+        text: long.trim(),
+      });
     });
   });
 
