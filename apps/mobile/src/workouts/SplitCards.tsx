@@ -8,7 +8,6 @@ import { Text } from '../design/Text';
 import { Toggle } from '../design/Toggle';
 import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 import { MuscleFigure } from '../exercises/MuscleFigure';
-import type { MuscleGroup } from '../exercises/muscleGroups';
 import { withAlpha } from '../theme/accentColor';
 import { PRESET_DESCRIPTIONS, PRESET_ICONS } from './workoutSplitPresetDisplay';
 import type { WorkoutSplitPreset } from './workoutSplitPresets';
@@ -16,8 +15,7 @@ import type { WorkoutSplitSummary } from './workoutSplitQueries';
 
 // Workout Splits' cards, after Harbir's reference (November 2026): a split of the person's own, a
 // ready-made split to start from, and the way to Workout Programs -- each an icon well in the
-// accent and words in the heading face -- a ready-made split's and Programs' with one of Harbir's
-// figures beside them.
+// accent and words in the heading face -- Programs' with one of Harbir's figures in its well.
 
 const WELL = 52;
 
@@ -183,20 +181,9 @@ export function SplitCard({
   );
 }
 
-/** Each ready-made split's figure: the muscles it's best known for. */
-const PRESET_FIGURES: Record<string, MuscleGroup> = {
-  ppl: 'shoulders',
-  'upper-lower': 'back',
-  'full-body': 'quadriceps',
-  'bro-split': 'biceps',
-  arnold: 'chest',
-  'ppl-upper-lower': 'glutes',
-};
-
 /**
  * A ready-made split to start from: its glyph in a well, its name in the heading face, what it's
- * for, its days as chips, and a chevron -- one of Harbir's figures, its muscles in the accent,
- * faint behind the chevron. A tap makes it a split of their own and the active one.
+ * for, its days as chips, and a chevron. A tap makes it a split of their own and the active one.
  */
 export function PresetCard({
   preset,
@@ -222,13 +209,6 @@ export function PresetCard({
         .join(', ')}`}
       style={[busy && [styles.activeCard, { borderColor: accentColor }], disabled && styles.faded]}
     >
-      <MuscleFigure
-        group={PRESET_FIGURES[preset.id] ?? 'chest'}
-        accentColor={accentColor}
-        width={130}
-        height={150}
-        style={styles.presetFigure}
-      />
       <View style={styles.presetRow}>
         <IconWell accentColor={accentColor}>
           <Feather name={PRESET_ICONS[preset.id] ?? 'layers'} size={22} color={accentColor} />
@@ -415,12 +395,6 @@ const styles = StyleSheet.create({
   },
   destructive: {
     color: colors.destructive,
-  },
-  presetFigure: {
-    position: 'absolute',
-    right: -spacing.sm,
-    top: -spacing.md,
-    opacity: 0.45,
   },
   presetRow: {
     flexDirection: 'row',
