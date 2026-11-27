@@ -102,8 +102,11 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
 
   it('says what each colour means, in days', async () => {
     await renderScreen();
-    expect(screen.getByTestId('muscle-activity-legend')).toHaveTextContent(
-      /Recently trained.*1–2 days.*Frequently trained.*3–7 days.*Less trained.*8–14 days.*No recent training.*15\+ days/,
+    // The legend on one line -- its levels named in full for VoiceOver.
+    const legend = screen.getByTestId('muscle-activity-legend');
+    expect(legend).toHaveTextContent(/Last trained.*1–2d.*3–7d.*8–14d.*15\+d/);
+    expect(legend.props.accessibilityLabel).toMatch(
+      /Recently trained, 1–2 days.*Frequently trained, 3–7 days.*Less trained, 8–14 days.*No recent training, 15\+ days/,
     );
     expect(screen.getByText(/not how recovered a muscle is/)).toBeTruthy();
   });
@@ -249,12 +252,11 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(breakdownOrder()).toHaveLength(6);
   });
 
-  it('turns the figure to the side that shows a muscle opened from its row', async () => {
+  it('shows the front and the back together -- no side to switch', async () => {
     await renderScreen();
     expect(screen.getByTestId('muscle-activity-figure-front')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('muscle-activity-view-all'));
-    fireEvent.press(screen.getByTestId('muscle-activity-row-hamstrings'));
-    expect(await screen.findByTestId('muscle-activity-figure-back')).toBeTruthy();
+    expect(screen.getByTestId('muscle-activity-rear-back')).toBeTruthy();
+    expect(screen.queryByTestId('muscle-activity-side')).toBeNull();
   });
 
   it('offers Try Again when it cannot be read', async () => {

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -30,13 +29,12 @@ import {
   typeScale,
   widgetGap,
 } from '../design/theme';
-import { sideOf } from '../exercises/illustrations/muscleMap';
 import { MuscleFigure } from '../exercises/MuscleFigure';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { fromKg } from '../lib/units';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { withAlpha } from '../theme/accentColor';
-import { LEVEL_COLORS, MuscleActivityFigure, type FigureSide } from './MuscleActivityFigure';
+import { LEVEL_COLORS, MuscleActivityFigure } from './MuscleActivityFigure';
 import {
   ACTIVITY_GROUPS,
   ACTIVITY_LEVEL_LABELS,
@@ -60,15 +58,13 @@ import {
 import { fetchMuscleActivity, type ActivityEntry } from './muscleActivityQueries';
 import { ProgressCardHeader } from './ProgressCardHeader';
 
-const FIGURE_HEIGHT = 300;
+const FIGURE_HEIGHT = 270;
 /** How many muscles Muscle Breakdown lists before View All Muscles. */
 const ROWS_SHOWN = 6;
 /** How many of a group's exercises its row lists, opened. */
 const EXERCISES_SHOWN = 5;
 /** A breakdown row's muscle picture. */
 const THUMB = 44;
-/** Below this screen width, the legend goes under the figure rather than beside it. */
-const STACK_BELOW_WIDTH = 350;
 
 /** "3,240 lb" -- a volume in the person's unit, to the whole number. */
 function volumeText(kg: number, unit: 'kg' | 'lb'): string {
@@ -77,6 +73,11 @@ function volumeText(kg: number, unit: 'kg' | 'lb'): string {
 
 const plural = (n: number, one: string, many: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
+
+/** A level's days, short, for the legend's one line: "1–2 days" -> "1–2d". */
+function shortDays(note: string): string {
+  return note.replace(/ days?$/, 'd');
+}
 
 /** A level's swatch, in its colour. */
 function Swatch({ color, size = 12 }: { color: string; size?: number }) {
@@ -136,17 +137,20 @@ function SummaryTile({
   value,
   suffix,
   label,
+  divider,
   testID,
 }: {
   value: string;
   suffix?: string;
   label: string;
+  /** A hairline on its left, from the figure before it. */
+  divider?: boolean;
   testID: string;
 }) {
   return (
     <View
       testID={testID}
-      style={styles.summaryTile}
+      style={[styles.summaryTile, divider && styles.summaryDivider]}
       accessible
       accessibilityLabel={`${label}: ${value}${suffix ? ` ${suffix.replace('/', 'of ')}` : ''}`}
     >
@@ -478,10 +482,7 @@ export function MuscleActivitySection({
 }) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { width } = useWindowDimensions();
-  const stacked = width < STACK_BELOW_WIDTH;
   const [period, setPeriod] = useState<ActivityPeriod>(30);
-  const [side, setSide] = useState<FigureSide>('front');
   // A muscle tapped on the figure: the breakdown shows just it.
   const [focused, setFocused] = useState<MuscleGroup | null>(null);
   // The row opened, if any.
@@ -538,7 +539,6 @@ export function MuscleActivitySection({
       return;
     }
     setExpanded(group);
-    setSide(sideOf(group));
   };
 
   if (!activity || !totals) {
@@ -591,7 +591,8 @@ export function MuscleActivitySection({
         testID="muscle-activity-period"
         options={ACTIVITY_PERIODS.map((value) => ({
           value: `${value}`,
-          label: `${value} Days`,
+          label: `${value}D`,
+          accessibilityLabel: `${value} days`,
         }))}
         value={`${period}`}
         onChange={(value) => setPeriod(Number(value) as ActivityPeriod)}
@@ -609,11 +610,13 @@ export function MuscleActivitySection({
         />
         <SummaryTile
           testID="muscle-activity-sets"
+          divider
           value={totals.sets.toLocaleString('en-US')}
           label="Sets"
         />
         <SummaryTile
           testID="muscle-activity-workouts"
+          divider
           value={totals.workouts.toLocaleString('en-US')}
           label="Workouts"
         />
@@ -623,54 +626,44 @@ export function MuscleActivitySection({
         <ProgressCardHeader
           title="Muscle Heat Map"
           subtitle={trained > 0 ? undefined : `Nothing logged in the last ${days} yet.`}
-          action={
-            <SegmentedControl<FigureSide>
-              testID="muscle-activity-side"
-              options={[
-                { value: 'front', label: 'Front' },
-                { value: 'back', label: 'Back' },
-              ]}
-              value={side}
-              onChange={setSide}
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-            />
-          }
         />
 
-        <View style={[styles.mapBody, stacked && styles.mapBodyStacked]}>
-          <View style={styles.figureColumn}>
-            <MuscleActivityFigure
-              activity={activity}
-              side={side}
-              selected={highlighted}
-              onSelect={focus}
-              height={FIGURE_HEIGHT}
-            />
-          </View>
-
-          <View
-            testID="muscle-activity-legend"
-            style={[styles.legend, stacked && styles.legendRow]}
-          >
-            {ACTIVITY_LEVELS.map((level) => (
-              <View
-                key={level}
-                style={[styles.legendItem, stacked && styles.legendItemHalf]}
-                accessible
-                accessibilityLabel={`${ACTIVITY_LEVEL_LABELS[level]}, ${ACTIVITY_LEVEL_NOTES[level]}`}
-              >
-                <Swatch color={LEVEL_COLORS[level]} size={12} />
-                <View style={styles.legendText}>
-                  <Text style={styles.legendLabel}>{ACTIVITY_LEVEL_LABELS[level]}</Text>
-                  <Text style={styles.legendDays}>{ACTIVITY_LEVEL_NOTES[level]}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+        {/* Front and back side by side: a tap on either shows that muscle. */}
+        <View style={styles.figures}>
+          {(['front', 'back'] as const).map((figureSide) => (
+            <View key={figureSide} style={styles.figureColumn}>
+              <MuscleActivityFigure
+                testID={figureSide === 'front' ? 'muscle-activity-figure' : 'muscle-activity-rear'}
+                activity={activity}
+                side={figureSide}
+                selected={highlighted}
+                onSelect={focus}
+                height={FIGURE_HEIGHT}
+              />
+              <Text style={styles.figureLabel}>{figureSide === 'front' ? 'Front' : 'Back'}</Text>
+            </View>
+          ))}
         </View>
 
-        <Text style={styles.note}>From your logged sets -- not how recovered a muscle is.</Text>
+        {/* The legend, on one line: when each colour was last trained. */}
+        <View
+          testID="muscle-activity-legend"
+          style={styles.legend}
+          accessible
+          accessibilityLabel={ACTIVITY_LEVELS.map(
+            (level) => `${ACTIVITY_LEVEL_LABELS[level]}, ${ACTIVITY_LEVEL_NOTES[level]}`,
+          ).join('. ')}
+        >
+          <Text style={styles.legendLead}>Last trained</Text>
+          {ACTIVITY_LEVELS.map((level) => (
+            <View key={level} style={styles.legendItem}>
+              <Swatch color={LEVEL_COLORS[level]} size={8} />
+              <Text style={styles.legendDays}>{shortDays(ACTIVITY_LEVEL_NOTES[level])}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.note}>From your logged sets, not how recovered a muscle is.</Text>
       </View>
 
       <View testID="muscle-activity-balance" style={styles.block}>
@@ -851,19 +844,18 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Training Summary: three small raised tiles in a row.
+  // Training Summary: three figures in one plain strip, a hairline between them.
   summary: {
     flexDirection: 'row',
-    gap: spacing.sm,
   },
   summaryTile: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  summaryDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.divider,
   },
   summaryValue: {
     ...typeScale.statMedium,
@@ -879,49 +871,43 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // The figure, and the legend beside it -- or under it on a narrow phone.
-  mapBody: {
+  // Front and back side by side, each named under it.
+  figures: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    justifyContent: 'center',
+    gap: spacing.xl,
     marginTop: spacing.md,
   },
-  mapBodyStacked: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-  },
   figureColumn: {
-    flex: 1,
     alignItems: 'center',
+    gap: spacing.xs,
   },
+  figureLabel: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
+  // The legend: one line of dots and days.
   legend: {
-    width: 136,
-    gap: spacing.md,
-  },
-  legendRow: {
-    width: 'auto',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: spacing.md,
+    rowGap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  legendLead: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  legendItemHalf: {
-    width: '50%',
-  },
-  legendText: {
-    flexShrink: 1,
-  },
-  legendLabel: {
-    ...typeScale.secondary,
-    color: colors.textPrimary,
+    gap: 5,
   },
   legendDays: {
     ...typeScale.caption,
-    color: colors.textMuted,
+    color: colors.textSecondaryBright,
   },
   note: {
     ...typeScale.caption,
