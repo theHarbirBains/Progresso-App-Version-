@@ -257,8 +257,8 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
             {contentReady && activeSection === 'Health' ? (
               <HealthOverview
                 accent={theme.accent}
-                onOpen={(page, scenario, metric) =>
-                  navigation.navigate('HealthPreview', { page, scenario, metric })
+                onOpen={(page, metric, onboarding) =>
+                  navigation.navigate('HealthPreview', { page, metric, onboarding })
                 }
               />
             ) : null}

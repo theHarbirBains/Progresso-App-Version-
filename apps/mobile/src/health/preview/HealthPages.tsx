@@ -1,8 +1,9 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { AppCard } from '../../design/AppCard';
-import { PrimaryButton, SecondaryButton } from '../../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../../design/Button';
+import { ChoiceTile } from '../../design/ChoiceTile';
 import { SegmentedControl } from '../../design/SegmentedControl';
 import { StatBlock } from '../../design/StatBlock';
 import { Text } from '../../design/Text';
@@ -20,30 +21,37 @@ import {
   TrendChip,
 } from './healthParts';
 import { stageColors } from './HealthOverview';
-import type { HealthPage } from './healthPreview';
+import { setPreviewSetup, type HealthPage } from './healthPreview';
 import {
   ACTIVITY,
+  anyDevice,
   CONNECTION_STATES,
+  DEVICE_ORDER,
+  DEVICES,
+  hasWearable,
   insightsFor,
   METRICS,
   metricsFor,
+  NO_DEVICES,
   READINESS,
   SLEEP,
   SOURCE_NAMES,
   sourceOf,
   TRAINING,
   type ConnectionState,
-  type HealthScenario,
+  type DeviceKey,
+  type DeviceSetup,
   type MetricKey,
 } from './sampleHealthData';
 
-// The Health prototype's deeper pages (Phase 1, sample data only): each opened from the overview,
-// each laid out to be read at a glance -- one hero, a chart, the few figures behind it.
+// The Health prototype's deeper pages (Phase 1, sample data only): each made for the devices
+// someone has -- a page never lists what their devices can't give -- and each laid out to be read
+// at a glance: one hero, a chart, the few figures behind it.
 
 export interface PageProps {
-  scenario: HealthScenario;
+  setup: DeviceSetup;
   accent: string;
-  open: (page: HealthPage, metric?: MetricKey) => void;
+  open: (page: HealthPage, metric?: MetricKey, onboarding?: boolean) => void;
 }
 
 function hm(minutes: number): string {
@@ -85,21 +93,68 @@ function Note({ children }: { children: ReactNode }) {
   return <Text style={styles.note}>{children}</Text>;
 }
 
+/** A device's icon in its well. */
+function DeviceIcon({
+  device,
+  accent,
+  size = 42,
+}: {
+  device: DeviceKey;
+  accent: string;
+  size?: number;
+}) {
+  return (
+    <View
+      style={[
+        styles.deviceIcon,
+        { width: size, height: size, backgroundColor: withAlpha(accent, 0.12) },
+      ]}
+    >
+      <MaterialCommunityIcons name={DEVICES[device].icon} size={size * 0.48} color={accent} />
+    </View>
+  );
+}
+
+/** What a device brings, its own data marked. */
+function DeviceData({ device, accent }: { device: DeviceKey; accent: string }) {
+  const info = DEVICES[device];
+  return (
+    <View style={styles.chips}>
+      {info.unique.map((item) => (
+        <View
+          key={item}
+          style={[styles.chip, { backgroundColor: withAlpha(accent, 0.14) }]}
+          accessibilityLabel={`${item}, only from ${info.name}`}
+        >
+          <Feather name="star" size={10} color={accent} />
+          <Text style={[styles.chipText, { color: accent }]}>{item}</Text>
+        </View>
+      ))}
+      {info.provides.map((item) => (
+        <View key={item} style={styles.chip}>
+          <Text style={styles.chipText}>{item}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // --- Recovery ------------------------------------------------------------------------------
 
-export function RecoveryPage({ scenario, accent, open }: PageProps) {
+export function RecoveryPage({ setup, accent, open }: PageProps) {
   const [compare, setCompare] = useState<'week' | 'month'>('week');
-  const available = new Set(metricsFor(scenario));
-  const keys: MetricKey[] = ['hrv', 'restingHr', 'sleep', 'respiratory', 'temperature'];
-  if (scenario === 'none') {
+  const available = new Set(metricsFor(setup));
+  const keys = (['hrv', 'restingHr', 'sleep', 'respiratory', 'temperature'] as MetricKey[]).filter(
+    (key) => available.has(key),
+  );
+  if (!hasWearable(setup)) {
     return (
       <Block accent={accent} testID="health-recovery-none">
-        <Text style={styles.title}>Recovery needs a wearable</Text>
+        <Text style={styles.title}>Recovery comes from a watch or ring</Text>
         <Note>
-          Heart rate variability and resting heart rate come from a watch or ring. Your training is
-          still tracked below, and on Training & Recovery.
+          Heart rate variability, resting heart rate and sleep are measured as you wear one.
         </Note>
-        <SecondaryButton label="Connect a Device" onPress={() => open('devices')} />
+        <SecondaryButton label="Set Up a Device" onPress={() => open('setup')} />
       </Block>
     );
   }
@@ -117,40 +172,62 @@ export function RecoveryPage({ scenario, accent, open }: PageProps) {
         ];
   return (
     <>
-      <AppCard hero testID="health-recovery-hero">
-        <View style={styles.centre}>
-          <Ring size={176} stroke={14} progress={READINESS.score / 100} color={accent}>
-            <Text style={styles.ringBig}>{READINESS.score}</Text>
-            <Text style={styles.ringLabel}>EXAMPLE SCORE</Text>
-          </Ring>
-          <Text style={styles.title}>{READINESS.word}</Text>
-          <Note>
-            How readiness could look. Progresso doesn’t calculate a score yet -- this one is made
-            up.
-          </Note>
-        </View>
-      </AppCard>
+      {setup.oura ? (
+        <AppCard hero testID="health-recovery-hero">
+          <View style={styles.centre}>
+            <Ring size={176} stroke={14} progress={READINESS.score / 100} color={accent}>
+              <Text style={styles.ringBig}>{READINESS.score}</Text>
+              <Text style={styles.ringLabel}>READINESS</Text>
+            </Ring>
+            <Text style={styles.title}>{READINESS.word}</Text>
+            <SourceTag source="oura" />
+            <Note>Oura’s own score, from the Oura app. Progresso doesn’t make one of its own.</Note>
+          </View>
+        </AppCard>
+      ) : (
+        <AppCard hero testID="health-recovery-signals">
+          <View style={styles.block}>
+            <Text style={styles.kicker}>AGAINST YOUR USUAL</Text>
+            <View style={styles.stats}>
+              {(['hrv', 'restingHr', 'sleep'] as MetricKey[]).map((key) => (
+                <StatBlock
+                  key={key}
+                  value={METRICS[key].change}
+                  label={METRICS[key].short}
+                  valueColor={accent}
+                />
+              ))}
+            </View>
+            <Note>
+              The signals behind recovery, each against your own 30-day average. No score: an Oura
+              Ring gives one; Progresso doesn’t make its own.
+            </Note>
+          </View>
+        </AppCard>
+      )}
 
-      <Block title="This week" accent={accent}>
-        <Columns
-          values={READINESS.week}
-          labels={READINESS.weekDays}
-          highlight={READINESS.week.length - 1}
-          height={72}
-          color={accent}
-          gap={8}
-        />
-      </Block>
+      {setup.oura ? (
+        <Block title="This week" accent={accent}>
+          <Columns
+            values={READINESS.week}
+            labels={READINESS.weekDays}
+            highlight={READINESS.week.length - 1}
+            height={72}
+            color={accent}
+            gap={8}
+          />
+        </Block>
+      ) : null}
 
-      <Block title="What goes into it" accent={accent}>
+      <Block title="Signals" accent={accent}>
         <View>
           {keys.map((key, i) => (
             <MetricRow
               key={key}
               testID={`health-recovery-${key}`}
               metric={METRICS[key]}
-              source={sourceOf(key, scenario)}
-              available={available.has(key)}
+              source={sourceOf(key, setup)}
+              available
               accent={accent}
               divider={i > 0}
               onPress={() => open('metric', key)}
@@ -192,28 +269,33 @@ export function RecoveryPage({ scenario, accent, open }: PageProps) {
 
 // --- Sleep ---------------------------------------------------------------------------------
 
-export function SleepPage({ scenario, accent }: PageProps) {
+export function SleepPage({ setup, accent, open }: PageProps) {
   const stages = stageColors(accent);
-  const wearable = scenario !== 'none';
-  if (!wearable) {
+  const source = sourceOf('sleep', setup);
+  if (!hasWearable(setup)) {
     return (
-      <Block accent={accent} testID="health-sleep-manual">
-        <Text style={styles.title}>Log last night</Text>
-        <View style={styles.manualTimes}>
-          <View style={styles.manualTime}>
-            <Feather name="moon" size={16} color={accent} />
-            <Text style={styles.caption}>Bedtime</Text>
-            <Text style={styles.manualValue}>10:45 PM</Text>
+      <>
+        <Block accent={accent} testID="health-sleep-manual">
+          <Text style={styles.title}>Log last night</Text>
+          <View style={styles.manualTimes}>
+            <View style={styles.manualTime}>
+              <Feather name="moon" size={16} color={accent} />
+              <Text style={styles.caption}>Bedtime</Text>
+              <Text style={styles.manualValue}>10:45 PM</Text>
+            </View>
+            <View style={styles.manualTime}>
+              <Feather name="sun" size={16} color={accent} />
+              <Text style={styles.caption}>Woke up</Text>
+              <Text style={styles.manualValue}>6:50 AM</Text>
+            </View>
           </View>
-          <View style={styles.manualTime}>
-            <Feather name="sun" size={16} color={accent} />
-            <Text style={styles.caption}>Woke up</Text>
-            <Text style={styles.manualValue}>6:50 AM</Text>
-          </View>
-        </View>
-        <PrimaryButton label="Save Sleep" onPress={() => {}} accentColor={accent} />
-        <Note>Sleep stages need a watch or ring; how long you slept doesn’t.</Note>
-      </Block>
+          <PrimaryButton label="Save Sleep" onPress={() => {}} accentColor={accent} />
+        </Block>
+        <TextButton
+          label="Track sleep automatically with a watch or ring"
+          onPress={() => open('setup')}
+        />
+      </>
     );
   }
   return (
@@ -222,17 +304,13 @@ export function SleepPage({ scenario, accent }: PageProps) {
         <View style={styles.block}>
           <Text style={styles.kicker}>LAST NIGHT</Text>
           <Text style={styles.bigValue}>{SLEEP.asleep}</Text>
-          <View style={styles.inBedRow}>
-            <View style={styles.flex}>
-              <StackedBar
-                height={10}
-                parts={[
-                  { key: 'asleep', value: 462, color: accent },
-                  { key: 'awake', value: 28, color: withAlpha(accent, 0.2) },
-                ]}
-              />
-            </View>
-          </View>
+          <StackedBar
+            height={10}
+            parts={[
+              { key: 'asleep', value: 462, color: accent },
+              { key: 'awake', value: 28, color: withAlpha(accent, 0.2) },
+            ]}
+          />
           <View style={styles.spread}>
             <Text style={styles.caption}>Asleep {SLEEP.asleep}</Text>
             <Text style={styles.caption}>In bed {SLEEP.inBed}</Text>
@@ -244,7 +322,7 @@ export function SleepPage({ scenario, accent }: PageProps) {
             <Feather name="sun" size={14} color={colors.textSecondary} />
             <Text style={styles.secondary}>{SLEEP.wake}</Text>
           </View>
-          <SourceTag source={sourceOf('sleep', scenario)} />
+          <SourceTag source={source} />
         </View>
       </AppCard>
 
@@ -264,7 +342,8 @@ export function SleepPage({ scenario, accent }: PageProps) {
               <View key={stage.key} style={styles.legendItem}>
                 <View style={[styles.swatch, { backgroundColor: stages[stage.key] }]} />
                 <Text style={styles.legendName}>
-                  {stage.key === 'light' && scenario === 'apple' ? 'Core' : stage.label}
+                  {/* Apple calls light sleep "Core". */}
+                  {stage.key === 'light' && source === 'appleWatch' ? 'Core' : stage.label}
                 </Text>
                 <Text style={styles.legendValue}>{hm(stage.minutes)}</Text>
               </View>
@@ -310,15 +389,16 @@ export function SleepPage({ scenario, accent }: PageProps) {
 
 // --- Activity ------------------------------------------------------------------------------
 
-export function ActivityPage({ scenario, accent }: PageProps) {
-  if (scenario === 'none') {
+export function ActivityPage({ setup, accent, open }: PageProps) {
+  if (!anyDevice(setup)) {
     return (
       <Block accent={accent} testID="health-activity-none">
-        <Text style={styles.title}>Steps need Apple Health or a ring</Text>
-        <Note>Your workouts still count: this week, {TRAINING.thisWeek.workouts} of them.</Note>
+        <Text style={styles.title}>Steps come from your phone or a wearable</Text>
+        <SecondaryButton label="Set Up Health" onPress={() => open('setup')} />
       </Block>
     );
   }
+  const wearable = hasWearable(setup);
   const hourLabels = ACTIVITY.hourly.map((_, i) =>
     i === 0 ? '6a' : i === 6 ? '12p' : i === 12 ? '6p' : i === 16 ? '10p' : '',
   );
@@ -339,17 +419,23 @@ export function ActivityPage({ scenario, accent }: PageProps) {
             color={accent}
             gap={3}
           />
-          <SourceTag source={sourceOf('steps', scenario)} />
+          <SourceTag source={sourceOf('steps', setup)} />
         </View>
       </AppCard>
 
-      <Block accent={accent}>
+      <Block accent={accent} testID="health-activity-today">
         <View style={styles.stats}>
-          <StatBlock value={ACTIVITY.activeCalories} label="Active Cal" valueColor={accent} />
-          <StatBlock value={`${ACTIVITY.exerciseMinutes} min`} label="Exercise" />
+          {wearable ? (
+            <>
+              <StatBlock value={ACTIVITY.activeCalories} label="Active Cal" valueColor={accent} />
+              <StatBlock value={`${ACTIVITY.exerciseMinutes} min`} label="Exercise" />
+            </>
+          ) : null}
           <StatBlock value={ACTIVITY.distance} label="Distance" />
         </View>
-        <Note>Active calories count all of today’s movement, not just workouts.</Note>
+        {wearable ? (
+          <Note>Active calories count all of today’s movement, not just workouts.</Note>
+        ) : null}
       </Block>
 
       <Block title="This week" accent={accent}>
@@ -364,7 +450,7 @@ export function ActivityPage({ scenario, accent }: PageProps) {
         <View style={styles.stats}>
           <StatBlock value={weekTotal.toLocaleString('en-US')} label="Steps" />
           <StatBlock value={Math.round(weekTotal / 7).toLocaleString('en-US')} label="Daily Avg" />
-          <StatBlock value="4h 12m" label="Exercise" />
+          {wearable ? <StatBlock value="4h 12m" label="Exercise" /> : null}
         </View>
       </Block>
     </>
@@ -373,20 +459,46 @@ export function ActivityPage({ scenario, accent }: PageProps) {
 
 // --- Heart ---------------------------------------------------------------------------------
 
-export function HeartPage({ scenario, accent, open }: PageProps) {
-  const available = new Set(metricsFor(scenario));
-  const keys: MetricKey[] = [
-    'restingHr',
-    'hrv',
-    'heartRate',
-    'respiratory',
-    'bloodOxygen',
-    'temperature',
-    'vo2max',
-    'hrRecovery',
-  ];
+const HEART_KEYS: MetricKey[] = [
+  'restingHr',
+  'hrv',
+  'heartRate',
+  'respiratory',
+  'bloodOxygen',
+  'temperature',
+  'vo2max',
+  'hrRecovery',
+];
+
+/** What other devices would add: "VO₂ Max and HR Recovery with Apple Watch". */
+export function moreWithDevices(setup: DeviceSetup): string[] {
+  const available = new Set(metricsFor(setup));
+  const missing = HEART_KEYS.filter((key) => !available.has(key));
+  const byDevice = new Map<DeviceKey, string[]>();
+  for (const key of missing) {
+    const device = METRICS[key].sources[0];
+    if (!device) continue;
+    byDevice.set(device, [...(byDevice.get(device) ?? []), METRICS[key].short]);
+  }
+  return [...byDevice].map(
+    ([device, names]) => `${names.join(' and ')} with ${DEVICES[device].name}`,
+  );
+}
+
+export function HeartPage({ setup, accent, open }: PageProps) {
+  const available = new Set(metricsFor(setup));
+  const keys = HEART_KEYS.filter((key) => available.has(key));
   const pairs: MetricKey[][] = [];
   for (let i = 0; i < keys.length; i += 2) pairs.push(keys.slice(i, i + 2));
+  const more = moreWithDevices(setup);
+  if (keys.length === 0) {
+    return (
+      <Block accent={accent} testID="health-heart-none">
+        <Text style={styles.title}>Heart data comes from a watch or ring</Text>
+        <SecondaryButton label="Set Up a Device" onPress={() => open('setup')} />
+      </Block>
+    );
+  }
   return (
     <>
       <Block accent={accent} testID="health-heart">
@@ -398,15 +510,27 @@ export function HeartPage({ scenario, accent, open }: PageProps) {
                   key={key}
                   testID={`health-heart-${key}`}
                   metric={METRICS[key]}
-                  available={available.has(key)}
+                  available
                   accent={accent}
                   onPress={() => open('metric', key)}
                 />
               ))}
+              {pair.length === 1 ? <View style={styles.flex} /> : null}
             </View>
           ))}
         </View>
       </Block>
+      {more.length > 0 ? (
+        <Pressable
+          testID="health-heart-more"
+          onPress={() => open('devices')}
+          accessibilityRole="button"
+          style={styles.moreRow}
+        >
+          <Feather name="plus-circle" size={14} color={accent} />
+          <Text style={styles.moreText}>More: {more.join(' · ')}</Text>
+        </Pressable>
+      ) : null}
       <Note>For general fitness, not medical advice. Tap a figure for what it means.</Note>
     </>
   );
@@ -414,10 +538,10 @@ export function HeartPage({ scenario, accent, open }: PageProps) {
 
 // --- Training & Recovery -------------------------------------------------------------------
 
-export function TrainingPage({ scenario, accent }: PageProps) {
-  const wearable = scenario !== 'none';
+export function TrainingPage({ setup, accent }: PageProps) {
+  const wearable = hasWearable(setup);
   const weeks = TRAINING.weeks;
-  const rows: { label: string; values: number[]; latest: string; needsWearable: boolean }[] = [
+  const rows = [
     {
       label: 'Volume',
       values: weeks.map((w) => w.volume),
@@ -442,8 +566,8 @@ export function TrainingPage({ scenario, accent }: PageProps) {
       latest: `${weeks[weeks.length - 1].hrv} ms`,
       needsWearable: true,
     },
-  ];
-  const patterns = insightsFor(scenario).filter(
+  ].filter((row) => wearable || !row.needsWearable);
+  const patterns = insightsFor(setup).filter(
     (insight) => insight.id === 'rest-days-sleep' || insight.id === 'hrv-dip',
   );
   return (
@@ -458,28 +582,25 @@ export function TrainingPage({ scenario, accent }: PageProps) {
           ))}
           <View style={styles.weekLatestCol} />
         </View>
-        {rows.map((row) => {
-          const off = row.needsWearable && !wearable;
-          return (
-            <View key={row.label} style={[styles.weekRow, off && styles.faded]}>
-              <Text style={styles.weekLabel}>{row.label}</Text>
-              <View style={styles.flex}>
-                <Columns
-                  values={off ? row.values.map(() => 0.01) : row.values}
-                  highlight={row.values.length - 1}
-                  height={30}
-                  color={accent}
-                  gap={10}
-                />
-              </View>
-              <Text style={styles.weekLatest}>{off ? '—' : row.latest}</Text>
+        {rows.map((row) => (
+          <View key={row.label} testID={`health-training-${row.label}`} style={styles.weekRow}>
+            <Text style={styles.weekLabel}>{row.label}</Text>
+            <View style={styles.flex}>
+              <Columns
+                values={row.values}
+                highlight={row.values.length - 1}
+                height={30}
+                color={accent}
+                gap={10}
+              />
             </View>
-          );
-        })}
+            <Text style={styles.weekLatest}>{row.latest}</Text>
+          </View>
+        ))}
         <Note>
           {wearable
             ? 'Training from Progresso, sleep and HRV from your devices, week by week.'
-            : 'Connect a device to see sleep and HRV beside your training.'}
+            : 'Your training, week by week, from Progresso.'}
         </Note>
       </Block>
 
@@ -507,144 +628,338 @@ export function TrainingPage({ scenario, accent }: PageProps) {
 
 // --- Devices -------------------------------------------------------------------------------
 
-const DEVICE_PROVIDES = {
-  apple: ['Steps', 'Sleep', 'HRV', 'Resting HR', 'VO₂ Max', 'Blood Oxygen'],
-  oura: ['Sleep stages', 'Readiness', 'HRV', 'Resting HR', 'Temperature', 'Steps'],
-} as const;
-
-function DeviceCard({
-  name,
-  detail,
-  icon,
+function ConnectedDevice({
+  device,
   state,
-  provides,
   accent,
-  testID,
 }: {
-  name: string;
-  detail: string;
-  icon: ReactNode;
+  device: DeviceKey;
   state: ConnectionState;
-  provides: readonly string[];
   accent: string;
-  testID: string;
 }) {
+  const info = DEVICES[device];
   const action: Record<ConnectionState, ReactNode> = {
     connected: <Text style={styles.caption}>Synced 5 min ago</Text>,
     syncing: <Text style={styles.caption}>Bringing in the last 24 hours…</Text>,
     permission: <SecondaryButton label="Allow Access" onPress={() => {}} />,
     issue: <SecondaryButton label="Try Again" onPress={() => {}} />,
     notConnected: (
-      <PrimaryButton label={`Connect ${name}`} onPress={() => {}} accentColor={accent} />
+      <PrimaryButton label={`Connect ${info.name}`} onPress={() => {}} accentColor={accent} />
     ),
   };
   return (
-    <AppCard testID={testID}>
+    <AppCard testID={`health-device-${device}`}>
       <View style={styles.block}>
         <View style={styles.deviceHead}>
-          <View style={[styles.deviceIcon, { backgroundColor: withAlpha(accent, 0.12) }]}>
-            {icon}
-          </View>
+          <DeviceIcon device={device} accent={accent} />
           <View style={styles.flex}>
-            <Text style={styles.rowName}>{name}</Text>
-            <Text style={styles.caption}>{detail}</Text>
+            <Text style={styles.rowName}>{info.name}</Text>
+            <Text style={styles.caption}>Through {info.via}</Text>
           </View>
           <StatusPill state={state} accent={accent} />
         </View>
-        <View style={styles.chips}>
-          {provides.map((item) => (
-            <View key={item} style={styles.chip}>
-              <Text style={styles.chipText}>{item}</Text>
-            </View>
-          ))}
-        </View>
+        <DeviceData device={device} accent={accent} />
         {action[state]}
       </View>
     </AppCard>
   );
 }
 
-export function DevicesPage({ scenario, accent }: PageProps) {
+export function DevicesPage({ setup, accent, open }: PageProps) {
   const [state, setState] = useState<ConnectionState>('connected');
-  const appleOn = scenario === 'apple' || scenario === 'both';
-  const ouraOn = scenario === 'oura' || scenario === 'both';
+  const connected = DEVICE_ORDER.filter((key) => setup[key]);
+  const others = DEVICE_ORDER.filter((key) => !setup[key]);
+  const both = setup.oura && (setup.appleWatch || setup.otherWatch);
   return (
     <>
-      <View style={styles.previewControl}>
-        <SampleNote />
-        <Text style={styles.caption}>Preview a connected device’s state</Text>
-        <SegmentedControl
-          testID="health-device-state"
-          options={CONNECTION_STATES.filter((option) => option.value !== 'notConnected')}
-          value={state}
-          onChange={setState}
-          accentColor={accent}
-          stretch
-        />
-      </View>
-
-      {scenario === 'none' ? (
+      {connected.length > 0 ? (
+        <View style={styles.previewControl}>
+          <SampleNote />
+          <Text style={styles.caption}>Preview a connected device’s state</Text>
+          <SegmentedControl
+            testID="health-device-state"
+            options={CONNECTION_STATES.filter((option) => option.value !== 'notConnected')}
+            value={state}
+            onChange={setState}
+            accentColor={accent}
+            stretch
+          />
+        </View>
+      ) : (
         <AppCard hero testID="health-devices-none">
           <View style={styles.block}>
             <Text style={styles.title}>You don’t need a wearable</Text>
             <Note>
-              Health uses your workouts and nutrition, and anything you log. Connect a device any
-              time for sleep, heart and recovery data.
+              Health starts from your workouts and nutrition. Add a device any time for steps,
+              sleep, heart and recovery.
             </Note>
           </View>
         </AppCard>
-      ) : null}
+      )}
 
-      <DeviceCard
-        testID="health-device-apple"
-        name="Apple Health"
-        detail="Apple Watch and iPhone"
-        icon={<MaterialCommunityIcons name="heart-pulse" size={20} color={accent} />}
-        state={appleOn ? state : 'notConnected'}
-        provides={DEVICE_PROVIDES.apple}
-        accent={accent}
-      />
-      <DeviceCard
-        testID="health-device-oura"
-        name="Oura Ring"
-        detail="Sleep, readiness and recovery"
-        icon={<MaterialCommunityIcons name="ring" size={20} color={accent} />}
-        state={ouraOn ? state : 'notConnected'}
-        provides={DEVICE_PROVIDES.oura}
-        accent={accent}
-      />
-      <AppCard testID="health-device-manual">
-        <View style={styles.block}>
-          <View style={styles.deviceHead}>
-            <View style={[styles.deviceIcon, { backgroundColor: withAlpha(accent, 0.12) }]}>
-              <Feather name="edit-3" size={18} color={accent} />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.rowName}>Manual Tracking</Text>
-              <Text style={styles.caption}>Sleep you log, and your Progresso training</Text>
-            </View>
-            <StatusPill state="connected" accent={accent} />
-          </View>
-        </View>
-      </AppCard>
+      {connected.map((device) => (
+        <ConnectedDevice key={device} device={device} state={state} accent={accent} />
+      ))}
 
-      {scenario === 'both' ? (
+      {both ? (
         <Block title="One value for each" accent={accent} testID="health-devices-sources">
           <View>
-            {(['sleep', 'hrv', 'restingHr', 'steps', 'vo2max'] as MetricKey[]).map((key, i) => (
+            {(['sleep', 'hrv', 'restingHr', 'steps'] as MetricKey[]).map((key, i) => (
               <View key={key} style={[styles.historyRow, i > 0 && styles.divider]}>
                 <Text style={styles.historyDay}>{METRICS[key].short}</Text>
                 <View style={styles.sourceChoice}>
                   <Text style={styles.historyValue}>
-                    {SOURCE_NAMES[sourceOf(key, scenario) ?? 'apple']}
+                    {SOURCE_NAMES[sourceOf(key, setup) ?? 'iphone']}
                   </Text>
                   <Feather name="chevron-down" size={14} color={colors.textMuted} />
                 </View>
               </View>
             ))}
           </View>
-          <Note>When both measure the same thing, Health shows one, never both added up.</Note>
+          <Note>
+            When two devices measure the same thing, Health shows one -- never both added up.
+          </Note>
         </Block>
+      ) : null}
+
+      {others.length > 0 ? (
+        <Block title="Add a device" accent={accent} testID="health-devices-add">
+          <View>
+            {others.map((device, i) => (
+              <Pressable
+                key={device}
+                testID={`health-add-${device}`}
+                onPress={() => open('setup')}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.addDevice,
+                  i > 0 && styles.divider,
+                  pressed && styles.faded,
+                ]}
+              >
+                <DeviceIcon device={device} accent={accent} size={36} />
+                <View style={styles.flex}>
+                  <Text style={styles.rowName}>{DEVICES[device].name}</Text>
+                  <Text style={styles.caption} numberOfLines={2}>
+                    {[...DEVICES[device].unique, ...DEVICES[device].provides]
+                      .slice(0, 3)
+                      .join(', ')}
+                  </Text>
+                </View>
+                <Feather name="plus" size={18} color={accent} />
+              </Pressable>
+            ))}
+          </View>
+        </Block>
+      ) : null}
+
+      <AppCard testID="health-device-manual">
+        <View style={styles.deviceHead}>
+          <View style={[styles.deviceIcon, { backgroundColor: withAlpha(accent, 0.12) }]}>
+            <Feather name="edit-3" size={18} color={accent} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.rowName}>Manual Tracking</Text>
+            <Text style={styles.caption}>Sleep you log, and your Progresso training</Text>
+          </View>
+          <StatusPill state="connected" accent={accent} />
+        </View>
+      </AppCard>
+    </>
+  );
+}
+
+// --- Set Up Health (and onboarding's step) -------------------------------------------------
+
+const SETUP_CHOICES: { key: DeviceKey; title: string; detail: string }[] = [
+  { key: 'appleWatch', title: 'Apple Watch', detail: 'Sleep, heart, VO₂ Max' },
+  { key: 'oura', title: 'Oura Ring', detail: 'Readiness, sleep, temperature' },
+  { key: 'otherWatch', title: 'Another Watch', detail: 'Garmin, Fitbit, WHOOP…' },
+  { key: 'iphone', title: 'Just My iPhone', detail: 'Steps and distance' },
+];
+
+/** What Health will show for a setup -- the page's sections, each on or off. */
+export function sectionsFor(setup: DeviceSetup): { name: string; on: boolean }[] {
+  const wearable = hasWearable(setup);
+  return [
+    { name: 'Training', on: true },
+    { name: 'Activity', on: anyDevice(setup) },
+    { name: setup.oura ? 'Readiness (Oura)' : 'Recovery signals', on: wearable },
+    { name: 'Sleep', on: wearable },
+    { name: 'Heart', on: wearable },
+  ];
+}
+
+/**
+ * Set Up Health -- the same three steps from Health (any time, from Devices or the overview) and
+ * from onboarding (`onboarding`: a progress line and Skip): what they use; what each brings, its
+ * own data marked, with Connect (a preview: nothing is asked of the phone); then what Health will
+ * show. Done tailors the preview to the choice.
+ */
+export function SetupPage({
+  setup,
+  accent,
+  onboarding,
+  onDone,
+}: PageProps & { onboarding?: boolean; onDone: () => void }) {
+  const [step, setStep] = useState<'pick' | 'connect' | 'done'>('pick');
+  const [chosen, setChosen] = useState<DeviceSetup>(onboarding ? NO_DEVICES : setup);
+  const [none, setNone] = useState(false);
+  const [connected, setConnected] = useState<Partial<Record<DeviceKey, boolean>>>({});
+  const picked = DEVICE_ORDER.filter((key) => chosen[key]);
+  const stepIndex = step === 'pick' ? 0 : step === 'connect' ? 1 : 2;
+  const finish = () => {
+    setPreviewSetup(none ? NO_DEVICES : chosen);
+    onDone();
+  };
+
+  return (
+    <>
+      {onboarding ? (
+        <View testID="health-setup-onboarding" style={styles.onboardingHead}>
+          <SampleNote />
+          <View style={styles.progressTrack}>
+            {[0, 1, 2].map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.progressPart,
+                  { backgroundColor: i <= stepIndex ? accent : colors.surfaceLift },
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {step === 'pick' ? (
+        <>
+          <View style={styles.setupIntro}>
+            <Text style={styles.setupTitle}>
+              {onboarding ? 'Do you use a fitness tracker?' : 'What do you use?'}
+            </Text>
+            <Text style={styles.secondary}>
+              Pick everything you have. Health shows only what your devices measure.
+            </Text>
+          </View>
+          <View style={styles.choiceGrid}>
+            {[SETUP_CHOICES.slice(0, 2), SETUP_CHOICES.slice(2, 4)].map((row, r) => (
+              <View key={r} style={styles.gridRow}>
+                {row.map((choice) => (
+                  <ChoiceTile
+                    key={choice.key}
+                    testID={`health-setup-${choice.key}`}
+                    selected={chosen[choice.key]}
+                    accessibilityLabel={`${choice.title}. ${choice.detail}`}
+                    accentColor={accent}
+                    style={styles.choice}
+                    onPress={() => {
+                      setNone(false);
+                      setChosen({ ...chosen, [choice.key]: !chosen[choice.key] });
+                    }}
+                  >
+                    <DeviceIcon device={choice.key} accent={accent} size={36} />
+                    <Text style={styles.choiceTitle}>{choice.title}</Text>
+                    <Text style={styles.caption}>{choice.detail}</Text>
+                  </ChoiceTile>
+                ))}
+              </View>
+            ))}
+            <ChoiceTile
+              testID="health-setup-none"
+              selected={none}
+              accessibilityLabel="None of these"
+              accentColor={accent}
+              onPress={() => {
+                setNone(!none);
+                setChosen(NO_DEVICES);
+              }}
+            >
+              <Text style={styles.choiceTitle}>None of these</Text>
+              <Text style={styles.caption}>Health still uses your workouts and nutrition</Text>
+            </ChoiceTile>
+          </View>
+          <PrimaryButton
+            testID="health-setup-continue"
+            label="Continue"
+            disabled={!none && picked.length === 0}
+            onPress={() => setStep(none ? 'done' : 'connect')}
+            accentColor={accent}
+          />
+          {onboarding ? <TextButton label="Skip for Now" onPress={onDone} /> : null}
+        </>
+      ) : null}
+
+      {step === 'connect' ? (
+        <>
+          <View style={styles.setupIntro}>
+            <Text style={styles.setupTitle}>Connect your devices</Text>
+            <Text style={styles.secondary}>
+              Each brings its own data. Starred: only that device has it.
+            </Text>
+          </View>
+          {picked.map((device) => (
+            <AppCard key={device} testID={`health-setup-connect-${device}`}>
+              <View style={styles.block}>
+                <View style={styles.deviceHead}>
+                  <DeviceIcon device={device} accent={accent} />
+                  <View style={styles.flex}>
+                    <Text style={styles.rowName}>{DEVICES[device].name}</Text>
+                    <Text style={styles.caption}>Through {DEVICES[device].via}</Text>
+                  </View>
+                  {connected[device] ? <StatusPill state="connected" accent={accent} /> : null}
+                </View>
+                <DeviceData device={device} accent={accent} />
+                {connected[device] ? null : (
+                  <SecondaryButton
+                    testID={`health-setup-connect-${device}-button`}
+                    label={device === 'oura' ? 'Connect Oura' : 'Connect Apple Health'}
+                    onPress={() => setConnected({ ...connected, [device]: true })}
+                  />
+                )}
+              </View>
+            </AppCard>
+          ))}
+          <PrimaryButton
+            testID="health-setup-next"
+            label="Continue"
+            onPress={() => setStep('done')}
+            accentColor={accent}
+          />
+        </>
+      ) : null}
+
+      {step === 'done' ? (
+        <>
+          <View style={styles.setupIntro}>
+            <Text style={styles.setupTitle}>Your Health page</Text>
+            <Text style={styles.secondary}>
+              Made for what you use. Change it any time in Devices.
+            </Text>
+          </View>
+          <AppCard testID="health-setup-summary">
+            <View>
+              {sectionsFor(none ? NO_DEVICES : chosen).map((section, i) => (
+                <View key={section.name} style={[styles.historyRow, i > 0 && styles.divider]}>
+                  <Text style={[styles.historyValue, !section.on && styles.offText]}>
+                    {section.name}
+                  </Text>
+                  <Feather
+                    name={section.on ? 'check' : 'minus'}
+                    size={16}
+                    color={section.on ? accent : colors.textMuted}
+                  />
+                </View>
+              ))}
+            </View>
+          </AppCard>
+          <PrimaryButton
+            testID="health-setup-done"
+            label={onboarding ? 'Continue' : 'Done'}
+            onPress={finish}
+            accentColor={accent}
+          />
+        </>
       ) : null}
     </>
   );
@@ -652,8 +967,8 @@ export function DevicesPage({ scenario, accent }: PageProps) {
 
 // --- Insights ------------------------------------------------------------------------------
 
-export function InsightsPage({ scenario, accent }: PageProps) {
-  const insights = insightsFor(scenario);
+export function InsightsPage({ setup, accent }: PageProps) {
+  const insights = insightsFor(setup);
   return (
     <>
       <Block accent={accent} testID="health-insights">
@@ -694,7 +1009,7 @@ function periodColumns(history: number[], days: number): number[] {
   return weeks;
 }
 
-export function MetricPage({ scenario, accent, metric: key }: PageProps & { metric: MetricKey }) {
+export function MetricPage({ setup, accent, metric: key }: PageProps & { metric: MetricKey }) {
   const [period, setPeriod] = useState<'7' | '30' | '90'>('30');
   const metric = METRICS[key];
   const days = Number(period);
@@ -750,7 +1065,7 @@ export function MetricPage({ scenario, accent, metric: key }: PageProps & { metr
         <View>
           <View style={styles.historyRow}>
             <Text style={styles.historyDay}>Source</Text>
-            <SourceTag source={sourceOf(key, scenario)} />
+            <SourceTag source={sourceOf(key, setup)} />
           </View>
           <View style={[styles.historyRow, styles.divider]}>
             <Text style={styles.historyDay}>Last updated</Text>
@@ -773,7 +1088,7 @@ const styles = StyleSheet.create({
   },
   centre: {
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
   },
   title: {
@@ -810,7 +1125,6 @@ const styles = StyleSheet.create({
   note: {
     ...typeScale.caption,
     color: colors.textMuted,
-    textAlign: 'left',
   },
   caption: {
     ...typeScale.caption,
@@ -831,10 +1145,6 @@ const styles = StyleSheet.create({
   spread: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  inBedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   bedWake: {
     flexDirection: 'row',
@@ -889,6 +1199,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     color: colors.textPrimary,
   },
+  offText: {
+    color: colors.textMuted,
+  },
   divider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
@@ -939,8 +1252,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: widgetGap,
   },
+  moreRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  moreText: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    flex: 1,
+  },
   faded: {
-    opacity: 0.4,
+    opacity: 0.5,
   },
   weekHeader: {
     flexDirection: 'row',
@@ -997,6 +1321,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.pill,
@@ -1011,9 +1338,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  addDevice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 60,
+    paddingVertical: spacing.sm,
+  },
   metricHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  onboardingHead: {
+    gap: spacing.md,
+  },
+  progressTrack: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  progressPart: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  setupIntro: {
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  setupTitle: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+  },
+  choiceGrid: {
+    gap: widgetGap,
+  },
+  choice: {
+    flex: 1,
+    gap: spacing.xs,
+    minHeight: 124,
+  },
+  choiceTitle: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
   },
 });

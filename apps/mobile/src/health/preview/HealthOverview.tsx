@@ -1,23 +1,26 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SegmentedControl } from '../../design/SegmentedControl';
+import { PrimaryButton } from '../../design/Button';
 import { Text } from '../../design/Text';
 import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../../design/theme';
 import { withAlpha } from '../../theme/accentColor';
 import { Columns, Ring, StackedBar } from './healthCharts';
 import { BlockTitle, InsightRow, MetricTile, SampleNote, Tile } from './healthParts';
-import type { HealthPage } from './healthPreview';
+import { setPreviewSetup, usePreviewSetup, type HealthPage } from './healthPreview';
 import {
   ACTIVITY,
+  anyDevice,
+  DEVICE_ORDER,
+  DEVICES,
+  hasWearable,
   insightsFor,
   METRICS,
   metricsFor,
   READINESS,
-  SCENARIOS,
   SLEEP,
   TRAINING,
-  type HealthScenario,
+  type DeviceSetup,
   type MetricKey,
 } from './sampleHealthData';
 
@@ -39,32 +42,45 @@ export function stageColors(accent: string): Record<string, string> {
   };
 }
 
+/** The heart's three figures on the overview: the two everyone with a wearable has, then their device's own. */
+export function heartHighlights(setup: DeviceSetup): MetricKey[] {
+  const available = new Set(metricsFor(setup));
+  const third: MetricKey[] = ['vo2max', 'temperature', 'respiratory', 'heartRate'];
+  return [
+    'restingHr' as MetricKey,
+    'hrv' as MetricKey,
+    third.find((key) => available.has(key)) ?? 'heartRate',
+  ].filter((key) => available.has(key));
+}
+
+/** "Apple Watch and Oura Ring" -- the devices in a setup, named. */
+export function setupNames(setup: DeviceSetup): string {
+  const names = DEVICE_ORDER.filter((key) => setup[key]).map((key) => DEVICES[key].name);
+  if (names.length <= 1) return names[0] ?? 'No devices';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /**
- * Health's overview (Phase 1 prototype, sample data): what matters today first -- readiness (an
- * example), last night's sleep and today's movement side by side, the heart in three figures,
- * training against recovery, two insights and the devices behind it all -- each a tap from its
- * own page. A preview bar on top switches between the four device scenarios.
+ * Health's overview (Phase 1 prototype, sample data), made for each person's devices: only what
+ * those devices give is shown -- nothing that would only ever say "not available". A watch or ring
+ * brings recovery, sleep and the heart; a phone alone brings steps; with nothing connected, Health
+ * starts from the person's own training, with Set Up Health a tap away. A setup can always be
+ * started or changed (Devices). A preview bar on top switches the devices it pretends to have.
  */
 export function HealthOverview({
   accent,
   onOpen,
 }: {
   accent: string;
-  onOpen: (page: HealthPage, scenario: HealthScenario, metric?: MetricKey) => void;
+  onOpen: (page: HealthPage, metric?: MetricKey, onboarding?: boolean) => void;
 }) {
-  const [scenario, setScenario] = useState<HealthScenario>('both');
+  const setup = usePreviewSetup();
   const [dayOffset, setDayOffset] = useState(0);
-  const available = new Set(metricsFor(scenario));
-  const wearable = scenario !== 'none';
-  const open = (page: HealthPage, metric?: MetricKey) => onOpen(page, scenario, metric);
+  const wearable = hasWearable(setup);
+  const anything = anyDevice(setup);
+  const open = (page: HealthPage, metric?: MetricKey) => onOpen(page, metric);
   const stages = stageColors(accent);
-  const heartKeys: MetricKey[] = [
-    'restingHr',
-    'hrv',
-    scenario === 'oura' ? 'respiratory' : 'vo2max',
-  ];
-  const insights = insightsFor(scenario).slice(0, 2);
-  // A little life in the sample as days change.
+  const insights = insightsFor(setup).slice(0, 2);
   const readiness = Math.max(40, READINESS.score - dayOffset * 4);
 
   return (
@@ -75,110 +91,158 @@ export function HealthOverview({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* The prototype's own controls: sample data, and which devices it pretends are connected. */}
+      {/* The prototype's own controls: which devices it pretends this person has. */}
       <View style={styles.previewBar}>
-        <SampleNote testID="health-sample-note" />
-        <SegmentedControl
-          testID="health-scenario"
-          options={SCENARIOS}
-          value={scenario}
-          onChange={setScenario}
-          accentColor={accent}
-          stretch
-        />
+        <View style={styles.previewHead}>
+          <SampleNote testID="health-sample-note" />
+          <Pressable
+            testID="health-preview-onboarding"
+            onPress={() => onOpen('setup', undefined, true)}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.previewLink, { color: accent }]}>Onboarding step</Text>
+          </Pressable>
+        </View>
+        <View style={styles.previewChips}>
+          {DEVICE_ORDER.map((key) => {
+            const on = setup[key];
+            return (
+              <Pressable
+                key={key}
+                testID={`health-preview-device-${key}`}
+                onPress={() => setPreviewSetup({ ...setup, [key]: !on })}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: on }}
+                style={[
+                  styles.previewChip,
+                  on && { backgroundColor: withAlpha(accent, 0.16), borderColor: accent },
+                ]}
+              >
+                <Text style={[styles.previewChipText, on && { color: accent }]}>
+                  {key === 'otherWatch' ? 'Other Watch' : DEVICES[key].name.replace(' Ring', '')}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      {/* The day. */}
-      <View style={styles.dateRow}>
-        <Pressable
-          testID="health-day-back"
-          onPress={() => setDayOffset((d) => d + 1)}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Previous day"
-          style={styles.dateArrow}
-        >
-          <Feather name="chevron-left" size={18} color={colors.textSecondary} />
-        </Pressable>
-        <Text testID="health-day" style={styles.dateText}>
-          {dayLabel(dayOffset)}
-        </Text>
-        <Pressable
-          testID="health-day-forward"
-          onPress={() => setDayOffset((d) => Math.max(0, d - 1))}
-          disabled={dayOffset === 0}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Next day"
-          style={[styles.dateArrow, dayOffset === 0 && styles.faded]}
-        >
-          <Feather name="chevron-right" size={18} color={colors.textSecondary} />
-        </Pressable>
-      </View>
+      {anything ? (
+        <View style={styles.dateRow}>
+          <Pressable
+            testID="health-day-back"
+            onPress={() => setDayOffset((d) => d + 1)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Previous day"
+            style={styles.dateArrow}
+          >
+            <Feather name="chevron-left" size={18} color={colors.textSecondary} />
+          </Pressable>
+          <Text testID="health-day" style={styles.dateText}>
+            {dayLabel(dayOffset)}
+          </Text>
+          <Pressable
+            testID="health-day-forward"
+            onPress={() => setDayOffset((d) => Math.max(0, d - 1))}
+            disabled={dayOffset === 0}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Next day"
+            style={[styles.dateArrow, dayOffset === 0 && styles.faded]}
+          >
+            <Feather name="chevron-right" size={18} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      ) : null}
 
-      {/* Readiness -- an example -- or, with no wearable, what Health is without one. */}
-      {wearable ? (
+      {/* Nothing connected: Health starts from their training, with setup a tap away. */}
+      {!anything ? (
+        <Tile testID="health-set-up" style={styles.setUp}>
+          <View style={[styles.setUpIcon, { backgroundColor: withAlpha(accent, 0.12) }]}>
+            <MaterialCommunityIcons name="heart-pulse" size={24} color={accent} />
+          </View>
+          <Text style={styles.heroTitle}>Bring in your health data</Text>
+          <Text style={styles.secondary}>
+            Connect Apple Health, an Oura Ring or your watch’s app -- or don’t. Your training and
+            nutrition are already here.
+          </Text>
+          <PrimaryButton
+            testID="health-set-up-button"
+            label="Set Up Health"
+            onPress={() => open('setup')}
+            accentColor={accent}
+          />
+        </Tile>
+      ) : null}
+
+      {/* Recovery: Oura's own readiness where there's an Oura Ring; otherwise the signals behind it. */}
+      {wearable && setup.oura ? (
         <Tile
           testID="health-readiness"
           onPress={() => open('recovery')}
           style={styles.hero}
-          accessibilityLabel={`Readiness ${readiness}, an example. ${READINESS.word}.`}
+          accessibilityLabel={`Oura readiness ${readiness}, ${READINESS.word}.`}
         >
           <Ring size={124} stroke={11} progress={readiness / 100} color={accent}>
             <Text style={styles.heroScore}>{readiness}</Text>
-            <Text style={styles.heroScoreLabel}>EXAMPLE</Text>
+            <Text style={styles.heroScoreLabel}>OURA</Text>
           </Ring>
           <View style={styles.heroWords}>
             <Text style={styles.kicker}>READINESS</Text>
             <Text style={styles.heroTitle}>{READINESS.word}</Text>
-            {(['hrv', 'restingHr', 'sleep'] as MetricKey[])
-              .filter((key) => available.has(key))
-              .map((key) => (
-                <View key={key} style={styles.contributor}>
-                  <Text style={styles.contributorName}>{METRICS[key].short}</Text>
-                  <Text style={styles.contributorValue}>
-                    {METRICS[key].value}
-                    {key === 'sleep' ? '' : ` ${METRICS[key].unit}`}
-                  </Text>
-                </View>
-              ))}
+            {(['hrv', 'restingHr', 'sleep'] as MetricKey[]).map((key) => (
+              <View key={key} style={styles.contributor}>
+                <Text style={styles.contributorName}>{METRICS[key].short}</Text>
+                <Text style={styles.contributorValue}>
+                  {METRICS[key].value}
+                  {key === 'sleep' ? '' : ` ${METRICS[key].unit}`}
+                </Text>
+              </View>
+            ))}
           </View>
         </Tile>
-      ) : (
-        <Tile testID="health-no-wearable" style={styles.noWearable}>
-          <View style={[styles.noWearableIcon, { backgroundColor: withAlpha(accent, 0.12) }]}>
-            <Feather name="watch" size={22} color={accent} />
-          </View>
-          <Text style={styles.heroTitle}>Health works without a wearable</Text>
-          <Text style={styles.secondary}>
-            Your workouts and nutrition are already here. Log sleep yourself, or connect a device
-            for heart and recovery data.
-          </Text>
-          <View style={styles.noWearableActions}>
-            <Pressable onPress={() => open('devices')} accessibilityRole="button" hitSlop={6}>
-              <Text style={[styles.link, { color: accent }]}>Connect a device</Text>
-            </Pressable>
-            <Pressable onPress={() => open('sleep')} accessibilityRole="button" hitSlop={6}>
-              <Text style={[styles.link, { color: accent }]}>Log sleep</Text>
-            </Pressable>
-          </View>
-        </Tile>
-      )}
-
-      {/* Sleep and movement, side by side. */}
-      <View style={styles.pair}>
+      ) : wearable ? (
         <Tile
-          testID="health-sleep"
-          onPress={() => open('sleep')}
-          style={styles.half}
-          accessibilityLabel={wearable ? `Sleep ${SLEEP.asleep}` : 'Sleep, log last night'}
+          testID="health-recovery-signals"
+          onPress={() => open('recovery')}
+          style={styles.signals}
+          accessibilityLabel="Recovery signals"
         >
-          <View style={styles.tileHead}>
-            <Feather name="moon" size={14} color={accent} />
-            <Text style={styles.tileName}>Sleep</Text>
+          <View style={styles.signalsHead}>
+            <Text style={styles.kicker}>RECOVERY SIGNALS</Text>
+            <Feather name="chevron-right" size={16} color={colors.textMuted} />
           </View>
+          <View style={styles.pair}>
+            {(['hrv', 'restingHr', 'sleep'] as MetricKey[]).map((key) => (
+              <View key={key} style={styles.signal}>
+                <Text style={styles.signalValue}>
+                  {METRICS[key].value}
+                  {key === 'sleep' ? '' : <Text style={styles.tileUnit}> {METRICS[key].unit}</Text>}
+                </Text>
+                <Text style={styles.caption}>{METRICS[key].short}</Text>
+                <Text style={[styles.signalChange, { color: accent }]}>{METRICS[key].change}</Text>
+              </View>
+            ))}
+          </View>
+        </Tile>
+      ) : null}
+
+      {/* Sleep and movement -- sleep only with a watch or ring. */}
+      {anything ? (
+        <View style={styles.pair}>
           {wearable ? (
-            <>
+            <Tile
+              testID="health-sleep"
+              onPress={() => open('sleep')}
+              style={styles.half}
+              accessibilityLabel={`Sleep ${SLEEP.asleep}`}
+            >
+              <View style={styles.tileHead}>
+                <Feather name="moon" size={14} color={accent} />
+                <Text style={styles.tileName}>Sleep</Text>
+              </View>
               <Text style={styles.tileValue}>{SLEEP.asleep}</Text>
               <StackedBar
                 height={8}
@@ -192,60 +256,41 @@ export function HealthOverview({
                   }))}
               />
               <Text style={styles.caption}>In bed {SLEEP.inBed}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.tileValue}>—</Text>
-              <Text style={styles.caption}>Tap to log last night</Text>
-            </>
-          )}
-        </Tile>
-        <Tile
-          testID="health-activity"
-          onPress={() => open('activity')}
-          style={styles.half}
-          accessibilityLabel={
-            wearable ? `Activity, ${ACTIVITY.steps} steps` : 'This week’s training'
-          }
-        >
-          <View style={styles.tileHead}>
-            <Feather name={wearable ? 'trending-up' : 'bar-chart-2'} size={14} color={accent} />
-            <Text style={styles.tileName}>{wearable ? 'Activity' : 'Training'}</Text>
-          </View>
-          {wearable ? (
-            <>
-              <Text style={styles.tileValue}>
-                {ACTIVITY.steps}
-                <Text style={styles.tileUnit}> steps</Text>
-              </Text>
-              <Columns values={ACTIVITY.hourly} height={22} color={accent} gap={2} />
-              <Text style={styles.caption}>{ACTIVITY.activeCalories} active cal</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.tileValue}>
-                {TRAINING.thisWeek.workouts}
-                <Text style={styles.tileUnit}> workouts</Text>
-              </Text>
-              <Text style={styles.caption}>
-                {TRAINING.thisWeek.sets} sets this week · from Progresso
-              </Text>
-            </>
-          )}
-        </Tile>
-      </View>
+            </Tile>
+          ) : null}
+          <Tile
+            testID="health-activity"
+            onPress={() => open('activity')}
+            style={styles.half}
+            accessibilityLabel={`Activity, ${ACTIVITY.steps} steps`}
+          >
+            <View style={styles.tileHead}>
+              <Feather name="trending-up" size={14} color={accent} />
+              <Text style={styles.tileName}>Activity</Text>
+            </View>
+            <Text style={styles.tileValue}>
+              {ACTIVITY.steps}
+              <Text style={styles.tileUnit}> steps</Text>
+            </Text>
+            <Columns values={ACTIVITY.hourly} height={22} color={accent} gap={2} />
+            <Text style={styles.caption}>
+              {wearable ? `${ACTIVITY.activeCalories} active cal` : ACTIVITY.distance}
+            </Text>
+          </Tile>
+        </View>
+      ) : null}
 
-      {/* The heart, in three figures. */}
+      {/* The heart: what their watch or ring measures. */}
       {wearable ? (
         <View style={styles.block}>
           <BlockTitle title="Heart" action="All" onAction={() => open('heart')} accent={accent} />
           <View style={styles.pair}>
-            {heartKeys.map((key) => (
+            {heartHighlights(setup).map((key) => (
               <MetricTile
                 key={key}
                 testID={`health-heart-${key}`}
                 metric={METRICS[key]}
-                available={available.has(key)}
+                available
                 accent={accent}
                 onPress={() => open('metric', key)}
               />
@@ -258,7 +303,7 @@ export function HealthOverview({
       <Tile testID="health-training" onPress={() => open('training')} style={styles.training}>
         <View style={styles.trainingHead}>
           <View style={styles.trainingWords}>
-            <Text style={styles.kicker}>TRAINING & RECOVERY</Text>
+            <Text style={styles.kicker}>{wearable ? 'TRAINING & RECOVERY' : 'TRAINING'}</Text>
             <Text style={styles.trainingTitle}>
               Volume up 14% this week{wearable ? ', sleep steady' : ''}
             </Text>
@@ -275,11 +320,10 @@ export function HealthOverview({
         />
       </Tile>
 
-      {/* Two observations. */}
       <View style={styles.block}>
         <BlockTitle
           title="Insights"
-          action="See All"
+          action={insightsFor(setup).length > 2 ? 'See All' : undefined}
           onAction={() => open('insights')}
           accent={accent}
         />
@@ -290,23 +334,34 @@ export function HealthOverview({
         </View>
       </View>
 
-      {/* What it's all from. */}
-      <Pressable
-        testID="health-devices"
-        onPress={() => open('devices')}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.devices, pressed && styles.faded]}
-      >
-        <Feather name="link" size={14} color={colors.textMuted} />
-        <Text style={styles.devicesText} numberOfLines={1}>
-          {scenario === 'none'
-            ? 'No devices connected'
-            : scenario === 'both'
-              ? 'Apple Health and Oura · synced 5 min ago'
-              : `${scenario === 'apple' ? 'Apple Health' : 'Oura'} · synced 5 min ago`}
-        </Text>
-        <Text style={[styles.devicesManage, { color: accent }]}>Manage</Text>
-      </Pressable>
+      {/* A phone alone: a watch or ring is always a tap away, never pushed. */}
+      {anything && !wearable ? (
+        <Pressable
+          testID="health-add-wearable"
+          onPress={() => open('setup')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.addRow, pressed && styles.faded]}
+        >
+          <Feather name="plus-circle" size={16} color={accent} />
+          <Text style={styles.addText}>Add a watch or ring for sleep and recovery</Text>
+        </Pressable>
+      ) : null}
+
+      {/* What it's all from -- set up or changed any time. */}
+      {anything ? (
+        <Pressable
+          testID="health-devices"
+          onPress={() => open('devices')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.devices, pressed && styles.faded]}
+        >
+          <Feather name="link" size={14} color={colors.textMuted} />
+          <Text style={styles.devicesText} numberOfLines={1}>
+            {setupNames(setup)} · synced 5 min ago
+          </Text>
+          <Text style={[styles.devicesManage, { color: accent }]}>Manage</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
@@ -321,6 +376,35 @@ const styles = StyleSheet.create({
   },
   previewBar: {
     gap: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  previewHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  previewLink: {
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
+  },
+  previewChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  previewChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
+  },
+  previewChipText: {
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
+    color: colors.textSecondary,
   },
   dateRow: {
     flexDirection: 'row',
@@ -344,6 +428,17 @@ const styles = StyleSheet.create({
   },
   faded: {
     opacity: 0.4,
+  },
+  setUp: {
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  setUpIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hero: {
     flexDirection: 'row',
@@ -388,24 +483,27 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     color: colors.textPrimary,
   },
-  noWearable: {
-    gap: spacing.sm,
+  signals: {
+    gap: spacing.md,
     padding: spacing.lg,
   },
-  noWearableIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noWearableActions: {
+  signalsHead: {
     flexDirection: 'row',
-    gap: spacing.xl,
-    marginTop: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  link: {
-    ...typeScale.label,
+  signal: {
+    flex: 1,
+    gap: 2,
+  },
+  signalValue: {
+    fontFamily: fonts.monoBold,
+    fontSize: 20,
+    color: colors.textPrimary,
+  },
+  signalChange: {
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
   },
   secondary: {
     ...typeScale.secondary,
@@ -462,6 +560,16 @@ const styles = StyleSheet.create({
     ...typeScale.callout,
     fontFamily: fonts.semibold,
     color: colors.textPrimary,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  addText: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
   },
   devices: {
     flexDirection: 'row',

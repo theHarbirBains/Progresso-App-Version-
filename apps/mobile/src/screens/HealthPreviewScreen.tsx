@@ -9,10 +9,15 @@ import {
   InsightsPage,
   MetricPage,
   RecoveryPage,
+  SetupPage,
   SleepPage,
   TrainingPage,
 } from '../health/preview/HealthPages';
-import { HEALTH_PAGE_TITLES, type HealthPage } from '../health/preview/healthPreview';
+import {
+  HEALTH_PAGE_TITLES,
+  usePreviewSetup,
+  type HealthPage,
+} from '../health/preview/healthPreview';
 import { METRICS, type MetricKey } from '../health/preview/sampleHealthData';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -21,16 +26,27 @@ type Props = RootStackScreenProps<'HealthPreview'>;
 
 /**
  * One of Health's deeper pages -- Recovery, Sleep, Activity, Heart, Training & Recovery, Devices,
- * Insights, or a metric's own page -- opened from Health on Progress. PHASE 1 PROTOTYPE: sample
+ * Insights, a metric's own page, or Set Up Health (as onboarding would show it, too) -- opened
+ * from Health on Progress, each made for the devices the preview has. PHASE 1 PROTOTYPE: sample
  * data only, development builds only (health/preview/healthPreview.ts).
  */
 export function HealthPreviewScreen({ navigation, route }: Props) {
   const accent = useAppTheme().accent.accent;
-  const { page, scenario, metric } = route.params;
-  const open = (next: HealthPage, nextMetric?: MetricKey) =>
-    navigation.push('HealthPreview', { page: next, scenario, metric: nextMetric });
-  const title = page === 'metric' && metric ? METRICS[metric].name : HEALTH_PAGE_TITLES[page];
-  const pageProps = { scenario, accent, open };
+  const setup = usePreviewSetup();
+  const { page, metric, onboarding } = route.params;
+  const open = (next: HealthPage, nextMetric?: MetricKey, nextOnboarding?: boolean) =>
+    navigation.push('HealthPreview', {
+      page: next,
+      metric: nextMetric,
+      onboarding: nextOnboarding,
+    });
+  const title =
+    page === 'metric' && metric
+      ? METRICS[metric].name
+      : page === 'setup' && onboarding
+        ? 'Welcome to Progresso'
+        : HEALTH_PAGE_TITLES[page];
+  const pageProps = { setup, accent, open };
   return (
     <Screen
       scrollTestID="health-preview-scroll"
@@ -51,6 +67,9 @@ export function HealthPreviewScreen({ navigation, route }: Props) {
       {page === 'devices' ? <DevicesPage {...pageProps} /> : null}
       {page === 'insights' ? <InsightsPage {...pageProps} /> : null}
       {page === 'metric' && metric ? <MetricPage {...pageProps} metric={metric} /> : null}
+      {page === 'setup' ? (
+        <SetupPage {...pageProps} onboarding={onboarding} onDone={() => navigation.goBack()} />
+      ) : null}
     </Screen>
   );
 }

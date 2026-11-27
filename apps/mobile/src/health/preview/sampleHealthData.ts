@@ -6,23 +6,99 @@
 // methodology approved first). The prototype is shown only in development builds
 // (healthPreview.ts).
 
-/** Which wearables the preview pretends are connected. */
-export type HealthScenario = 'apple' | 'oura' | 'both' | 'none';
+/**
+ * The devices someone can have. Apple Health brings an iPhone's own counts and an Apple Watch's,
+ * and what other watch apps (Garmin Connect, Fitbit, WHOOP...) write into it; Oura comes from its
+ * own app. Each has its own set of data, and Health shows only what someone's devices give.
+ */
+export type DeviceKey = 'iphone' | 'appleWatch' | 'oura' | 'otherWatch';
 
-export const SCENARIOS: { value: HealthScenario; label: string }[] = [
-  { value: 'apple', label: 'Apple' },
-  { value: 'oura', label: 'Oura' },
-  { value: 'both', label: 'Both' },
-  { value: 'none', label: 'None' },
-];
+export type DeviceSetup = Record<DeviceKey, boolean>;
 
-export type HealthSource = 'apple' | 'oura' | 'progresso' | 'manual';
+export interface DeviceInfo {
+  key: DeviceKey;
+  name: string;
+  /** How it reaches Progresso. */
+  via: string;
+  icon: 'cellphone' | 'watch' | 'ring' | 'watch-variant';
+  /** What it brings. */
+  provides: string[];
+  /** What only it brings, of the devices here. */
+  unique: string[];
+}
+
+export const DEVICES: Record<DeviceKey, DeviceInfo> = {
+  iphone: {
+    key: 'iphone',
+    name: 'iPhone',
+    via: 'Apple Health',
+    icon: 'cellphone',
+    provides: ['Steps', 'Distance'],
+    unique: [],
+  },
+  appleWatch: {
+    key: 'appleWatch',
+    name: 'Apple Watch',
+    via: 'Apple Health',
+    icon: 'watch',
+    provides: [
+      'Steps',
+      'Active calories',
+      'Exercise minutes',
+      'Sleep stages',
+      'Heart rate',
+      'Resting HR',
+      'HRV',
+      'Blood oxygen',
+      'Respiratory rate',
+    ],
+    unique: ['VO₂ Max', 'Heart rate recovery'],
+  },
+  oura: {
+    key: 'oura',
+    name: 'Oura Ring',
+    via: 'The Oura app',
+    icon: 'ring',
+    provides: ['Sleep stages', 'HRV', 'Resting HR', 'Respiratory rate', 'Steps', 'Blood oxygen'],
+    unique: ['Readiness score', 'Temperature trend'],
+  },
+  otherWatch: {
+    key: 'otherWatch',
+    name: 'Another Watch',
+    via: 'Garmin, Fitbit, WHOOP and others, through Apple Health',
+    icon: 'watch-variant',
+    provides: ['Steps', 'Active calories', 'Sleep', 'Heart rate', 'Resting HR', 'HRV'],
+    unique: ['Its own scores, like Body Battery or Strain (a later step)'],
+  },
+};
+
+export const DEVICE_ORDER: DeviceKey[] = ['iphone', 'appleWatch', 'oura', 'otherWatch'];
+
+export const NO_DEVICES: DeviceSetup = {
+  iphone: false,
+  appleWatch: false,
+  oura: false,
+  otherWatch: false,
+};
+
+/** A watch or ring: what sleep, heart and recovery need. */
+export function hasWearable(setup: DeviceSetup): boolean {
+  return setup.appleWatch || setup.oura || setup.otherWatch;
+}
+
+export function anyDevice(setup: DeviceSetup): boolean {
+  return hasWearable(setup) || setup.iphone;
+}
+
+export type HealthSource = DeviceKey | 'progresso' | 'manual';
 
 export const SOURCE_NAMES: Record<HealthSource, string> = {
-  apple: 'Apple Health',
+  iphone: 'iPhone',
+  appleWatch: 'Apple Watch',
   oura: 'Oura',
+  otherWatch: 'Your watch',
   progresso: 'Progresso',
-  manual: 'Manual',
+  manual: 'Logged by you',
 };
 
 export type MetricKey =
@@ -56,8 +132,8 @@ export interface HealthMetric {
   usual: [number, number];
   /** 90 days of values, oldest first (sample). */
   history: number[];
-  /** Which sources can give it. */
-  sources: HealthSource[];
+  /** Which devices can give it. */
+  sources: DeviceKey[];
   updated: string;
   /** What it is, in two sentences at most. */
   about: string;
@@ -87,7 +163,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'higher',
     usual: [52, 64],
     history: wave(58, 8, 1),
-    sources: ['apple', 'oura'],
+    sources: ['appleWatch', 'oura', 'otherWatch'],
     updated: 'Today, 6:41 AM',
     about:
       'The small changes in time between heartbeats, measured while you rest. It varies a lot from person to person, so it means most against your own usual range.',
@@ -104,7 +180,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'lower',
     usual: [53, 58],
     history: wave(56, 3, 7),
-    sources: ['apple', 'oura'],
+    sources: ['appleWatch', 'oura', 'otherWatch'],
     updated: 'Today, 6:41 AM',
     about:
       'Your heart rate at its calmest, usually measured overnight. Sleep, stress, illness and hard training can all nudge it.',
@@ -121,7 +197,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'neither',
     usual: [62, 74],
     history: wave(68, 6, 3),
-    sources: ['apple', 'oura'],
+    sources: ['appleWatch', 'oura', 'otherWatch'],
     updated: 'Today, 11:02 AM',
     about: 'Your average heart rate through the day, from your watch or ring.',
     icon: 'heart',
@@ -137,7 +213,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'neither',
     usual: [14, 15.4],
     history: wave(14.7, 0.6, 5),
-    sources: ['apple', 'oura'],
+    sources: ['appleWatch', 'oura'],
     updated: 'Today, 6:41 AM',
     about: 'How many breaths you take a minute while you sleep. It tends to stay very steady.',
     icon: 'wind',
@@ -153,7 +229,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'neither',
     usual: [95, 99],
     history: wave(97, 1, 9),
-    sources: ['apple', 'oura'],
+    sources: ['appleWatch', 'oura'],
     updated: 'Today, 6:41 AM',
     about:
       'An estimate of the oxygen in your blood, where your device supports it. Wearables are not medical devices.',
@@ -187,7 +263,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'higher',
     usual: [45, 47],
     history: wave(46, 1, 2),
-    sources: ['apple'],
+    sources: ['appleWatch'],
     updated: 'Yesterday',
     about:
       'An estimate of your cardio fitness, made by Apple Watch from outdoor walks and runs. An estimate, not a lab test.',
@@ -204,7 +280,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'higher',
     usual: [22, 28],
     history: wave(25, 3, 4),
-    sources: ['apple'],
+    sources: ['appleWatch'],
     updated: 'Yesterday',
     about: 'How far your heart rate drops in the minute after a workout ends.',
     icon: 'zap',
@@ -220,7 +296,7 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'neither',
     usual: [6.8, 7.8],
     history: wave(7.3, 0.6, 6),
-    sources: ['apple', 'oura', 'manual'],
+    sources: ['appleWatch', 'oura', 'otherWatch'],
     updated: 'Today, 6:41 AM',
     about: 'Time asleep last night, not counting time awake in bed.',
     icon: 'moon',
@@ -236,30 +312,32 @@ export const METRICS: Record<MetricKey, HealthMetric> = {
     better: 'neither',
     usual: [6800, 9400],
     history: wave(8000, 1500, 8),
-    sources: ['apple', 'oura'],
+    sources: ['iphone', 'appleWatch', 'oura', 'otherWatch'],
     updated: 'Today, 11:02 AM',
     about: 'Every step your phone, watch or ring counted today.',
     icon: 'activity',
   },
 };
 
-/** The metrics a scenario can show; anything else is shown as not available -- never as 0. */
-export function metricsFor(scenario: HealthScenario): MetricKey[] {
-  const all = Object.keys(METRICS) as MetricKey[];
-  if (scenario === 'none') return [];
-  if (scenario === 'both') return all;
-  return all.filter((key) => METRICS[key].sources.includes(scenario));
+/** The metrics someone's devices give -- the only ones Health shows them. */
+export function metricsFor(setup: DeviceSetup): MetricKey[] {
+  return (Object.keys(METRICS) as MetricKey[]).filter((key) =>
+    METRICS[key].sources.some((device) => setup[device]),
+  );
 }
 
-/** Where a metric comes from in a scenario -- with both, the one preferred for it. */
-export function sourceOf(key: MetricKey, scenario: HealthScenario): HealthSource | null {
-  const sources = METRICS[key].sources;
-  if (scenario === 'none') return null;
-  if (scenario !== 'both') return sources.includes(scenario) ? scenario : null;
-  // With both: Oura for what it measures overnight, Apple for the rest.
-  const ouraFirst: MetricKey[] = ['hrv', 'restingHr', 'respiratory', 'temperature', 'sleep'];
-  if (ouraFirst.includes(key) && sources.includes('oura')) return 'oura';
-  return sources.includes('apple') ? 'apple' : (sources[0] ?? null);
+/**
+ * Where a metric comes from for this setup: with more than one device, one is chosen for each --
+ * Oura for what it measures overnight, a watch for the day, the phone for steps without a watch --
+ * so nothing is counted twice.
+ */
+export function sourceOf(key: MetricKey, setup: DeviceSetup): DeviceKey | null {
+  const has = (device: DeviceKey) => setup[device] && METRICS[key].sources.includes(device);
+  const overnight: MetricKey[] = ['hrv', 'restingHr', 'respiratory', 'temperature', 'sleep'];
+  const order: DeviceKey[] = overnight.includes(key)
+    ? ['oura', 'appleWatch', 'otherWatch', 'iphone']
+    : ['appleWatch', 'otherWatch', 'iphone', 'oura'];
+  return order.find(has) ?? null;
 }
 
 /** Sample sleep: last night, and the six before. */
@@ -307,10 +385,13 @@ export const ACTIVITY = {
   ],
 };
 
-/** Sample readiness: an example only. */
+/**
+ * Sample readiness: Oura's own score, as the Oura app would give it (sample). Progresso makes no
+ * score of its own -- without Oura, Health shows the signals (HRV, resting heart rate, sleep).
+ */
 export const READINESS = {
   score: 78,
-  word: 'Ready to train',
+  word: 'Good',
   week: [64, 71, 69, 74, 80, 72, 78],
   weekDays: ['F', 'S', 'S', 'M', 'T', 'W', 'T'],
 };
@@ -336,7 +417,8 @@ export interface HealthInsight {
   tone: InsightTone;
   /** What it's drawn from. */
   basis: string;
-  needs: HealthSource[];
+  /** It needs a watch or ring (sleep, heart); else it's from Progresso alone. */
+  needsWearable: boolean;
 }
 
 export const INSIGHTS: HealthInsight[] = [
@@ -347,7 +429,7 @@ export const INSIGHTS: HealthInsight[] = [
     detail: 'Bedtime within 25 min of usual on 6 of 7 nights, up from 3 last week.',
     tone: 'positive',
     basis: 'Sleep · 14 nights',
-    needs: ['apple', 'oura'],
+    needsWearable: true,
   },
   {
     id: 'rhr-baseline',
@@ -356,7 +438,7 @@ export const INSIGHTS: HealthInsight[] = [
     detail: '54 bpm this week, against a 30-day average of 56.',
     tone: 'neutral',
     basis: 'Resting HR · 30 days',
-    needs: ['apple', 'oura'],
+    needsWearable: true,
   },
   {
     id: 'volume-up',
@@ -365,7 +447,7 @@ export const INSIGHTS: HealthInsight[] = [
     detail: '47,600 kg over 5 workouts, 14% more than last week.',
     tone: 'neutral',
     basis: 'Your workouts · 2 weeks',
-    needs: [],
+    needsWearable: false,
   },
   {
     id: 'rest-days-sleep',
@@ -375,7 +457,7 @@ export const INSIGHTS: HealthInsight[] = [
       'You slept 24 min longer, on average, on nights after rest days. A pattern, not a cause.',
     tone: 'neutral',
     basis: 'Sleep and workouts · 4 weeks',
-    needs: ['apple', 'oura'],
+    needsWearable: true,
   },
   {
     id: 'hrv-dip',
@@ -384,18 +466,13 @@ export const INSIGHTS: HealthInsight[] = [
     detail: 'Down 9 ms the morning after Tuesday’s session, back to usual by Thursday.',
     tone: 'watch',
     basis: 'HRV and workouts · 7 days',
-    needs: ['apple', 'oura'],
+    needsWearable: true,
   },
 ];
 
-/** The insights a scenario could show: ones needing a wearable need one connected. */
-export function insightsFor(scenario: HealthScenario): HealthInsight[] {
-  return INSIGHTS.filter(
-    (insight) =>
-      insight.needs.length === 0 ||
-      (scenario !== 'none' &&
-        (scenario === 'both' || insight.needs.includes(scenario as HealthSource))),
-  );
+/** The insights someone's setup could support. */
+export function insightsFor(setup: DeviceSetup): HealthInsight[] {
+  return INSIGHTS.filter((insight) => !insight.needsWearable || hasWearable(setup));
 }
 
 export type ConnectionState = 'connected' | 'notConnected' | 'syncing' | 'permission' | 'issue';
