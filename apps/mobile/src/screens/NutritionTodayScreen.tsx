@@ -686,55 +686,6 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
               onSetTarget={() => navigation.navigate('NutritionGoals')}
             />
           </Animated.View>
-
-          <BottomSheet
-            visible={weekOpen}
-            onClose={() => setWeekOpen(false)}
-            swipeToDismiss
-            testID="nutrition-week-sheet"
-          >
-            <WeeklyCalorieBudget
-              layout="details"
-              title={week.title}
-              today={isToday}
-              consumed={week.earlier === null ? null : week.earlier + consumed.calories}
-              dailyTarget={goals.calories}
-              daysLeft={week.daysLeft}
-              goal={calorieGoal}
-              failed={weekFailed}
-              rangeText={week.rangeText}
-              logging={week.logging}
-              accentColor={accent}
-              onSetTarget={() => navigation.navigate('NutritionGoals')}
-            />
-          </BottomSheet>
-
-          <LoggedFoodSheet
-            log={openLog}
-            isToday={isToday}
-            amount={openLog ? (quantityInputs[openLog.id] ?? '') : ''}
-            onChangeAmount={(text) => {
-              if (openLog) setQuantityInputs((prev) => ({ ...prev, [openLog.id]: text }));
-            }}
-            onSaveAmount={() => {
-              if (openLog) void handleUpdateQuantity(openLog);
-            }}
-            onDelete={() => {
-              if (!openLog) return;
-              setOpenLogId(null);
-              void handleDelete(openLog.id);
-            }}
-            onClose={closeFood}
-            accentColor={accent}
-            onAccentColor={nutritionTheme.onAccent}
-          />
-          <CopyYesterdaySheet
-            visible={copyOpen}
-            onClose={() => setCopyOpen(false)}
-            logs={yesterdayLogs}
-            accentColor={accent}
-            onAccentColor={nutritionTheme.onAccent}
-          />
         </>
       )}
 
@@ -795,6 +746,60 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       >
         {moved ? dayWidgets : <RiseInStack>{dayWidgets}</RiseInStack>}
       </Animated.View>
+      {/* The sheets stand outside the widgets: hidden, each is nothing, but among them it would be
+          a box of its own (the widgets' rise-in wraps every one) and take a gap -- three of them
+          made the space above Daily Targets four gaps deep. Out of the page's flow altogether,
+          they never move it, shown or not. */}
+      <View style={styles.sheets} pointerEvents="box-none">
+        <BottomSheet
+          visible={weekOpen}
+          onClose={() => setWeekOpen(false)}
+          swipeToDismiss
+          testID="nutrition-week-sheet"
+        >
+          <WeeklyCalorieBudget
+            layout="details"
+            title={week.title}
+            today={isToday}
+            consumed={week.earlier === null ? null : week.earlier + consumed.calories}
+            dailyTarget={goals.calories}
+            daysLeft={week.daysLeft}
+            goal={calorieGoal}
+            failed={weekFailed}
+            rangeText={week.rangeText}
+            logging={week.logging}
+            accentColor={accent}
+            onSetTarget={() => navigation.navigate('NutritionGoals')}
+          />
+        </BottomSheet>
+
+        <LoggedFoodSheet
+          log={openLog}
+          isToday={isToday}
+          amount={openLog ? (quantityInputs[openLog.id] ?? '') : ''}
+          onChangeAmount={(text) => {
+            if (openLog) setQuantityInputs((prev) => ({ ...prev, [openLog.id]: text }));
+          }}
+          onSaveAmount={() => {
+            if (openLog) void handleUpdateQuantity(openLog);
+          }}
+          onDelete={() => {
+            if (!openLog) return;
+            setOpenLogId(null);
+            void handleDelete(openLog.id);
+          }}
+          onClose={closeFood}
+          accentColor={accent}
+          onAccentColor={nutritionTheme.onAccent}
+        />
+        <CopyYesterdaySheet
+          visible={copyOpen}
+          onClose={() => setCopyOpen(false)}
+          logs={yesterdayLogs}
+          accentColor={accent}
+          onAccentColor={nutritionTheme.onAccent}
+        />
+      </View>
     </Screen>
   );
 }
@@ -820,6 +825,12 @@ const styles = StyleSheet.create({
   },
   fill: {
     flexGrow: 1,
+  },
+  // The page's sheets: no room of their own in it.
+  sheets: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
   },
   errorText: {
     ...typeScale.callout,

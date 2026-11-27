@@ -2,6 +2,7 @@ import { Image, Keyboard, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
+import { RiseIn } from '../design/RiseIn';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { fakeTouch } from '../testUtils/fakeTouch';
 import { useAuth } from '../auth/AuthProvider';
@@ -593,6 +594,17 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     expect(
       within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
     ).toBeTruthy();
+  });
+
+  it('keeps one gap between each two widgets -- the hidden sheets take none', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+
+    // Each widget rises in in a box of its own, one gap apart; a sheet among them would be one
+    // more box, and one more gap (above Daily Targets, where they used to be).
+    const content = screen.getByTestId('nutrition-day-content');
+    expect(within(content).UNSAFE_queryAllByType(RiseIn)).toHaveLength(5);
   });
 
   it("shows the logged food's photo when it has one, and a glyph when it does not", async () => {
