@@ -96,14 +96,24 @@ export function HealthOverview({
       <View style={styles.previewBar}>
         <View style={styles.previewHead}>
           <SampleNote testID="health-sample-note" exceptSteps />
-          <Pressable
-            testID="health-preview-onboarding"
-            onPress={() => onOpen('setup', undefined, true)}
-            hitSlop={8}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.previewLink, { color: accent }]}>Onboarding step</Text>
-          </Pressable>
+          <View style={styles.previewLinks}>
+            <Pressable
+              testID="health-preview-iphone"
+              onPress={() => onOpen('iphone')}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.previewLink, { color: accent }]}>iPhone only</Text>
+            </Pressable>
+            <Pressable
+              testID="health-preview-onboarding"
+              onPress={() => onOpen('setup', undefined, true)}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.previewLink, { color: accent }]}>Onboarding step</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.previewChips}>
           {DEVICE_ORDER.map((key) => {
@@ -402,6 +412,10 @@ const styles = StyleSheet.create({
   previewLink: {
     ...typeScale.caption,
     fontFamily: fonts.semibold,
+  },
+  previewLinks: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
   previewChips: {
     flexDirection: 'row',

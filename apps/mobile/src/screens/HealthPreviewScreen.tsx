@@ -2,6 +2,7 @@ import { StyleSheet } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { Screen } from '../design/Screen';
 import { spacing } from '../design/theme';
+import { IPhoneHealth } from '../health/iphone/IPhoneHealth';
 import {
   ActivityPage,
   DevicesPage,
@@ -72,6 +73,7 @@ export function HealthPreviewScreen({ navigation, route }: Props) {
       {page === 'devices' ? <DevicesPage {...pageProps} /> : null}
       {page === 'insights' ? <InsightsPage {...pageProps} /> : null}
       {page === 'metric' && metric ? <MetricPage {...pageProps} metric={metric} /> : null}
+      {page === 'iphone' ? <IPhoneHealth accent={accent} /> : null}
       {page === 'setup' ? (
         <SetupPage {...pageProps} onboarding={onboarding} onDone={() => navigation.goBack()} />
       ) : null}

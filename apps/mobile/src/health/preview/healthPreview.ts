@@ -18,7 +18,9 @@ export type HealthPage =
   | 'devices'
   | 'insights'
   | 'metric'
-  | 'setup';
+  | 'setup'
+  /** iPhone-only Health: what an iPhone measures by itself (a prototype of its own). */
+  | 'iphone';
 
 export const HEALTH_PAGE_TITLES: Record<HealthPage, string> = {
   recovery: 'Recovery',
@@ -30,6 +32,7 @@ export const HEALTH_PAGE_TITLES: Record<HealthPage, string> = {
   insights: 'Insights',
   metric: 'Metric',
   setup: 'Set Up Health',
+  iphone: 'iPhone Health',
 };
 
 export interface HealthPreviewParams {
