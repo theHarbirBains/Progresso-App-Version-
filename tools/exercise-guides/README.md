@@ -35,14 +35,18 @@ one studio, rendered to an MP4 per exercise that the guide plays muted, inline a
 | --- | --- |
 | The exercise split (`pl-t-bar-row` / `pl-t-bar-row-upper`) | Done: catalogue, guide, tips, drawing; migration `20261222100000` applied. |
 | Chest-supported T-bar row machine (`machines/chest_supported_t_bar.py`) | First pass: frame, chest pad on two posts, split foot plates, rear-pivot lever between the feet, yoke with the upper bar (level with the floor at every angle) and the diagonal handles, plate horn, rubber stop. `preview_machine.py` renders it at rest and at the top. |
+| Equipment picture (`equipment_still.py`) | Done for the pilot: the machine alone, transparent, the upper handles' grips in amber -- Equipment & Details' picture. |
+| Publishing (`publish.py`, `demos.json`) | Done: writes the app's `exerciseDemos.generated.ts` from what's in `apps/mobile/assets/exercise-guides/<slug>/`; a video whose `qc.json` didn't pass is left out and flagged. |
+| Guide screen (How To / Muscles / Tips) | Done, from Harbir's screenshots: `apps/mobile/src/exercises/guide/ExerciseDemoGuide.tsx`. Shows the drawing where the video goes until it's rendered. |
 | Character | **Waiting on Harbir's faceless anatomical model** (to be rigged here). |
-| Movement template, animation, MP4, QC | Next, once the character is in. |
-| Guide screen (How To / Muscles / Tips) | **Waiting on Harbir's design screenshots.** The app already has the player (`exercises/videos/ExerciseVideo.tsx`, muted inline autoplay on a loop) and the Muscles figure. |
+| Movement template, animation, MP4, step stills, QC | Next, once the character is in. The render writes `demo.mp4`, `demo.json`, `poster.webp`, `step-1..4.webp` and `qc.json` into the exercise's assets folder, then `publish.py`. |
 
 ## Running it
 
 ```bash
 "<blender>" -b -P tools/exercise-guides/preview_machine.py -- tools/exercise-guides/work/machine [preview]
+"<blender>" -b -P tools/exercise-guides/equipment_still.py -- pl-t-bar-row-upper
+python tools/exercise-guides/publish.py
 ```
 
 Blender 4.5 LTS, as the render pipeline uses (see its README for where it lives on this machine).

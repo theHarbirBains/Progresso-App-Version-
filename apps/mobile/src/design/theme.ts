@@ -204,3 +204,18 @@ export const analyticsColors = {
   none: '#66707C',
   chart: '#6E9BE6',
 } as const;
+
+/**
+ * An exercise guide's palette (Harbir's Exercise Guide design, November 2026), on that page only:
+ * blue for the muscle chips under its name, coral and amber for its primary and secondary muscles
+ * (the muscle analytics' own two, so a worked muscle reads the same on both pages), and a muted
+ * green and red for its Do and Avoid cards. Gold stays the theme's accent: its tabs, step numbers,
+ * section icons and Watch Full Demonstration.
+ */
+export const guideColors = {
+  chip: analyticsColors.chart,
+  primary: analyticsColors.recent,
+  secondary: analyticsColors.frequent,
+  do: '#6CBF84',
+  avoid: '#E56B6F',
+} as const;

@@ -137,9 +137,11 @@ def build_static():
     return objs
 
 
-def build_lever(lever_deg, handles=('upper', 'diagonal')):
-    """The lever at an angle, with its yoke, its handles and its plates."""
+def build_lever(lever_deg, handles=('upper', 'diagonal'), marked=()):
+    """The lever at an angle, with its yoke, its handles and its plates -- the grips of the handles
+    in `marked` in the accent (the equipment picture's: the handles this exercise uses)."""
     objs = []
+    grip_mat = (lambda which: 'accent' if which in marked else 'rubber')
     d, n = _dir(lever_deg), _normal(lever_deg)
     end = yoke(lever_deg)
     objs.append(eq.tube('tb_lever', PIVOT + d * 0.02, end, half=0.04))
@@ -153,14 +155,14 @@ def build_lever(lever_deg, handles=('upper', 'diagonal')):
         for side in (-1, 1):
             a = bar + Vector((0, side * UPPER_GRIP[0], 0))
             b = bar + Vector((0, side * UPPER_GRIP[1], 0))
-            objs.append(eq.cylinder(f'tb_upper_grip_{side}', a, b, 0.0185, 'rubber', bevel=0.004))
+            objs.append(eq.cylinder(f'tb_upper_grip_{side}', a, b, 0.0185, grip_mat('upper'), bevel=0.004))
             objs.append(eq.cylinder(f'tb_upper_cap_{side}', b, b + Vector((0, side * 0.012, 0)), 0.022, 'frame'))
     if 'diagonal' in handles:
         for side in (-1, 1):
             centre, along = diagonal_grip(lever_deg, side)
             start = end + Vector((0, side * DIAGONAL_OUT, 0))
             objs.append(eq.cylinder(f'tb_diag_stem_{side}', start, start + along * 0.03, 0.016, 'chrome'))
-            objs.append(eq.cylinder(f'tb_diag_grip_{side}', start + along * 0.03, start + along * DIAGONAL_LEN, 0.0185, 'rubber', bevel=0.004))
+            objs.append(eq.cylinder(f'tb_diag_grip_{side}', start + along * 0.03, start + along * DIAGONAL_LEN, 0.0185, grip_mat('diagonal'), bevel=0.004))
     # The plate horn out of the yoke's front, with two plates.
     horn_a, horn_b = end + d * 0.05, end + d * 0.40
     objs.append(eq.cylinder('tb_horn', horn_a, horn_b, 0.025, 'chrome'))

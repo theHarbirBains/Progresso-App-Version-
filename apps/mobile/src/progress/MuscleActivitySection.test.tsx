@@ -16,10 +16,18 @@ function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
+/** Earlier today, whatever the time -- a few hours ago is yesterday just after midnight. */
+function earlierToday(): string {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  return new Date((midnight.getTime() + now.getTime()) / 2).toISOString();
+}
+
 const entries: ActivityEntry[] = [
   {
     workoutId: 'w1',
-    performedAt: hoursAgo(3),
+    performedAt: earlierToday(),
     exerciseId: 'bench',
     exerciseName: 'Bench Press',
     muscleGroup: 'chest',

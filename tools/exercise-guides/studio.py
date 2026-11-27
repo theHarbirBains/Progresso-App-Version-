@@ -11,14 +11,16 @@ from stage import area, gpu, world_coords  # noqa: F401  (re-exported for the sc
 CHARCOAL = (0.0116, 0.0103, 0.0080)
 
 
-def setup(direction, coords, preview=False, size=(1080, 1080), lens=60, samples=None):
+def setup(direction, coords, preview=False, size=(1080, 1080), lens=60, samples=None,
+          transparent=False):
     """The studio, its lights and camera, framing every point in `coords` from `direction`
-    (subject toward camera, Blender axes)."""
+    (subject toward camera, Blender axes). `transparent`: a still for a card (the equipment
+    picture) -- no backdrop, the floor only catching shadows."""
     scene = bpy.context.scene
     device = gpu(scene)
     scene.cycles.samples = samples or (48 if preview else 192)
     scene.cycles.use_denoising = True
-    scene.render.film_transparent = False
+    scene.render.film_transparent = transparent
     scene.render.resolution_x, scene.render.resolution_y = size
     scene.view_settings.view_transform = 'AgX'
     try:
@@ -46,6 +48,7 @@ def setup(direction, coords, preview=False, size=(1080, 1080), lens=60, samples=
     bsdf.inputs['Base Color'].default_value = (0.016, 0.0145, 0.012, 1)
     bsdf.inputs['Roughness'].default_value = 0.85
     floor.data.materials.append(mat)
+    floor.is_shadow_catcher = transparent
 
     d = Vector(direction).normalized()
     side = d.cross(Vector((0, 0, 1))).normalized()

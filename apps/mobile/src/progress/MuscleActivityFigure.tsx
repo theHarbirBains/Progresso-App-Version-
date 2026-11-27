@@ -30,7 +30,7 @@ const TAP_REACH = 2;
 const DIMMED = 0.3;
 
 /** Harbir's figure for the person's sex, or the other's where that one isn't drawn yet. */
-function heatmapFor(sex: 'male' | 'female'): Record<FigureSide, HeatmapSide> | null {
+export function heatmapFor(sex: 'male' | 'female'): Record<FigureSide, HeatmapSide> | null {
   return MUSCLE_HEATMAP[sex] ?? MUSCLE_HEATMAP.male ?? MUSCLE_HEATMAP.female ?? null;
 }
 

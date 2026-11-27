@@ -32,6 +32,10 @@ export interface ExerciseGuide {
   executionSteps: string[];
   commonMistakes: string[];
   illustrationUrl: string | null;
+  /** How it's held, what's held and how it's loaded, as recorded (an exercise guide's details). */
+  grip?: string | null;
+  attachment?: string | null;
+  loadType?: string | null;
 }
 
 interface Sources {

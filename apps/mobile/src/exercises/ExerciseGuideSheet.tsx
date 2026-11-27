@@ -19,6 +19,8 @@ import { useAppTheme } from '../theme/appThemeContext';
 import { withAlpha } from '../theme/accentColor';
 import { readExerciseGuide, useBuiltinExtras, type ExerciseGuide } from './builtinExtras';
 import type { Equipment } from './equipment';
+import { ExerciseDemoGuide, guideTitle } from './guide/ExerciseDemoGuide';
+import { EXERCISE_DEMOS } from './guide/exerciseDemos.generated';
 import { BUILTIN_GUIDES, type TechniqueCard } from './illustrations/builtinGuides.generated';
 import { GUIDE_CARDS, type GuideCardPage } from './illustrations/guideCards.generated';
 import { TechniqueVisual } from './illustrations/TechniqueVisuals';
@@ -145,7 +147,14 @@ export function ExerciseGuideSheet({
   testID = 'exercise-guide',
 }: Props) {
   const state = useExerciseGuide(exerciseId, visible);
-  const { cards } = useGuideCards(exerciseId, state.guide);
+  const { slug, cards } = useGuideCards(exerciseId, state.guide);
+  // An exercise in the 3D Exercise Guide: its header names the guide, then the exercise once its
+  // name has scrolled away.
+  const demo = slug ? EXERCISE_DEMOS[slug] : undefined;
+  const [nameAway, setNameAway] = useState(false);
+  useEffect(() => {
+    if (!visible) setNameAway(false);
+  }, [visible]);
 
   return (
     <Modal
@@ -158,7 +167,16 @@ export function ExerciseGuideSheet({
         <View style={styles.header}>
           {/* A card has the title in its own picture. */}
           <View style={styles.headerTitle}>
-            {cards ? null : (
+            {demo ? (
+              <Text
+                testID={`${testID}-header-title`}
+                style={styles.guideHeaderText}
+                numberOfLines={1}
+                accessibilityRole="header"
+              >
+                {nameAway && state.guide ? guideTitle(state.guide.name).title : 'Exercise Guide'}
+              </Text>
+            ) : cards ? null : (
               <>
                 <View style={styles.headerRule} />
                 <Text style={styles.headerText} accessibilityRole="header">
@@ -183,6 +201,7 @@ export function ExerciseGuideSheet({
           exerciseId={exerciseId}
           exerciseName={exerciseName}
           state={state}
+          onNameScrolledAway={setNameAway}
           testID={testID}
         />
       </View>
@@ -200,11 +219,14 @@ export function ExerciseGuideBody({
   exerciseId,
   exerciseName,
   state,
+  onNameScrolledAway,
   testID = 'exercise-guide',
 }: {
   exerciseId: string;
   exerciseName: string;
   state: ReturnType<typeof useExerciseGuide>;
+  /** The 3D Exercise Guide's: told when its name scrolls out of view and back. */
+  onNameScrolledAway?: (away: boolean) => void;
   testID?: string;
 }) {
   const accent = useAppTheme().accent.accent;
@@ -220,7 +242,20 @@ export function ExerciseGuideBody({
   const { slug, cards } = useGuideCards(exerciseId, shown);
   const labels =
     cards && slug ? cardLabels(slug, shown?.name ?? exerciseName, shown?.commonMistakes ?? []) : [];
+  const demo = slug ? EXERCISE_DEMOS[slug] : undefined;
 
+  // An exercise in the 3D Exercise Guide (tools/exercise-guides/demos.json) shows that, once read.
+  if (demo && shown && !error) {
+    return (
+      <ExerciseDemoGuide
+        guide={shown}
+        demo={demo}
+        accent={accent}
+        onNameScrolledAway={onNameScrolledAway}
+        testID={testID}
+      />
+    );
+  }
   if (cards) {
     return (
       <Pager
@@ -730,6 +765,13 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     letterSpacing: 3,
     color: colors.textSecondaryBright,
+  },
+  // The 3D Exercise Guide's header: its title, as a screen's.
+  guideHeaderText: {
+    ...typeScale.cardTitle,
+    flex: 1,
+    textAlign: 'center',
+    color: colors.textPrimary,
   },
   close: {
     width: 36,

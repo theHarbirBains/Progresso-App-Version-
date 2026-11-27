@@ -1,0 +1,4 @@
+{
+  "_comment": "The exercises whose guide is the 3D Exercise Guide (exercises/guide/ExerciseDemoGuide.tsx), by catalogue slug. The pilot only, until Harbir approves it; publish.py reads this.",
+  "exercises": ["pl-t-bar-row-upper"]
+}

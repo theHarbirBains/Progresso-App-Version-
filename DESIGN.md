@@ -124,6 +124,13 @@ analyticsColors (muscle analytics only -- Progress's Muscles tab):
   none:     #66707C   // slate: no recent training (15+ days)
   chart:    #6E9BE6   // blue: the analytics' charts and secondary figures
 
+guideColors (the 3D Exercise Guide only -- exercises/guide/ExerciseDemoGuide.tsx):
+  chip:      = analyticsColors.chart    // blue: the muscle chips under the exercise's name
+  primary:   = analyticsColors.recent   // coral: its primary muscles on the figure and key
+  secondary: = analyticsColors.frequent // amber: its secondary muscles
+  do:        #6CBF84   // muted green: the Do card
+  avoid:     #E56B6F   // muted red: the Avoid card (not `destructive`: nothing is deleted)
+
 glassBorder:       rgba(245, 230, 210, 0.08)   // warm glass-surface hairline, default weight; also Card's edge
 glassBorderStrong: rgba(245, 230, 210, 0.14)   // glass-surface hairline, chrome surfaces (§3b)
 surfaceLift:       rgba(245, 230, 210, 0.06)   // a raised block inside a widget: StatBlock, FoodFacts' macros, the top-set block, icon wells
@@ -134,6 +141,7 @@ surfaceLift:       rgba(245, 230, 210, 0.06)   // a raised block inside a widget
 - **Warm Minimal, app-wide.** Warm near-black backgrounds, charcoal surfaces, warm off-white text and one soft amber `accent` (also both mode accents, §3) -- a deliberate redesign call, restrained on purpose: amber marks the active tab, primary actions, selected states and key numbers, nothing decorative. Where two things need telling apart (Train vs. Nutrition, a workout vs. a food log in Feed), that's done with label/icon, not hue. There is no free colour picking; a theme's accent comes with it (§3, §3c).
 - **Lifetime ranks are the one run of hues beyond the accent** (`rankPalettes`, by explicit request): each rank a flat two-colour palette -- `primary` for its outline, name, figures and bar, `deep` for its emblem's body: Bronze `#C98A5A`/`#4A2E1C`, Silver `#C3CBD3`/`#3A4048`, Gold `#F2C14E`/`#5A4214`, Platinum `#7FDCCF`/`#1F4A45`, Diamond `#6FB8FF`/`#1B3A5C`, Vanguard `#4FD18B`/`#174A31`, Titan `#E5506A`/`#561A26`, Sovereign `#A97CFF`/`#36255C`, Legacy `#FF8BD1`/`#55203F`. No gradients, no glow. Only on rank emblems, rank names, rank bars and the rank ladder; achievements themselves wear the accent.
 - **Muscle analytics has a palette of its own** (`analyticsColors`, Harbir's colour system, November 2026, by explicit request): on Progress's Muscles tab, where four heat levels and a chart sat side by side as shades of gold that were hard to tell apart, each kind of thing has its own hue -- coral, amber, teal and slate for the heat levels (the heat map, its legend, the breakdown's swatches and bars, the muscle pictures), blue for charts and secondary figures (the upper body in Training Balance). Gold stays the theme's accent there too: the selected controls (periods, Front / Back, Sort's choice, View All) and the lower body in Training Balance. Muted, never saturated, each holding its contrast on charcoal; the same on a man's figure and a woman's. Nowhere else in the app.
+- **The 3D Exercise Guide has a palette of its own** (`guideColors`, Harbir's Exercise Guide design, November 2026, by explicit request -- his screenshots): blue muscle chips under the name, its primary muscles in coral and secondary in amber (the muscle analytics' own two, so a worked muscle reads the same on both pages), and a muted green Do card beside a muted red Avoid card. Gold stays the theme's accent there: the How To / Muscles / Tips tabs, the step numbers, the section icons and Watch Full Demonstration. On that page only -- not a success or warning colour anywhere else.
 - **One brand accent, no separate "success" color.** Personal records reuse `colors.accent` rather than a green/success hue (an explicit, approved direction — see `Badge.tsx`'s own comment).
 - **`hero` is reserved for the single most important card on a screen** (e.g. Workout Detail's summary card, Profile's identity card) — a thin accent-tinted border (`surfaceHero`/`borderHero`) instead of a fill, so elevation reads as "this is the important one" without introducing a second color block. Do not apply `hero` to more than one card per screen.
 - **Destructive red is for errors and destructive actions only** — never repurposed as a generic "warning" or "attention" color.

@@ -12,8 +12,9 @@ import { EXERCISE_VIDEOS, type ExerciseVideoEntry } from './exerciseVideos.gener
 // exercise page shows its picture as it always has (docs/EXERCISE_VIDEOS.md).
 
 export interface ExerciseVideoUrls {
-  video: string;
-  poster: string | null;
+  /** Its address -- or, for one bundled with the app (an exercise guide's), its asset. */
+  video: string | number;
+  poster: string | number | null;
 }
 
 export interface ExerciseVideoProvider {

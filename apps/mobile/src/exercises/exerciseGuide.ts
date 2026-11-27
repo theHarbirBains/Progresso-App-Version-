@@ -45,7 +45,7 @@ async function readGuide(exerciseId: string): Promise<ExerciseGuide | null> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'name, muscle_group, equipment, movement_type, measurement_type, slug, secondary_muscle_groups, movement_pattern, instructions, setup_steps, execution_steps, common_mistakes, illustration_url',
+      'name, muscle_group, equipment, movement_type, measurement_type, slug, secondary_muscle_groups, movement_pattern, instructions, setup_steps, execution_steps, common_mistakes, illustration_url, grip, attachment, load_type',
     )
     .eq('id', exerciseId)
     .maybeSingle();
@@ -65,6 +65,9 @@ async function readGuide(exerciseId: string): Promise<ExerciseGuide | null> {
     execution_steps: string[] | null;
     common_mistakes: string[] | null;
     illustration_url: string | null;
+    grip?: string | null;
+    attachment?: string | null;
+    load_type?: string | null;
   };
   return {
     name: row.name,
@@ -80,6 +83,9 @@ async function readGuide(exerciseId: string): Promise<ExerciseGuide | null> {
     executionSteps: row.execution_steps ?? [],
     commonMistakes: row.common_mistakes ?? [],
     illustrationUrl: row.illustration_url,
+    grip: row.grip ?? null,
+    attachment: row.attachment ?? null,
+    loadType: row.load_type ?? null,
   };
 }
 
