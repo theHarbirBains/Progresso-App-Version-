@@ -1,5 +1,5 @@
 import { forgetShown } from '../lib/lastShown';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Platform } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -706,8 +706,13 @@ describe('ProgressOverviewScreen -- steps', () => {
     route = { params: { section: 'Steps' } } as never;
     try {
       renderScreen();
-      expect(await screen.findByTestId('health-activity-source')).toHaveTextContent(
-        'Apple Health isn’t available here',
+      // The page holds its sections until everything's in (up to 3 s, useShowAllAtOnce).
+      await waitFor(
+        () =>
+          expect(screen.getByTestId('health-activity-source')).toHaveTextContent(
+            'Apple Health isn’t available here',
+          ),
+        { timeout: 5000 },
       );
     } finally {
       Object.defineProperty(Platform, 'OS', { value: os, configurable: true });

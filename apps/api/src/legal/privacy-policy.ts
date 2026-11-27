@@ -7,7 +7,21 @@ const operator = escapeHtml(LEGAL_DETAILS.operator);
 // A first draft, written from what the app and API actually collect and send (October 2026).
 // Not legal advice: have it reviewed before external testers or the App Store. When a feature
 // changes what's collected or who it's shared with, change this text in the same change.
-const BODY = `
+// What Progresso does with Apple Health, as it stands: steps read on the phone only -- or, once
+// health data is kept in people's accounts (the API's HEALTH_DATA_ENABLED, Phase 3 of the Health &
+// Wearables brief), what's read for Health and kept. The published policy follows the server's
+// switch, so it always says what actually happens.
+const APPLE_HEALTH_STEPS_ONLY = `<p><strong>Apple Health.</strong> On iPhone, if you connect Apple Health, Progresso reads your step count to show today's steps and your steps over the last few weeks in the app, and today's on its Home Screen widget. It reads nothing else from Apple Health and never writes to it. Your steps are read on your phone each time they're shown and never leave it: they aren't sent to us, stored on our servers, used for advertising or shared with anyone. You can stop it at any time in the Health app.</p>`;
+
+const APPLE_HEALTH_KEPT = `<p><strong>Apple Health.</strong> On iPhone, if you connect Apple Health, Progresso reads your step count to show today's steps and your steps over the last few weeks in the app, and today's on its Home Screen widget. If you also connect Apple Health in Progress &gt; Health, Progresso reads the data you allow there -- your steps, walking and running distance, active calories and exercise minutes; your heart rate, resting heart rate, heart rate variability and heart rate recovery; your breathing rate, blood oxygen and sleeping wrist temperature; your VO&#8322; max; and your sleep (when you were in bed and asleep, and its stages) -- as one figure a day for each and each night's sleep, from the last 90 days and from then on, including in the background when Apple Health has something new. It keeps them in your Progresso account so Health can show them on any phone. Only you can see them: not your trainer, the people who follow you, or anyone in a group workout. They aren't used for advertising, sold or shared with anyone, and Progresso never writes to Apple Health. They're kept until you delete them or your account, and the record of each sync for 90 days. You can stop it at any time in the Health app, or by disconnecting in Progress &gt; Health &gt; Devices, where you can also delete what's been kept.</p>`;
+
+const HEALTH_CHOICE_KEPT = `
+  <li>Disconnect Apple Health, and delete the health data kept in your account, in Progress &gt; Health &gt; Devices.</li>`;
+
+function body(healthDataKept: boolean): string {
+  const APPLE_HEALTH = healthDataKept ? APPLE_HEALTH_KEPT : APPLE_HEALTH_STEPS_ONLY;
+  const HEALTH_CHOICE = healthDataKept ? HEALTH_CHOICE_KEPT : '';
+  return `
 <p>Progresso is a workout and nutrition tracker. This policy explains what we collect when you use it, why, who can see it, and how to delete it. Progresso is operated by ${operator} ("we", "us").</p>
 
 <h2>What we collect</h2>
@@ -55,7 +69,7 @@ const BODY = `
 
 <h2>Health and body information</h2>
 <p>Workouts, body measurements and what you eat say a lot about your health. We use them only to provide Progresso to you, never for advertising, and we don't share them beyond what's described above.</p>
-<p><strong>Apple Health.</strong> On iPhone, if you connect Apple Health, Progresso reads your step count to show today's steps and your steps over the last few weeks in the app, and today's on its Home Screen widget. It reads nothing else from Apple Health and never writes to it. Your steps are read on your phone each time they're shown and never leave it: they aren't sent to us, stored on our servers, used for advertising or shared with anyone. You can stop it at any time in the Health app.</p>
+${APPLE_HEALTH}
 <p><strong>Your location, while you sign up.</strong> On iPhone, if you allow it, Progresso asks your phone where it is once, while you sign up, so the country you're in can be listed first. Apple's own service on the iPhone names the country, and only that country is used, to sort the list. Your location isn't sent to us or kept, and only the country you pick is saved to your account.</p>
 <p><strong>Your location, and your gym.</strong> When you choose the gym you're training at, Progresso asks your phone where it is, while you're using the app, and searches Apple Maps for the gyms near it -- as you open Choose Your Gym if you've already allowed location, otherwise only once you tap Find Gyms Near Me; a gym you search for by name is looked up on Apple Maps too. Your location goes only to Apple's map service for that search (Apple's privacy policy covers it) -- never to us, and it isn't kept. Progresso never asks for your location in the background. Only the gym you choose for a workout is saved, with that workout: its name and address, and where it is on the map. Only you see it -- not your followers, not people in a group workout with you, not a trainer -- and you can change or remove it at any time. It's deleted with the workout's history when you delete your account.</p>
 <p><strong>Reminders.</strong> If you allow notifications, the reminders you turn on in Settings &gt; Notifications (your workout days, your meals, a protein and calorie check-in, your weekly summary, and a cheer for a new PR) are scheduled on your phone itself. To write them, the app uses what it already shows you, like your next workout and what you've logged today, and the reminders and your choices stay on your phone: none of it is sent to us. Turn them off in Settings at any time.</p>
@@ -75,7 +89,7 @@ const BODY = `
 <ul>
   <li>Change your profile, units and notifications in Settings at any time.</li>
   <li>Block people, or end a trainer link, whenever you want.</li>
-  <li>Ask us for a copy of your data, or ask us anything about it, at ${contact}.</li>
+  <li>Ask us for a copy of your data, or ask us anything about it, at ${contact}.</li>${HEALTH_CHOICE}
 </ul>
 <p>Depending on where you live, you may have more rights over your data, such as correcting it or objecting to how it's used. Contact us and we'll help.</p>
 
@@ -94,5 +108,11 @@ const BODY = `
 <h2>Contact</h2>
 <p>Questions about privacy or your data: ${contact}.</p>
 `;
+}
 
-export const PRIVACY_POLICY_HTML = legalPage('Privacy Policy', BODY);
+/** The Privacy Policy as published: its Apple Health wording follows whether health data is kept. */
+export function privacyPolicyHtml(healthDataKept: boolean): string {
+  return healthDataKept
+    ? legalPage('Privacy Policy', body(true), LEGAL_DETAILS.healthDataLastUpdated)
+    : legalPage('Privacy Policy', body(false));
+}

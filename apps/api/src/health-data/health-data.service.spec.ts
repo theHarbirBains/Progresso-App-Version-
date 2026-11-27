@@ -14,6 +14,7 @@ function setup(options: {
   tables?: Record<string, Result>;
 }) {
   const calls: { fn: string; args: Record<string, unknown> }[] = [];
+  const tableCalls: { fn: string; args: unknown[] }[] = [];
   const used: Record<string, number> = {};
   const rpc = jest.fn(async (fn: string, args: Record<string, unknown>) => {
     calls.push({ fn, args });
@@ -26,8 +27,15 @@ function setup(options: {
   const from = jest.fn((table: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {};
-    for (const method of ['select', 'eq']) b[method] = jest.fn(() => b);
+    for (const method of ['select', 'eq', 'update']) {
+      b[method] = jest.fn((...args: unknown[]) => {
+        tableCalls.push({ fn: `${table}.${method}`, args });
+        return b;
+      });
+    }
     b.maybeSingle = jest.fn(async () => options.tables?.[table] ?? { data: null, error: null });
+    b.then = (ok: (r: unknown) => unknown) =>
+      Promise.resolve(options.tables?.[table] ?? { data: null, error: null }).then(ok);
     return b;
   });
   const config = {
@@ -37,7 +45,7 @@ function setup(options: {
     { getClient: () => ({ rpc, from }) } as unknown as SupabaseService,
     config as never,
   );
-  return { service, calls };
+  return { service, calls, tableCalls };
 }
 
 const saved: Result = { data: [{ run_id: 'run-1', rows_upserted: 2 }], error: null };
@@ -179,6 +187,39 @@ describe('HealthDataService', () => {
       status: HttpStatus.NOT_FOUND,
     });
     expect(notMine.calls).toEqual([]);
+  });
+
+  it('records a sync HealthKit woke it for as a background one', async () => {
+    const { service, calls } = setup({ rpc: { import_health_data: saved } });
+    await service.importAppleHealth(ME, { trigger: 'background' });
+    expect(calls.find((c) => c.fn === 'import_health_data')?.args).toEqual(
+      expect.objectContaining({ p_trigger: 'background' }),
+    );
+  });
+
+  it('disconnects Apple Health keeping its history -- and works with health data switched off', async () => {
+    const { service, calls, tableCalls } = setup({ enabled: false });
+    await expect(service.disconnectAppleHealth(ME, {})).resolves.toEqual({
+      disconnected: true,
+      deleted: 0,
+    });
+    expect(calls).toEqual([]);
+    expect(tableCalls).toEqual([
+      { fn: 'health_connections.update', args: [{ status: 'disconnected', last_error: null }] },
+      { fn: 'health_connections.eq', args: ['user_id', ME] },
+      { fn: 'health_connections.eq', args: ['provider', 'apple_health'] },
+    ]);
+  });
+
+  it('disconnects Apple Health and deletes its history when asked', async () => {
+    const { service, calls } = setup({ rpc: { delete_health_data: { data: 40, error: null } } });
+    await expect(service.disconnectAppleHealth(ME, { deleteHistory: true })).resolves.toEqual({
+      disconnected: true,
+      deleted: 40,
+    });
+    expect(calls).toEqual([
+      { fn: 'delete_health_data', args: { p_user: ME, p_provider: 'apple_health' } },
+    ]);
   });
 
   it('deletes one source’s history when asked for one', async () => {

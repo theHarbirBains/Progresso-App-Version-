@@ -45,6 +45,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   ProgressOverview: 'progress',
   ProgressExerciseDetail: 'progress',
   HealthPreview: 'progress',
+  AppleHealthConnect: 'progress',
   AccountSettings: 'you',
   SettingsPersonalInfo: 'you',
   ProfileMontage: 'you',

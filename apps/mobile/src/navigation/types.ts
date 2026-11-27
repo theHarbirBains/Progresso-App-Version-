@@ -132,6 +132,8 @@ export type RootStackParamList = {
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   /** Health's deeper pages -- PHASE 1 PROTOTYPE, sample data, development builds only. */
   HealthPreview: HealthPreviewParams;
+  /** Connect Apple Health (Phase 3, development builds only for now): what's read, then iPhone's ask. */
+  AppleHealthConnect: undefined;
   /** Workout Splits, on its My Splits or Programs tab (My Splits when absent). */
   WorkoutSplits: { tab?: 'splits' | 'programs' } | undefined;
   WorkoutSplitView: { splitId: string };

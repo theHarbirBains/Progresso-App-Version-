@@ -23,6 +23,8 @@ import {
 import { stageColors } from './HealthOverview';
 import { setPreviewSetup, type HealthPage } from './healthPreview';
 import { StepsSection } from '../../progress/StepsSection';
+import { AppleHealthSyncCard } from '../sync/AppleHealthSyncCard';
+import { APPLE_HEALTH_SYNC_ENABLED } from '../sync/appleHealthSyncAvailability';
 import {
   ACTIVITY,
   anyDevice,
@@ -53,6 +55,8 @@ export interface PageProps {
   setup: DeviceSetup;
   accent: string;
   open: (page: HealthPage, metric?: MetricKey, onboarding?: boolean) => void;
+  /** Opens Connect Apple Health -- the real one (Phase 3). */
+  connectAppleHealth?: () => void;
 }
 
 function hm(minutes: number): string {
@@ -634,13 +638,17 @@ function ConnectedDevice({
   );
 }
 
-export function DevicesPage({ setup, accent, open }: PageProps) {
+export function DevicesPage({ setup, accent, open, connectAppleHealth }: PageProps) {
   const [state, setState] = useState<ConnectionState>('connected');
   const connected = DEVICE_ORDER.filter((key) => setup[key]);
   const others = DEVICE_ORDER.filter((key) => !setup[key]);
   const both = setup.oura && (setup.appleWatch || setup.otherWatch);
   return (
     <>
+      {/* Apple Health as it really is (Phase 3); the devices below are the prototype's samples. */}
+      {APPLE_HEALTH_SYNC_ENABLED && connectAppleHealth ? (
+        <AppleHealthSyncCard accent={accent} onConnect={connectAppleHealth} />
+      ) : null}
       {connected.length > 0 ? (
         <View style={styles.previewControl}>
           <SampleNote />

@@ -1,6 +1,8 @@
 import { Controller, Get, Header, VERSION_NEUTRAL } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Public } from '../common/decorators/public.decorator';
-import { PRIVACY_POLICY_HTML } from './privacy-policy';
+import type { EnvironmentVariables } from '../config/env.validation';
+import { privacyPolicyHtml } from './privacy-policy';
 import { TERMS_OF_SERVICE_HTML } from './terms-of-service';
 
 /**
@@ -10,12 +12,21 @@ import { TERMS_OF_SERVICE_HTML } from './terms-of-service';
  */
 @Controller({ path: 'legal', version: VERSION_NEUTRAL })
 export class LegalController {
+  private readonly privacyPolicy: string;
+
+  constructor(configService: ConfigService<EnvironmentVariables, true>) {
+    // Says Apple Health data is kept in the account exactly when the server keeps it.
+    this.privacyPolicy = privacyPolicyHtml(
+      configService.get('HEALTH_DATA_ENABLED', { infer: true }),
+    );
+  }
+
   @Public()
   @Get('privacy')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Cache-Control', 'public, max-age=3600')
   privacy(): string {
-    return PRIVACY_POLICY_HTML;
+    return this.privacyPolicy;
   }
 
   @Public()

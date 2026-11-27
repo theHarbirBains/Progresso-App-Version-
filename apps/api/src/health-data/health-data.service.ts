@@ -14,6 +14,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import type {
   AppleHealthImportDto,
   DeleteHealthDataQueryDto,
+  DisconnectHealthDto,
   ManualSleepDto,
 } from './dto/health-import.dto';
 import type { HealthProvider } from './health-metrics';
@@ -33,7 +34,8 @@ export interface ImportResult {
   refused: Refused[];
 }
 
-type SyncTrigger = 'connect' | 'app_open' | 'webhook' | 'manual' | 'backfill' | 'nightly';
+type SyncTrigger =
+  'connect' | 'app_open' | 'background' | 'webhook' | 'manual' | 'backfill' | 'nightly';
 
 /** A manual sleep's handle: "manual-<uuid>". */
 const MANUAL_REF = /^manual-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -133,6 +135,32 @@ export class HealthDataService {
     if (error) throw new InternalServerErrorException('Could not delete that sleep');
     if (!data) throw new NotFoundException('Sleep not found');
     await this.save(userId, 'manual', 'manual', { clearedSleep: [sourceRef] });
+  }
+
+  /**
+   * Stops Apple Health syncing: the connection is marked disconnected (Apple doesn't let an app
+   * revoke its own access -- the person turns it off in the Health app), and its history is kept
+   * or deleted, as they choose. Nothing syncs again until they connect.
+   */
+  async disconnectAppleHealth(
+    userId: string,
+    dto: DisconnectHealthDto,
+  ): Promise<{ disconnected: true; deleted: number }> {
+    if (dto.deleteHistory) {
+      const { deleted } = await this.deleteHealthData(userId, { source: 'apple_health' });
+      return { disconnected: true, deleted };
+    }
+    const { error } = await this.supabase
+      .getClient()
+      .from('health_connections')
+      .update({ status: 'disconnected', last_error: null })
+      .eq('user_id', userId)
+      .eq('provider', 'apple_health');
+    if (error) {
+      this.logger.error(`disconnect failed: ${error.message}`);
+      throw new InternalServerErrorException('Could not disconnect Apple Health');
+    }
+    return { disconnected: true, deleted: 0 };
   }
 
   /**

@@ -6,6 +6,7 @@ import { Role } from '../common/enums/role.enum';
 import {
   AppleHealthImportDto,
   DeleteHealthDataQueryDto,
+  DisconnectHealthDto,
   ManualSleepDto,
 } from './dto/health-import.dto';
 import { HealthDataService, type ImportResult } from './health-data.service';
@@ -25,6 +26,17 @@ export class HealthDataController {
     @Body() dto: AppleHealthImportDto,
   ): Promise<ImportResult> {
     return this.healthData.importAppleHealth(user.id, dto);
+  }
+
+  /** Stops Apple Health syncing -- its history kept, or deleted (deleteHistory). */
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('apple/disconnect')
+  @HttpCode(HttpStatus.OK)
+  disconnectAppleHealth(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: DisconnectHealthDto,
+  ): Promise<{ disconnected: true; deleted: number }> {
+    return this.healthData.disconnectAppleHealth(user.id, dto);
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)

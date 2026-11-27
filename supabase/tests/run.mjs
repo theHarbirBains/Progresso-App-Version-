@@ -8040,6 +8040,17 @@ async function main() {
       stepsRows.rows[0].n === 1 && (await value('2026-11-20', 'steps', 'apple_health')) === '8500',
     );
 
+    // A sync HealthKit woke the app for is recorded as a background one.
+    await imp('apple_health', 'background', [{ day: '2026-11-20', metric: 'steps', value: 8500 }]);
+    const background = await admin.query(
+      "select count(*)::int as n from public.health_sync_runs where user_id = $1 and trigger = 'background'",
+      [owner],
+    );
+    record(
+      'A sync HealthKit woke Progresso for is recorded as a background one',
+      background.rows[0].n === 1,
+    );
+
     // Out of range, or from a source that never measures it: refused, and the whole sync with it.
     await expectThrows(
       imp('apple_health', 'app_open', [

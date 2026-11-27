@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
 import { hasHealthKitNative } from '../lib/nativeModules';
+import { loadHealthKit } from './healthKit';
 
-// Today's steps from Apple Health -- the only thing Progresso reads from it, and it never writes
-// to it. The count is read on the phone each time it's shown and kept nowhere: not in Supabase,
-// not on our server. iPhone only.
+// Today's steps from Apple Health, and it never writes to it. The count is read on the phone each
+// time it's shown and kept nowhere: not in Supabase, not on our server. iPhone only. (Apple Health
+// sync for Health -- sync/, Phase 3, development builds only for now -- reads more, and keeps it.)
 //
 // Apple Health never tells an app whether reading was allowed: someone who said no just gets no
 // steps back. So the app can only know whether it has asked, and a count of 0 may mean either.
@@ -15,16 +16,6 @@ import { hasHealthKitNative } from '../lib/nativeModules';
 // library's own setup, which has run on a real iPhone.
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount' as const;
-
-type HealthKit = typeof import('@kingstinct/react-native-healthkit');
-let healthKit: HealthKit | null = null;
-
-async function loadHealthKit(): Promise<HealthKit> {
-  // A require inside a function is what defers loading it to here.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  healthKit ??= require('@kingstinct/react-native-healthkit') as HealthKit;
-  return healthKit;
-}
 
 /**
  * 'unavailable': not on this device, or not in this copy of the app (Expo Go has no Apple Health).

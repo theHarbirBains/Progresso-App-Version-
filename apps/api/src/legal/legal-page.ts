@@ -14,7 +14,11 @@ export function escapeHtml(text: string): string {
  * match the device, and nothing loaded from anywhere else. `body` is trusted HTML written in
  * this folder.
  */
-export function legalPage(title: string, body: string): string {
+export function legalPage(
+  title: string,
+  body: string,
+  lastUpdated: string = LEGAL_DETAILS.lastUpdated,
+): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -42,7 +46,7 @@ export function legalPage(title: string, body: string): string {
 <body>
 <main>
 <h1>${escapeHtml(title)}</h1>
-<p class="updated">Last updated ${escapeHtml(LEGAL_DETAILS.lastUpdated)}</p>
+<p class="updated">Last updated ${escapeHtml(lastUpdated)}</p>
 ${body}
 <footer>Progresso is operated by ${escapeHtml(LEGAL_DETAILS.operator)}. Questions: ${escapeHtml(LEGAL_DETAILS.contactEmail)}</footer>
 </main>

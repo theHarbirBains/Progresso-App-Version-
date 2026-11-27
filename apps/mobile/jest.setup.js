@@ -327,11 +327,19 @@ jest.mock('@expo/ui/swift-ui/modifiers', () => ({}));
 // off iPhone, so Feed shows no Steps card; a test that cares makes it available.
 jest.mock('@kingstinct/react-native-healthkit', () => ({
   AuthorizationRequestStatus: { unknown: 0, shouldRequest: 1, unnecessary: 2 },
+  UpdateFrequency: { immediate: 1, hourly: 2, daily: 3, weekly: 4 },
   isHealthDataAvailable: jest.fn(() => false),
+  // Apple Health can't be read while the phone is locked; in tests it's unlocked.
+  isProtectedDataAvailable: jest.fn(() => true),
   getRequestStatusForAuthorization: jest.fn().mockResolvedValue(1),
   requestAuthorization: jest.fn().mockResolvedValue(true),
   queryStatisticsForQuantity: jest.fn().mockResolvedValue({ sources: [] }),
   queryStatisticsCollectionForQuantity: jest.fn().mockResolvedValue([]),
+  queryCategorySamples: jest.fn().mockResolvedValue([]),
+  // Apple Health sync (health/sync): HealthKit's change observers and background delivery.
+  subscribeToChanges: jest.fn(() => ({ remove: jest.fn() })),
+  configureBackgroundTypes: jest.fn().mockResolvedValue(true),
+  clearBackgroundTypes: jest.fn().mockResolvedValue(true),
 }));
 
 // The phone's contacts (Find People > Suggested): none, and not asked about yet, unless a test

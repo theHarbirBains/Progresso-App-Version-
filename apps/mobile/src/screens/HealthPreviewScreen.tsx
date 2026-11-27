@@ -46,7 +46,12 @@ export function HealthPreviewScreen({ navigation, route }: Props) {
       : page === 'setup' && onboarding
         ? 'Welcome to Progresso'
         : HEALTH_PAGE_TITLES[page];
-  const pageProps = { setup, accent, open };
+  const pageProps = {
+    setup,
+    accent,
+    open,
+    connectAppleHealth: () => navigation.navigate('AppleHealthConnect'),
+  };
   return (
     <Screen
       scrollTestID="health-preview-scroll"

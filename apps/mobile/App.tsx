@@ -106,6 +106,8 @@ import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDetailScreen';
 import { HealthPreviewScreen } from './src/screens/HealthPreviewScreen';
+import { AppleHealthConnectScreen } from './src/screens/AppleHealthConnectScreen';
+import { AppleHealthSync } from './src/health/sync/AppleHealthSync';
 import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecurityScreen';
@@ -514,6 +516,8 @@ function Root() {
                   />
                   {/* Health's pages: a Phase 1 prototype, opened only from development builds. */}
                   <Stack.Screen name="HealthPreview" component={HealthPreviewScreen} />
+                  {/* Apple Health sync (Phase 3): development builds only for now. */}
+                  <Stack.Screen name="AppleHealthConnect" component={AppleHealthConnectScreen} />
                   <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
                   {/* Workout Programs (programs/programScreens.ts) -- onboarding's sheet has them too. */}
                   {PROGRAM_SCREENS.map((screen) => (
@@ -705,6 +709,7 @@ function App() {
                         <AppShell fontsLoaded={fontsLoaded} />
                         <WidgetSync />
                         <PushSync />
+                        <AppleHealthSync />
                       </AppThemeProvider>
                     </RemindersProvider>
                   </AchievementsProvider>

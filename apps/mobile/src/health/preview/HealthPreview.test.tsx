@@ -19,6 +19,9 @@ import {
   type MetricKey,
 } from './sampleHealthData';
 
+// Devices' real Apple Health card reads the person's own connection; none here.
+jest.mock('../../lib/supabase', () => ({ supabase: {} }));
+
 const ACCENT = '#D99A50';
 
 const setups: Record<string, DeviceSetup> = {

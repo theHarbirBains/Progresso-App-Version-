@@ -27,6 +27,16 @@ permission wording and the rewritten Privacy Policy. Phase 1 (the UI prototype,
   stays.
 - There's no account export to extend yet (none exists).
 
+### Phase 3 (Apple Health), built 2026-11-27
+
+Approved with "Phase 3 let's do it"; development builds only for now, with background sync (his
+calls). `apps/mobile/src/health/sync`: Connect Apple Health (what's read, how it's kept, iPhone's
+sheet, 90 days), syncs on open, on coming back and on HealthKit's wake-ups (hourly background
+delivery; a `background` sync trigger, `20261225100000_health_background_sync.sql`), the real Apple
+Health card on Devices, and `POST /health-data/apple/disconnect`. The Privacy Policy's Apple Health
+paragraph follows `HEALTH_DATA_ENABLED`. Left for later: naps, and skipping Apple Health samples
+the Oura app wrote once Oura is connected directly (Phase 4).
+
 ## 1. What exists today (audit)
 
 | Area | Today | What it means for Health |

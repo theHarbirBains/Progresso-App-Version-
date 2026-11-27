@@ -133,8 +133,9 @@ export class SleepSessionDto {
 }
 
 export class AppleHealthImportDto {
-  @IsIn(['connect', 'app_open', 'manual', 'backfill'])
-  trigger!: 'connect' | 'app_open' | 'manual' | 'backfill';
+  /** Why it synced: connecting, the app opening, HealthKit waking it, or a tap on Sync Now. */
+  @IsIn(['connect', 'app_open', 'background', 'manual', 'backfill'])
+  trigger!: 'connect' | 'app_open' | 'background' | 'manual' | 'backfill';
 
   @IsOptional()
   @IsArray()
@@ -200,6 +201,13 @@ export class ManualSleepDto {
   @IsOptional()
   @IsBoolean()
   isNap?: boolean;
+}
+
+/** Stops a source syncing: its history kept, or deleted with it. */
+export class DisconnectHealthDto {
+  @IsOptional()
+  @IsBoolean()
+  deleteHistory?: boolean;
 }
 
 /** "Delete my health data": one source's, or (without one) all of it. */

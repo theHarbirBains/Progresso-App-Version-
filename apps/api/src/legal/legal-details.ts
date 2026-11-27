@@ -9,4 +9,6 @@ export const LEGAL_DETAILS = {
   governingLaw: 'the Province of Ontario and the federal laws of Canada that apply there',
   /** When the text last changed. */
   lastUpdated: 'November 26, 2026',
+  /** When the Apple Health wording for health data kept in the account was written. */
+  healthDataLastUpdated: 'November 27, 2026',
 } as const;
