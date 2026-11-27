@@ -196,7 +196,7 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('opens a row in place: its level, its volume over the period, and its exercises', async () => {
+  it('opens a row in place: its level and its exercises -- no chart', async () => {
     await renderScreen();
     fireEvent.press(screen.getByTestId('muscle-activity-row-chest'));
 
@@ -208,10 +208,8 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(screen.getByTestId('muscle-activity-group-level')).toHaveTextContent(
       /Recently trained · 1–2 days · 0.2 sessions a week/,
     );
-    expect(screen.getByTestId('muscle-activity-group')).toHaveTextContent(/VOLUME EACH WEEK/);
-    expect(screen.getByTestId('muscle-activity-trend').props.accessibilityLabel).toMatch(
-      /1,000 kg/,
-    );
+    expect(screen.getByTestId('muscle-activity-group')).not.toHaveTextContent(/EACH WEEK/);
+    expect(screen.queryByTestId('muscle-activity-trend')).toBeNull();
     expect(screen.getByTestId('muscle-activity-exercise-bench')).toHaveTextContent(
       /Bench Press.*2 sets · 1,000 kg · Today/,
     );

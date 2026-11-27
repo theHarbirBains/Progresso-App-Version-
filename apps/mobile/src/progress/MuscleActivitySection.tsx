@@ -160,70 +160,10 @@ function SummaryTile({
 }
 
 /**
- * A group's history over the period, oldest first, in blue: its volume each day (a week) or each
- * seven days (longer) -- or its sets, for a group trained only without weights.
- */
-function HistoryBars({
-  group,
-  period,
-  unit,
-}: {
-  group: GroupActivity;
-  period: ActivityPeriod;
-  unit: 'kg' | 'lb';
-}) {
-  const byVolume = group.volumeKg > 0;
-  const value = (bucket: GroupActivity['trend'][number]) =>
-    byVolume ? bucket.volumeKg : bucket.sets;
-  const most = Math.max(1e-9, ...group.trend.map(value));
-  const first = group.trend[0]?.start;
-  const label = (start: Date) =>
-    period === 7
-      ? start.toLocaleDateString(undefined, { weekday: 'narrow' })
-      : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const spoken = (bucket: GroupActivity['trend'][number]) =>
-    byVolume ? volumeText(bucket.volumeKg, unit) : plural(bucket.sets, 'set', 'sets');
-  return (
-    <View>
-      <Text style={styles.kicker}>
-        {byVolume ? 'VOLUME' : 'SETS'} {period === 7 ? 'EACH DAY' : 'EACH WEEK'}
-      </Text>
-      <View
-        testID="muscle-activity-trend"
-        accessible
-        accessibilityLabel={`${byVolume ? 'Volume' : 'Sets'} ${
-          period === 7 ? 'each day' : 'each week'
-        }: ${group.trend.map((bucket) => `${label(bucket.start)}, ${spoken(bucket)}`).join('; ')}`}
-      >
-        <View style={styles.bars}>
-          {group.trend.map((bucket) => (
-            <View key={bucket.start.toISOString()} style={styles.barSlot}>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: value(bucket) === 0 ? 2 : Math.max(4, (value(bucket) / most) * 56),
-                    backgroundColor: value(bucket) === 0 ? colors.border : analyticsColors.chart,
-                  },
-                ]}
-              />
-            </View>
-          ))}
-        </View>
-        <View style={styles.barLabels}>
-          <Text style={styles.barLabel}>{first ? label(first) : ''}</Text>
-          <Text style={styles.barLabel}>{period === 7 ? 'Today' : 'This week'}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/**
  * One muscle in Muscle Breakdown: its picture (Harbir's figure of it, a man's or a woman's, its
  * muscles in its level's colour), its name and when it was last trained, its sessions, sets and
  * volume, and a bar of the figure it's sorted by against the busiest muscle's. A tap opens it: its
- * level, its volume over the period, and the exercises behind it.
+ * level and the exercises behind it.
  */
 function BreakdownRow({
   group,
@@ -261,7 +201,7 @@ function BreakdownRow({
           group,
           unit,
         )}${last ? `. Last trained ${last}` : ''}`}
-        accessibilityHint={expanded ? 'Closes its details.' : 'Shows its exercises and history.'}
+        accessibilityHint={expanded ? 'Closes its details.' : 'Shows its exercises.'}
       >
         <View style={styles.thumb}>
           <MuscleFigure
@@ -311,8 +251,6 @@ function BreakdownRow({
               </Text>
             </View>
 
-            <HistoryBars group={group} period={period} unit={unit} />
-
             {group.exercises.length > 0 ? (
               <>
                 <Text style={styles.kicker}>EXERCISES</Text>
@@ -354,8 +292,7 @@ function BreakdownRow({
  *   -- with the legend beside it; a tap on a muscle shows just it in the breakdown, opened;
  * - **Training Balance**: upper body against lower body, by training volume;
  * - **Muscle Breakdown**: every group's sessions, sets, volume and last trained, sorted Recent,
- *   Sets, Volume or Frequency, six to start and View All Muscles; a row opens to its exercises and
- *   its volume over the period.
+ *   Sets, Volume or Frequency, six to start and View All Muscles; a row opens to its exercises.
  * All from one read: the person's own last 90 days, each time the tab opens.
  */
 export function MuscleActivitySection({
@@ -964,28 +901,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginTop: spacing.md,
     marginBottom: spacing.sm,
-  },
-  bars: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 56,
-    gap: 3,
-  },
-  barSlot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  bar: {
-    borderRadius: 2,
-  },
-  barLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xs,
-  },
-  barLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
   },
   viewAll: {
     flexDirection: 'row',
