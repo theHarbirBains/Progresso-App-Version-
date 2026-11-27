@@ -16,7 +16,8 @@ import type { WorkoutSplitSummary } from './workoutSplitQueries';
 
 // Workout Splits' cards, after Harbir's reference (November 2026): a split of the person's own, a
 // ready-made split to start from, and the way to Workout Programs -- each an icon well in the
-// accent, words in the heading face, and one of Harbir's figures, faint, behind or beside them.
+// accent and words in the heading face -- a ready-made split's and Programs' with one of Harbir's
+// figures beside them.
 
 const WELL = 52;
 
@@ -61,9 +62,8 @@ export function SplitsHeading({
 
 /**
  * One of the person's splits: a dumbbell in its well, the name in capitals and how many days it
- * has, Active and its switch on the right -- the active one outlined in the accent -- with one of
- * Harbir's figures faint behind; then Edit, Duplicate and Delete along its foot. A tap on the name
- * opens it.
+ * has, Active and its switch on the right -- the active one outlined in the accent; then Edit,
+ * Duplicate and Delete along its foot. A tap on the name opens it.
  */
 export function SplitCard({
   split,
@@ -98,7 +98,6 @@ export function SplitCard({
       hero={active}
       style={active ? [styles.activeCard, { borderColor: accentColor }] : undefined}
     >
-      <MuscleFigure group="back" width={150} height={170} style={styles.splitFigure} />
       <View style={styles.splitTop}>
         <Pressable
           testID={`workout-split-view-${split.id}`}
@@ -346,13 +345,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  // One of Harbir's figures, faint, behind the card's right side.
-  splitFigure: {
-    position: 'absolute',
-    right: 56,
-    top: -spacing.lg,
-    opacity: 0.22,
   },
   splitTop: {
     flexDirection: 'row',
