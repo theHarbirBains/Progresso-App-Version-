@@ -1,6 +1,16 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
-import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
+import { MUSCLE_GROUPS, SECONDARY_MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
   EQUIPMENT,
   LOAD_TYPES,
@@ -34,6 +44,15 @@ export class CreateExerciseDto {
 
   @IsIn(MUSCLE_GROUPS)
   muscleGroup!: MuscleGroup;
+
+  // The muscles it also works (exercises.secondary_muscle_groups) -- shown on its page and counted
+  // on the person's heat map. Its own muscle group is left out as it's saved.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(SECONDARY_MUSCLE_GROUPS.length)
+  @ArrayUnique()
+  @IsIn(SECONDARY_MUSCLE_GROUPS, { each: true })
+  secondaryMuscleGroups?: MuscleGroup[];
 
   @IsIn(MOVEMENT_TYPES)
   movementType!: MovementType;

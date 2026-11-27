@@ -93,9 +93,20 @@ describe('muscleActivity', () => {
     expect(triceps.volumeKg).toBe(0);
     expect(triceps.lastTrainedAt).toBeNull();
     expect(triceps.lastWorkedAt).toBe(daysAgo(3));
-    // Only as a muscle an exercise also works: never coloured as trained.
-    expect(triceps.level).toBe('none');
+    // Worked, as a muscle bench press also works: coloured on the heat map like any other.
+    expect(triceps.level).toBe('frequent');
     expect(triceps.exercises[0]).toMatchObject({ name: 'Bench Press', primary: false });
+  });
+
+  it('takes the muscles an exercise also works from the exercise itself -- a custom one too', () => {
+    const custom = {
+      ...entry({ daysAgo: 1, exerciseId: 'my-press', exerciseName: 'My Press' }),
+      secondaryMuscleGroups: ['forearms'] as MuscleGroup[],
+    };
+    // Its own list wins over anything else known of it.
+    const activity = muscleActivity([custom], 30, NOW, () => ['triceps']);
+    expect(groupOf(activity, 'forearms')).toMatchObject({ secondarySets: 3, level: 'recent' });
+    expect(groupOf(activity, 'triceps').secondarySets).toBe(0);
   });
 
   it('gives bodyweight and timed sets their sets, never a volume', () => {
@@ -134,8 +145,8 @@ describe('muscleActivity', () => {
     expect(groupOf(activity, 'glutes').level).toBe('none');
     expect(groupOf(activity, 'glutes').sets).toBe(3);
     expect(groupOf(activity, 'hamstrings').level).toBe('none');
-    // Biceps only as a muscle a row also works: not trained.
-    expect(groupOf(activity, 'biceps').level).toBe('none');
+    // Biceps only as a muscle a row also works: worked yesterday, all the same.
+    expect(groupOf(activity, 'biceps').level).toBe('recent');
     expect(ACTIVITY_LEVEL_NOTES).toEqual({
       recent: '1–2 days',
       frequent: '3–7 days',
@@ -218,12 +229,21 @@ describe('Muscle Breakdown', () => {
   const order = (sort: 'recent' | 'sets' | 'volume' | 'frequency') =>
     sortBreakdown(activity, sort).map((g) => g.group);
 
-  it('counts the muscles trained as the main muscle -- never one only also worked', () => {
-    expect(musclesTrained(activity)).toBe(3);
+  it('counts the muscles worked -- as the main muscle or one an exercise also works', () => {
+    // Chest, back and quads; shoulders and triceps (bench press), biceps (the row).
+    expect(musclesTrained(activity)).toBe(6);
   });
 
-  it('sorts by the last trained, then the rest in the app’s order', () => {
-    expect(order('recent').slice(0, 4)).toEqual(['back', 'quadriceps', 'chest', 'shoulders']);
+  it('sorts by the last worked, the more sets first, then the rest in the app’s order', () => {
+    expect(order('recent').slice(0, 7)).toEqual([
+      'back',
+      'biceps',
+      'quadriceps',
+      'chest',
+      'shoulders',
+      'triceps',
+      'forearms',
+    ]);
     expect(order('recent')).toHaveLength(ACTIVITY_GROUPS.length);
   });
 

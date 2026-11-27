@@ -9,22 +9,6 @@ const mockFetch = jest.fn();
 jest.mock('./muscleActivityQueries', () => ({
   fetchMuscleActivity: (...args: unknown[]) => mockFetch(...args),
 }));
-jest.mock('../exercises/builtinExtras', () => ({
-  loadBuiltinExtras: async () =>
-    new Map([
-      [
-        'bench',
-        {
-          slug: 'bb-bench-press',
-          secondaryMuscleGroups: ['shoulders', 'triceps'],
-          searchAliases: [],
-          movementPattern: 'horizontal_push',
-          illustrationUrl: null,
-        },
-      ],
-    ]),
-  setBuiltinSources: jest.fn(),
-}));
 
 const mockOpenExercise = jest.fn();
 
@@ -39,6 +23,8 @@ const entries: ActivityEntry[] = [
     exerciseId: 'bench',
     exerciseName: 'Bench Press',
     muscleGroup: 'chest',
+    // Read with it: the muscles it also works.
+    secondaryMuscleGroups: ['shoulders', 'triceps'],
     measurementType: 'weight_reps',
     sets: [
       { weightKg: 100, reps: 5, isDrop: false },
@@ -98,9 +84,9 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const since = mockFetch.mock.calls[0][1] as Date;
     expect(Math.round((Date.now() - since.getTime()) / 86400000)).toBeGreaterThanOrEqual(89);
-    // Chest and quadriceps trained (triceps only as a muscle bench press also works); 3 working
+    // Chest and quadriceps trained, shoulders and triceps worked by bench press too; 3 working
     // sets in 2 workouts.
-    expect(screen.getByTestId('muscle-activity-count')).toHaveTextContent(/2\/12.*Muscles/);
+    expect(screen.getByTestId('muscle-activity-count')).toHaveTextContent(/4\/12.*Muscles/);
     expect(screen.getByTestId('muscle-activity-sets')).toHaveTextContent(/3.*Sets/);
     expect(screen.getByTestId('muscle-activity-workouts')).toHaveTextContent(/2.*Workouts/);
     expect(screen.getByTestId('muscle-activity-map')).toHaveTextContent(/Muscle Heat Map/);
@@ -143,21 +129,22 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     );
   });
 
-  it('lists six muscles, last trained first, each with its sessions, sets, volume and when', async () => {
+  it('lists six muscles, last worked first, each with its sessions, sets, volume and when', async () => {
     await renderScreen();
+    // Bench press worked the chest -- and shoulders and triceps -- today; the squat was 20 days ago.
     expect(breakdownOrder()).toEqual([
       'chest',
+      'shoulders',
+      'triceps',
       'quadriceps',
       'back',
-      'shoulders',
       'biceps',
-      'triceps',
     ]);
     expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(
       /Chest.*Today.*1 session · 2 sets · 1,000 kg/,
     );
     expect(screen.getByTestId('muscle-activity-row-triceps')).toHaveTextContent(
-      /Also worked · 2 sets/,
+      /Triceps.*Today.*Also worked · 2 sets/,
     );
     expect(screen.queryByTestId('muscle-activity-row-hamstrings')).toBeNull();
 
@@ -185,7 +172,7 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
   it('changes period in memory, with no new read', async () => {
     await renderScreen();
     fireEvent.press(screen.getByTestId('muscle-activity-period-7'));
-    expect(screen.getByTestId('muscle-activity-count')).toHaveTextContent(/1\/12/);
+    expect(screen.getByTestId('muscle-activity-count')).toHaveTextContent(/3\/12/);
     expect(screen.getByTestId('muscle-activity-sets')).toHaveTextContent(/2/);
     expect(screen.getByTestId('muscle-activity-workouts')).toHaveTextContent(/1/);
     expect(screen.getByTestId('muscle-activity-balance-lower')).toHaveTextContent(/0%/);

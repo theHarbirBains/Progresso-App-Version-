@@ -202,6 +202,7 @@ export class SharedExercisesService {
         created_by: userId,
         name: source.name,
         muscle_group: source.muscleGroup,
+        secondary_muscle_groups: source.secondaryMuscleGroups,
         movement_type: source.movementType,
         logging_style: source.loggingStyle,
         measurement_type: source.measurementType,

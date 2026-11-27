@@ -1,5 +1,8 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsOptional,
@@ -8,7 +11,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
+import { MUSCLE_GROUPS, SECONDARY_MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import { trimmedOrNull } from './create-exercise.dto';
 import {
   EQUIPMENT,
@@ -38,6 +41,14 @@ export class UpdateExerciseDto {
   @IsOptional()
   @IsIn(MUSCLE_GROUPS)
   muscleGroup?: MuscleGroup;
+
+  // The muscles it also works -- see CreateExerciseDto. An empty list clears them.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(SECONDARY_MUSCLE_GROUPS.length)
+  @ArrayUnique()
+  @IsIn(SECONDARY_MUSCLE_GROUPS, { each: true })
+  secondaryMuscleGroups?: MuscleGroup[];
 
   @IsOptional()
   @IsIn(MOVEMENT_TYPES)

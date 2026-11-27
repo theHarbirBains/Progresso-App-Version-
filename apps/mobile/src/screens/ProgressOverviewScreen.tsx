@@ -35,6 +35,9 @@ import { workingSets } from '../workouts/exerciseHistoryGrouping';
 
 type Props = RootStackScreenProps<'ProgressOverview'>;
 
+/** The section Progress opens on unless asked for another: the Muscles heat map (Harbir's call). */
+const DEFAULT_SECTION: ProgressSection = 'Muscles';
+
 // What the shared history works out to, kept for as long as the history itself is the same
 // object. Progress opens fresh on every visit (a section page), but the history only changes
 // when a workout is completed -- so a visit reuses these instead of working them out again in
@@ -89,13 +92,13 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
   const loading = statsLoading || prsLoading;
   const error = statsError ?? prsError;
 
-  // Opened on the section asked for (Feed's Daily Steps widget asks for Steps), else Overview --
-  // only one this person has (no Steps off iPhone).
+  // Opened on the section asked for (Feed's Daily Steps widget asks for Steps), else the Muscles
+  // heat map (Harbir's call) -- only one this person has (no Steps off iPhone).
   const asked = route?.params?.section;
   const offered = (section: ProgressSection | undefined) =>
     section !== undefined && ownProgressSections().some((s) => s.key === section);
   const [activeSection, setActiveSection] = useState<ProgressSection>(
-    offered(asked) ? asked! : 'Overview',
+    offered(asked) ? asked! : offered(DEFAULT_SECTION) ? DEFAULT_SECTION : 'Overview',
   );
   useEffect(() => {
     if (asked && offered(asked)) setActiveSection(asked);

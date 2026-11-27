@@ -109,7 +109,9 @@ const navigation: any = {
     return jest.fn();
   }),
 };
-let route = {} as never;
+// Overview, asked for by name: Progress itself opens on the Muscles heat map (a test below).
+const OVERVIEW = { params: { section: 'Overview' } } as never;
+let route = OVERVIEW;
 
 const mockOpenMenu = jest.fn();
 
@@ -317,10 +319,17 @@ describe('ProgressOverviewScreen shell', () => {
     });
   });
 
-  it('lists its sections (Overview, Top Sets, Muscles, Cardio, All Time, Steps), defaulting to Overview', async () => {
+  it('lists its sections (Overview, Top Sets, Muscles, Cardio, All Time, Steps), opening on Muscles', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    route = {} as never;
     renderScreen();
     await screen.findByTestId('progress-tabs');
+    // Asked for nothing, it opens on the heat map.
+    expect(await screen.findByTestId('muscle-activity-map')).toBeTruthy();
+    expect(screen.getByTestId('progress-tabs-Muscles').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    route = OVERVIEW;
 
     for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'AllTime', 'Steps']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
@@ -331,7 +340,6 @@ describe('ProgressOverviewScreen shell', () => {
     for (const removed of ['Strength', 'PRs', 'Exercises', 'OneRepMax']) {
       expect(screen.queryByTestId(`progress-tabs-${removed}`)).toBeNull();
     }
-    expect(await screen.findByTestId('progress-overview-scroll')).toBeTruthy();
   });
 
   it('opens Cardio on the cardio in your workouts -- what to do while there is none', async () => {
@@ -635,7 +643,7 @@ describe('ProgressOverviewScreen -- steps', () => {
   afterEach(() => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(false);
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
-    route = {} as never;
+    route = OVERVIEW;
   });
 
   it("shows no steps on Overview: today's are Feed's Daily Steps widget", async () => {

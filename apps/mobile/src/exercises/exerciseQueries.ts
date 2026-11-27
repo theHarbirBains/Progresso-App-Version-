@@ -45,7 +45,7 @@ export interface ExerciseRow {
   createdBy: string | null;
   /** A built-in's illustration (exerciseGuide.ts's extras), once read. */
   slug?: string | null;
-  /** The muscle groups a built-in also works -- it's listed under them too, after the ones it's for. */
+  /** The muscle groups it also works -- a built-in's from the catalogue, a custom one's as its owner chose. */
   secondaryMuscleGroups?: MuscleGroup[];
   /** Other names a built-in is found by ("Deadlift" for Barbell Deadlift). */
   searchAliases?: string[];
@@ -118,6 +118,7 @@ interface ExerciseDbRow {
   id: string;
   name: string;
   muscle_group: MuscleGroup;
+  secondary_muscle_groups?: MuscleGroup[] | null;
   movement_type: MovementType;
   logging_style: LoggingStyle | null;
   measurement_type: MeasurementType | null;
@@ -140,6 +141,7 @@ function toExerciseRow(row: ExerciseDbRow): ExerciseRow {
     id: row.id,
     name: row.name,
     muscleGroup: row.muscle_group,
+    secondaryMuscleGroups: row.secondary_muscle_groups ?? [],
     movementType: row.movement_type,
     loggingStyle: row.logging_style,
     measurementType: row.measurement_type ?? 'weight_reps',
@@ -171,7 +173,7 @@ function buildExerciseQuery(params: {
   let query = supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
+      'id, name, muscle_group, secondary_muscle_groups, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
       count ? { count } : undefined,
     )
     .eq('is_active', true)
@@ -247,7 +249,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
+      'id, name, muscle_group, secondary_muscle_groups, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
     )
     .eq('is_active', true)
     .order('name', { ascending: true });
@@ -458,6 +460,8 @@ export async function fetchExerciseSourceCounts(
 export interface ExerciseDetails extends Required<MachineDetails> {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
+  /** The muscles it also works (never its own group); none where it couldn't be read. */
+  secondaryMuscleGroups?: MuscleGroup[];
 }
 
 /**
@@ -475,6 +479,7 @@ export async function fetchExerciseDetails(
     return {
       muscleGroup: cached.muscleGroup,
       movementType: cached.movementType,
+      secondaryMuscleGroups: cached.secondaryMuscleGroups ?? [],
       photoUrl: cached.photoUrl,
       gym: cached.gym ?? null,
       attachment: cached.attachment ?? null,
@@ -487,7 +492,7 @@ export async function fetchExerciseDetails(
   }
   const { data, error } = await supabase
     .from('exercises')
-    .select(`muscle_group, movement_type, ${MACHINE_COLUMNS}`)
+    .select(`muscle_group, movement_type, secondary_muscle_groups, ${MACHINE_COLUMNS}`)
     .eq('id', exerciseId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -495,6 +500,7 @@ export async function fetchExerciseDetails(
   const row = data as {
     muscle_group: MuscleGroup;
     movement_type: MovementType;
+    secondary_muscle_groups: MuscleGroup[] | null;
     photo_url: string | null;
     gym: string | null;
     attachment: string | null;
@@ -507,6 +513,7 @@ export async function fetchExerciseDetails(
   return {
     muscleGroup: row.muscle_group,
     movementType: row.movement_type,
+    secondaryMuscleGroups: row.secondary_muscle_groups ?? [],
     ...machineDetailsOf(row),
   };
 }

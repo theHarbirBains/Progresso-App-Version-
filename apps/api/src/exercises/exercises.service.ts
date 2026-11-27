@@ -8,7 +8,7 @@ import {
 import { SupabaseService } from '../supabase/supabase.service';
 import type { CreateExerciseDto } from './dto/create-exercise.dto';
 import type { UpdateExerciseDto } from './dto/update-exercise.dto';
-import type { MuscleGroup } from './muscle-group';
+import { cleanSecondaryGroups, type MuscleGroup } from './muscle-group';
 import {
   isLegacyGrip,
   type Equipment,
@@ -24,6 +24,8 @@ export interface ExerciseRecord {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
+  /** The muscles it also works (never its own group): its page shows them, the heat map counts them. */
+  secondaryMuscleGroups: MuscleGroup[];
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
   measurementType: MeasurementType;
@@ -53,6 +55,7 @@ export function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     id: row.id as string,
     name: row.name as string,
     muscleGroup: row.muscle_group as MuscleGroup,
+    secondaryMuscleGroups: (row.secondary_muscle_groups as MuscleGroup[] | null) ?? [],
     movementType: row.movement_type as MovementType,
     loggingStyle: (row.logging_style as LoggingStyle | null) ?? null,
     measurementType: (row.measurement_type as MeasurementType | undefined) ?? 'weight_reps',
@@ -102,6 +105,10 @@ export class ExercisesService {
       .insert({
         name: dto.name,
         muscle_group: dto.muscleGroup,
+        secondary_muscle_groups: cleanSecondaryGroups(
+          dto.secondaryMuscleGroups ?? [],
+          dto.muscleGroup,
+        ),
         created_by: userId,
         movement_type: dto.movementType,
         // Only a unilateral exercise ever has one -- CreateExerciseDto's
@@ -146,6 +153,14 @@ export class ExercisesService {
     const updatePayload: Record<string, unknown> = {};
     if (dto.name !== undefined) updatePayload.name = dto.name;
     if (dto.muscleGroup !== undefined) updatePayload.muscle_group = dto.muscleGroup;
+    // The muscles it also works, as sent -- and never its own group, so a new main muscle leaves
+    // the list too.
+    if (dto.secondaryMuscleGroups !== undefined || dto.muscleGroup !== undefined) {
+      updatePayload.secondary_muscle_groups = cleanSecondaryGroups(
+        dto.secondaryMuscleGroups ?? existing.secondaryMuscleGroups,
+        dto.muscleGroup ?? existing.muscleGroup,
+      );
+    }
     if (dto.isActive !== undefined) updatePayload.is_active = dto.isActive;
     if (dto.movementType !== undefined) {
       updatePayload.movement_type = dto.movementType;

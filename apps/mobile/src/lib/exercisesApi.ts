@@ -12,6 +12,8 @@ export interface ExerciseResponse {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
+  /** The muscles it also works (never its own group). Absent from an API before it was kept. */
+  secondaryMuscleGroups?: MuscleGroup[];
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
   measurementType: MeasurementType;
@@ -37,6 +39,8 @@ export interface ExerciseResponse {
 export interface CreateExerciseInput {
   name: string;
   muscleGroup: MuscleGroup;
+  /** The muscles it also works (never its own group). Absent from an API before it was kept. */
+  secondaryMuscleGroups?: MuscleGroup[];
   movementType: MovementType;
   /** Required when movementType is 'unilateral', omitted otherwise -- see ExerciseFormScreen. */
   loggingStyle?: LoggingStyle;
@@ -57,6 +61,8 @@ export interface CreateExerciseInput {
 export interface UpdateExerciseInput {
   name?: string;
   muscleGroup?: MuscleGroup;
+  /** The muscles it also works; an empty list clears them. */
+  secondaryMuscleGroups?: MuscleGroup[];
   movementType?: MovementType;
   loggingStyle?: LoggingStyle;
   /** Workouts already logged keep what they were logged as. */

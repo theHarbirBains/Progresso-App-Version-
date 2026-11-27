@@ -123,12 +123,45 @@ describe('ExerciseFormScreen (create mode)', () => {
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
         name: 'Cable Preacher Curl',
         muscleGroup: 'biceps',
+        secondaryMuscleGroups: [],
         movementType: 'bilateral',
         measurementType: 'weight_reps',
       }),
     );
     expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it('asks what else it works -- any of the other muscle groups, never its own', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Close-Grip Press');
+    selectMuscleGroup('exercise-form-muscle-group', 'chest');
+    // Its own group isn't offered; Full Body and Other never are.
+    expect(screen.queryByTestId('exercise-form-secondary-muscles-chest')).toBeNull();
+    expect(screen.queryByTestId('exercise-form-secondary-muscles-full_body')).toBeNull();
+    expect(screen.queryByTestId('exercise-form-secondary-muscles-other')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-form-secondary-muscles-triceps'));
+    fireEvent.press(screen.getByTestId('exercise-form-secondary-muscles-shoulders'));
+    fireEvent.press(screen.getByTestId('exercise-form-secondary-muscles-forearms'));
+    // Tapped again, left out.
+    fireEvent.press(screen.getByTestId('exercise-form-secondary-muscles-forearms'));
+    expect(
+      screen.getByTestId('exercise-form-secondary-muscles-triceps').props.accessibilityState,
+    ).toMatchObject({ selected: true });
+
+    // A muscle chosen as the main one leaves the others.
+    selectMuscleGroup('exercise-form-muscle-group', 'triceps');
+    expect(screen.queryByTestId('exercise-form-secondary-muscles-triceps')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ muscleGroup: 'triceps', secondaryMuscleGroups: ['shoulders'] }),
+      ),
+    );
   });
 
   it('keeps a dumbbell exercise quick: its photo, and the rest behind More Details', async () => {
@@ -146,6 +179,7 @@ describe('ExerciseFormScreen (create mode)', () => {
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
         name: 'Dumbbell Curl',
         muscleGroup: 'biceps',
+        secondaryMuscleGroups: [],
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         equipment: 'dumbbell',
@@ -203,6 +237,7 @@ describe('ExerciseFormScreen (create mode)', () => {
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
         name: 'Triceps Pushdown',
         muscleGroup: 'triceps',
+        secondaryMuscleGroups: [],
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         equipment: 'cable',
@@ -467,6 +502,7 @@ describe('ExerciseFormScreen (create mode)', () => {
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
         name: 'Single-Arm Lat Pulldown',
         muscleGroup: 'back',
+        secondaryMuscleGroups: [],
         movementType: 'unilateral',
         measurementType: 'weight_reps',
         loggingStyle: 'single_side',
@@ -622,6 +658,31 @@ describe('ExerciseFormScreen (edit mode)', () => {
     expect(screen.getByTestId('exercise-form-unilateral').props.value).toBe(false);
   });
 
+  it('prefills the muscles it also works, and saves a change to them', async () => {
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={{ ...ownedExercise, secondaryMuscleGroups: ['forearms'] }}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId('exercise-form-secondary-muscles-forearms').props.accessibilityState,
+    ).toMatchObject({ selected: true });
+
+    fireEvent.press(screen.getByTestId('exercise-form-secondary-muscles-shoulders'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
+        'token-123',
+        ownedExercise.id,
+        expect.objectContaining({ secondaryMuscleGroups: ['shoulders', 'forearms'] }),
+      ),
+    );
+  });
+
   it('prefills Unilateral as on for an existing unilateral exercise', () => {
     render(
       <ExerciseFormScreen
@@ -679,6 +740,7 @@ describe('ExerciseFormScreen (edit mode)', () => {
       expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', {
         name: 'Renamed Curl',
         muscleGroup: 'biceps',
+        secondaryMuscleGroups: [],
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         isActive: true,

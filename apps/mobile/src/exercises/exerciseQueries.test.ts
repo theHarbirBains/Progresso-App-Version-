@@ -188,6 +188,8 @@ describe('fetchExercises', () => {
         id: 'ex-1',
         name: 'Barbell Curl',
         muscleGroup: 'biceps',
+        // None read: it works no other muscles.
+        secondaryMuscleGroups: [],
         // A row from before measurement types says nothing: it measures weight and reps.
         measurementType: 'weight_reps',
         // What sets the machine apart, nothing said where it wasn't given.
@@ -366,6 +368,7 @@ describe('fetchExerciseDetails', () => {
     await expect(fetchExerciseDetails('user-1', 'ex-row')).resolves.toEqual({
       muscleGroup: 'back',
       movementType: 'bilateral',
+      secondaryMuscleGroups: [],
       photoUrl: 'https://example.com/row.jpg',
       gym: 'Fit4Less Downtown',
       grip: null,

@@ -28,9 +28,6 @@ import {
   spacing,
   typeScale,
 } from '../design/theme';
-import { loadBuiltinExtras } from '../exercises/builtinExtras';
-// Plugs the built-in extras' reads in, for the muscles each built-in also works.
-import '../exercises/exerciseGuide';
 import { sideOf } from '../exercises/illustrations/muscleMap';
 import { MuscleFigure } from '../exercises/MuscleFigure';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
@@ -187,7 +184,8 @@ function BreakdownRow({
   onOpenExercise: (exerciseId: string, exerciseName: string) => void;
 }) {
   const name = MUSCLE_GROUP_LABELS[group.group];
-  const last = sinceText(group.lastTrainedAt, now);
+  // When it was last worked -- as the main muscle or one an exercise also works, as its colour.
+  const last = sinceText(group.lastWorkedAt, now);
   const color = LEVEL_COLORS[group.level];
   return (
     <View style={divider && styles.rowDivider}>
@@ -319,11 +317,7 @@ export function MuscleActivitySection({
   const [sort, setSort] = useState<BreakdownSort>('recent');
   const [sortOpen, setSortOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [read, setRead] = useState<{
-    entries: ActivityEntry[];
-    secondary: Map<string, readonly MuscleGroup[]>;
-    at: Date;
-  } | null>(null);
+  const [read, setRead] = useState<{ entries: ActivityEntry[]; at: Date } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -331,13 +325,9 @@ export function MuscleActivitySection({
     setError(null);
     try {
       const at = new Date();
-      const [entries, extras] = await Promise.all([
-        fetchMuscleActivity(userId, periodStart(90, at)),
-        loadBuiltinExtras(),
-      ]);
-      const secondary = new Map<string, readonly MuscleGroup[]>();
-      extras.forEach((extra, id) => secondary.set(id, extra.secondaryMuscleGroups));
-      setRead({ entries, secondary, at });
+      // Each exercise comes with the muscles it also works, built-in or custom.
+      const entries = await fetchMuscleActivity(userId, periodStart(90, at));
+      setRead({ entries, at });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load your training.");
     }
@@ -349,10 +339,7 @@ export function MuscleActivitySection({
   }, [load]);
 
   const activity = useMemo(
-    () =>
-      read
-        ? muscleActivity(read.entries, period, read.at, (id) => read.secondary.get(id) ?? [])
-        : null,
+    () => (read ? muscleActivity(read.entries, period, read.at) : null),
     [read, period],
   );
   const totals = useMemo(

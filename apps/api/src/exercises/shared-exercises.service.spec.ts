@@ -209,6 +209,7 @@ describe('SharedExercisesService', () => {
             created_by: 'user-1',
             name: 'Seated Row',
             muscle_group: 'back',
+            secondary_muscle_groups: [],
             movement_type: 'bilateral',
             logging_style: null,
             measurement_type: 'weight_reps',

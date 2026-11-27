@@ -169,9 +169,13 @@ export function ExerciseOverview({
   // A built-in's demonstration video, where it has one and a provider's on (exerciseVideoSource).
   const video = exerciseVideoFor(slug);
   const hasHero = !!video || !!photoUri || (!!slug && hasIllustration(slug));
-  const secondary = (extras?.secondaryMuscleGroups ?? []).filter(
-    (group) => group !== details.muscleGroup,
-  );
+  // The muscles it also works: read with it (a custom exercise's, as its owner chose), else a
+  // built-in's from its extras.
+  const secondary = (
+    details.secondaryMuscleGroups?.length
+      ? details.secondaryMuscleGroups
+      : (extras?.secondaryMuscleGroups ?? [])
+  ).filter((group) => group !== details.muscleGroup);
   const category = movementCategoryOf(extras?.movementPattern);
   const pattern = movementPatternLabel(extras?.movementPattern);
   const facts: { key: string; label: string; value: string }[] = [

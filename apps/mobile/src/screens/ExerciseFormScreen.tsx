@@ -46,6 +46,7 @@ import {
   type ExerciseRow,
 } from '../exercises/exerciseQueries';
 import { MuscleGroupSelect } from '../exercises/MuscleGroupSelect';
+import { SecondaryMuscleSelect } from '../exercises/SecondaryMuscleSelect';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import {
   MEASUREMENT_TYPE_LABELS,
@@ -130,6 +131,10 @@ export function ExerciseFormScreen(props: Props) {
     existing?.name ?? (props.mode === 'create' ? (props.initialName?.trim() ?? '') : ''),
   );
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(existing?.muscleGroup ?? null);
+  // The muscles it also works (optional) -- never its own group.
+  const [secondaryMuscles, setSecondaryMuscles] = useState<MuscleGroup[]>(
+    (existing?.secondaryMuscleGroups ?? []).filter((group) => group !== existing?.muscleGroup),
+  );
   const [isUnilateral, setIsUnilateral] = useState(existing?.movementType === 'unilateral');
   const [measurementType, setMeasurementType] = useState<MeasurementType>(
     existing?.measurementType ?? 'weight_reps',
@@ -216,6 +221,7 @@ export function ExerciseFormScreen(props: Props) {
     return {
       name: name.trim(),
       muscleGroup: muscleGroup as MuscleGroup,
+      secondaryMuscleGroups: secondaryMuscles.filter((group) => group !== muscleGroup),
       movementType,
       measurementType,
       // Only meaningful for a unilateral exercise; always 'single_side' since this form never asks.
@@ -424,8 +430,21 @@ export function ExerciseFormScreen(props: Props) {
         <MuscleGroupSelect
           testID="exercise-form-muscle-group"
           value={muscleGroup}
-          onChange={setMuscleGroup}
+          onChange={(group) => {
+            setMuscleGroup(group);
+            // Its own muscle group is never one it also works.
+            setSecondaryMuscles((chosen) => chosen.filter((other) => other !== group));
+          }}
           accentColor={accentColor}
+        />
+
+        <SecondaryMuscleSelect
+          testID="exercise-form-secondary-muscles"
+          primary={muscleGroup}
+          value={secondaryMuscles}
+          onChange={setSecondaryMuscles}
+          accentColor={accentColor}
+          onAccentColor={onAccentColor}
         />
 
         {/* What it's done with decides which setup details are asked; tapping it again clears it. */}

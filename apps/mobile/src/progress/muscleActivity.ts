@@ -3,18 +3,20 @@ import type { ActivityEntry } from './muscleActivityQueries';
 
 // Muscle Activity: which muscle groups the person has trained lately, worked out from the sets
 // they logged -- never a recovery figure. Each exercise counts toward its own muscle group (its
-// primary one, as everywhere in the app) and, for a built-in, the groups it also works (the
-// catalogue's secondary_muscle_groups); the two are kept apart, never weighted into one number.
+// primary one, as everywhere in the app) and toward the groups it also works (its
+// secondary_muscle_groups: a built-in's from the catalogue, a custom one's as its owner chose).
+// Its sets, sessions and volume stay its own group's; a muscle it also works keeps them apart
+// (secondarySets), never weighted into one number -- but on the heat map it's worked all the same
+// (Harbir's call): its colour, the muscles trained and when it was last worked count both.
 
 export const ACTIVITY_PERIODS = [7, 30, 90] as const;
 export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];
 
 /**
- * How lately a muscle group was trained as the main muscle, in the period (Harbir's heat map,
- * November 2026), by the day it was last trained -- today counted as its first day: within the
- * last 2 days (today or yesterday); 3 to 7 days; 8 to 14 days; or longer ago, or not in the
- * period at all. A muscle an exercise only also works never colours it: that isn't a set of its
- * own.
+ * How lately a muscle group was worked in the period -- as an exercise's own muscle or one it also
+ * works (Harbir's heat map, November 2026) -- by the day it was last worked, today counted as its
+ * first day: within the last 2 days (today or yesterday); 3 to 7 days; 8 to 14 days; or longer
+ * ago, or not in the period at all.
  */
 export const ACTIVITY_LEVELS = ['recent', 'frequent', 'less', 'none'] as const;
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
@@ -130,10 +132,10 @@ export function daysSince(at: string, now: Date): number {
   return Math.round((startOfDay(now).getTime() - startOfDay(new Date(at)).getTime()) / DAY_MS);
 }
 
-/** A group's level from when it was last trained as the main muscle in the period, if it was. */
-export function levelFor(lastTrainedAt: string | null, now: Date): ActivityLevel {
-  if (lastTrainedAt === null) return 'none';
-  const days = daysSince(lastTrainedAt, now);
+/** A group's level from when it was last worked in the period, if it was. */
+export function levelFor(lastWorkedAt: string | null, now: Date): ActivityLevel {
+  if (lastWorkedAt === null) return 'none';
+  const days = daysSince(lastWorkedAt, now);
   if (days <= LEVEL_MAX_DAYS.recent) return 'recent';
   if (days <= LEVEL_MAX_DAYS.frequent) return 'frequent';
   if (days <= LEVEL_MAX_DAYS.less) return 'less';
@@ -142,14 +144,15 @@ export function levelFor(lastTrainedAt: string | null, now: Date): ActivityLevel
 
 /**
  * Each muscle group's activity in the period, from what was logged: `entries` are the exercises
- * done in finished workouts (fetchMuscleActivity), `secondaryOf` the groups a built-in also works.
- * Every group on the figure is in the answer, in the app's order, trained or not.
+ * done in finished workouts (fetchMuscleActivity), each with the groups it also works;
+ * `secondaryOf` is asked for an entry that doesn't carry them. Every group on the figure is in the
+ * answer, in the app's order, trained or not.
  */
 export function muscleActivity(
   entries: readonly ActivityEntry[],
   period: ActivityPeriod,
   now: Date,
-  secondaryOf: (exerciseId: string) => readonly MuscleGroup[],
+  secondaryOf: (exerciseId: string) => readonly MuscleGroup[] = () => [],
 ): GroupActivity[] {
   const from = periodStart(period, now);
   const starts = trendBuckets(period, now);
@@ -213,7 +216,7 @@ export function muscleActivity(
     }
     note(own, entry, working, volume, true);
 
-    for (const group of new Set(secondaryOf(entry.exerciseId))) {
+    for (const group of new Set(entry.secondaryMuscleGroups ?? secondaryOf(entry.exerciseId))) {
       if (group === entry.muscleGroup) continue;
       const also = tallyOf(group);
       also.secondarySets += working;
@@ -256,7 +259,8 @@ export function muscleActivity(
       : 0;
     const perWeek = sessions / weeks;
     const lastTrainedAt = tally?.lastTrainedAt ?? null;
-    const level = levelFor(lastTrainedAt, now);
+    // Coloured by when it was last worked at all -- as the main muscle or one an exercise also works.
+    const level = levelFor(tally?.lastWorkedAt ?? null, now);
     return {
       group,
       level,
@@ -284,9 +288,9 @@ export function muscleActivity(
   });
 }
 
-/** How many groups were trained as the main muscle in the period. */
+/** How many groups were worked in the period -- as the main muscle or one an exercise also works. */
 export function musclesTrained(activity: readonly GroupActivity[]): number {
-  return activity.filter((group) => group.sets > 0).length;
+  return activity.filter((group) => group.sets > 0 || group.secondarySets > 0).length;
 }
 
 /** The period at a glance: its working sets (every exercise's) and the workouts they were in. */
@@ -375,10 +379,10 @@ export const BREAKDOWN_SORT_LABELS: Record<BreakdownSort, string> = {
   frequency: 'Frequency',
 };
 
-/** What a sort orders by, for a group: its last trained moment, sets, volume or sessions. */
+/** What a sort orders by, for a group: when it was last worked, its sets, volume or sessions. */
 function sortFigure(group: GroupActivity, sort: BreakdownSort): number {
   if (sort === 'recent') {
-    return group.lastTrainedAt ? new Date(group.lastTrainedAt).getTime() : -Infinity;
+    return group.lastWorkedAt ? new Date(group.lastWorkedAt).getTime() : -Infinity;
   }
   if (sort === 'sets') return group.sets;
   if (sort === 'volume') return group.volumeKg;
@@ -386,8 +390,8 @@ function sortFigure(group: GroupActivity, sort: BreakdownSort): number {
 }
 
 /**
- * Muscle Breakdown's order, the most first: Recent -- last trained first, then the ones not
- * trained in the period; Sets; Volume; Frequency -- sessions. Ties go to the more sets, then the
+ * Muscle Breakdown's order, the most first: Recent -- last worked first (as the main muscle or
+ * one an exercise also works), then the ones not worked in the period; Sets; Volume; Frequency -- sessions. Ties go to the more sets, then the
  * app's order of muscle groups.
  */
 export function sortBreakdown(

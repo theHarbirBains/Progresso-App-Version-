@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
-import { ExercisesService } from './exercises.service';
+import { ExercisesService, toExerciseRecord } from './exercises.service';
 
 function createMockClient(options: {
   insertData?: Record<string, unknown> | null;
@@ -65,6 +65,35 @@ const ownCustomRow = {
 const othersCustomRow = { ...ownCustomRow, id: 'ex-theirs', created_by: 'user-2' };
 
 describe('ExercisesService', () => {
+  describe('the muscles an exercise also works', () => {
+    it('saves them each once, in order, never its own muscle group', async () => {
+      const client = createMockClient({ insertData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.createCustom('user-1', {
+        name: 'Close-Grip Press',
+        muscleGroup: 'chest',
+        movementType: 'bilateral',
+        secondaryMuscleGroups: ['triceps', 'chest', 'shoulders'],
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          muscle_group: 'chest',
+          secondary_muscle_groups: ['shoulders', 'triceps'],
+        }),
+      );
+    });
+
+    it('reads them back on the exercise', () => {
+      expect(
+        toExerciseRecord({ ...ownCustomRow, secondary_muscle_groups: ['biceps'] })
+          .secondaryMuscleGroups,
+      ).toEqual(['biceps']);
+      expect(toExerciseRecord(ownCustomRow).secondaryMuscleGroups).toEqual([]);
+    });
+  });
+
   describe('createCustom', () => {
     it('creates a bilateral custom exercise owned by the caller', async () => {
       const client = createMockClient({ insertData: ownCustomRow });
@@ -79,6 +108,7 @@ describe('ExercisesService', () => {
       expect(client.insert).toHaveBeenCalledWith({
         name: 'My Curl Variation',
         muscle_group: 'biceps',
+        secondary_muscle_groups: [],
         created_by: 'user-1',
         movement_type: 'bilateral',
         logging_style: null,
@@ -98,6 +128,7 @@ describe('ExercisesService', () => {
         id: 'ex-mine',
         name: 'My Curl Variation',
         muscleGroup: 'biceps',
+        secondaryMuscleGroups: [],
         movementType: 'bilateral',
         loggingStyle: null,
         measurementType: 'weight_reps',
@@ -138,6 +169,7 @@ describe('ExercisesService', () => {
       expect(client.insert).toHaveBeenCalledWith({
         name: 'Single-Arm Lat Pulldown',
         muscle_group: 'back',
+        secondary_muscle_groups: [],
         created_by: 'user-1',
         movement_type: 'unilateral',
         logging_style: 'single_side',
@@ -417,6 +449,35 @@ describe('ExercisesService', () => {
       expect(client.update).toHaveBeenCalledWith({ is_active: false });
       expect(client.updateEq).toHaveBeenCalledWith('id', 'ex-mine');
       expect(result.isActive).toBe(false);
+    });
+
+    it('sets the muscles it also works -- an empty list clears them', async () => {
+      const client = createMockClient({ selectData: ownCustomRow, updateData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.updateCustom('user-1', 'ex-mine', {
+        secondaryMuscleGroups: ['forearms', 'biceps'],
+      });
+      // Its own group (biceps) never one it also works.
+      expect(client.update).toHaveBeenLastCalledWith({ secondary_muscle_groups: ['forearms'] });
+
+      await service.updateCustom('user-1', 'ex-mine', { secondaryMuscleGroups: [] });
+      expect(client.update).toHaveBeenLastCalledWith({ secondary_muscle_groups: [] });
+    });
+
+    it('takes a new main muscle out of the muscles it also works', async () => {
+      const client = createMockClient({
+        selectData: { ...ownCustomRow, secondary_muscle_groups: ['forearms', 'shoulders'] },
+        updateData: ownCustomRow,
+      });
+      const service = serviceWith(client);
+
+      await service.updateCustom('user-1', 'ex-mine', { muscleGroup: 'shoulders' });
+
+      expect(client.update).toHaveBeenCalledWith({
+        muscle_group: 'shoulders',
+        secondary_muscle_groups: ['forearms'],
+      });
     });
 
     it('switches an owned exercise to unilateral with its logging style', async () => {

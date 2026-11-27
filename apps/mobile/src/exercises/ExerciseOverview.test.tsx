@@ -102,6 +102,21 @@ describe('ExerciseOverview', () => {
     expect(screen.queryByTestId('exercise-overview-how-to')).toBeNull();
   });
 
+  it("shows the muscles a person's own exercise also works, as they chose them", async () => {
+    render(
+      <ExerciseOverview
+        details={{ ...rowDetails, secondaryMuscleGroups: ['biceps', 'forearms'] }}
+        exerciseId="mine-id"
+        exerciseName="My Row"
+        accentColor="#D99A50"
+      />,
+    );
+    await settle();
+    expect(screen.getByTestId('exercise-overview-secondary')).toHaveTextContent(
+      /Secondary: Biceps, Forearms/,
+    );
+  });
+
   it('shows nothing until the details are read', () => {
     render(
       <ExerciseOverview

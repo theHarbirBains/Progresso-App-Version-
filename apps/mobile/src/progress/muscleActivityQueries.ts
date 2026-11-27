@@ -12,6 +12,11 @@ export interface ActivityEntry {
   exerciseName: string;
   muscleGroup: MuscleGroup;
   measurementType: MeasurementType;
+  /**
+   * The muscles the exercise also works (exercises.secondary_muscle_groups) -- a built-in's from
+   * the catalogue, a custom one's as its owner chose. Absent where it wasn't read.
+   */
+  secondaryMuscleGroups?: MuscleGroup[];
   /** Its finished working sets (never a warm-up); a drop set marked. */
   sets: { weightKg: number | null; reps: number | null; isDrop: boolean }[];
 }
@@ -42,14 +47,21 @@ export async function fetchMuscleActivity(userId: string, since: Date): Promise<
     workout_id: string;
     exercise_id: string;
     measurement_type: MeasurementType | null;
-    exercises: { name: string; muscle_group: MuscleGroup } | null;
+    exercises: {
+      name: string;
+      muscle_group: MuscleGroup;
+      secondary_muscle_groups: MuscleGroup[] | null;
+    } | null;
   };
   const exercises = await fetchAllRowsForIds<Row>([...performedAt.keys()], (ids, from, to) =>
     supabase
       .from('workout_exercises')
-      .select('id, workout_id, exercise_id, measurement_type, exercises(name, muscle_group)', {
-        count: 'exact',
-      })
+      .select(
+        'id, workout_id, exercise_id, measurement_type, exercises(name, muscle_group, secondary_muscle_groups)',
+        {
+          count: 'exact',
+        },
+      )
       .in('workout_id', ids)
       .is('deleted_at', null)
       .order('id')
@@ -77,6 +89,7 @@ export async function fetchMuscleActivity(userId: string, since: Date): Promise<
       exerciseId: e.exercise_id,
       exerciseName: e.exercises?.name ?? 'Exercise',
       muscleGroup: e.exercises?.muscle_group ?? 'other',
+      secondaryMuscleGroups: e.exercises?.secondary_muscle_groups ?? [],
       measurementType: e.measurement_type ?? 'weight_reps',
       sets: setsOf.get(e.id)!,
     }));

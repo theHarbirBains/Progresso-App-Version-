@@ -102,6 +102,7 @@ describe('fetchMuscleActivity', () => {
         exerciseId: 'bench',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        secondaryMuscleGroups: [],
         measurementType: 'weight_reps',
         sets: [
           { weightKg: 80, reps: 8, isDrop: false },
@@ -114,6 +115,7 @@ describe('fetchMuscleActivity', () => {
         exerciseId: 'plank',
         exerciseName: 'Plank',
         muscleGroup: 'core',
+        secondaryMuscleGroups: [],
         measurementType: 'timed',
         sets: [{ weightKg: null, reps: null, isDrop: false }],
       },
