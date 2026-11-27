@@ -638,7 +638,7 @@ describe('ActiveWorkoutScreen', () => {
       ),
     );
     expect(await screen.findByTestId('active-workout-cardio-entry-c1')).toHaveTextContent(
-      /Treadmill.*20 min.*Time.*3 km.*Distance.*6.5.*Speed.*1%.*Incline/,
+      /Treadmill.*20 min.*Time.*3 km.*Distance.*6.5.*Speed.*1Incline/,
     );
     expect(screen.getByTestId('active-workout-pages-cardio')).toHaveTextContent(/Cardio.*1/);
     expect(screen.getByTestId('active-workout-cardio-totals')).toHaveTextContent(

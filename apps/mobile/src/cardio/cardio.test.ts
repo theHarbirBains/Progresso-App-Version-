@@ -20,7 +20,7 @@ import {
   type CardioDraft,
   type CardioValues,
 } from './cardioActivities';
-import { workoutTimes } from './workoutTime';
+import { finishedSetTimes, liftingSeconds, workoutTimes } from './workoutTime';
 
 const values = (extra: Partial<CardioValues> = {}): CardioValues => ({
   activity: 'treadmill',
@@ -102,6 +102,70 @@ describe('workoutTimes', () => {
         cardio: [{ durationSeconds: 1800 }],
       }),
     ).toEqual({ totalSeconds: 1800, strengthSeconds: 0, cardioSeconds: 1800 });
+  });
+
+  /** Sets finished every few minutes, from one minute after the start to another. */
+  function setsBetween(fromMinute: number, toMinute: number, every = 4): string[] {
+    const times: string[] = [];
+    for (let minute = fromMinute; minute <= toMinute; minute += every) {
+      times.push(new Date(Date.parse(start) + minute * 60_000).toISOString());
+    }
+    return times;
+  }
+
+  it('adds cardio done outside the workout to it, never taking it from the lifting', () => {
+    // Maaz: 48 minutes of chest and core (sets from 3 to 43 minutes in), finished at 48, with an
+    // hour on the treadmill typed in -- an hour that can't have been in those 48 minutes.
+    const times = workoutTimes({
+      performedAt: start,
+      completedAt: '2026-11-20T10:48:00Z',
+      hasStrength: true,
+      setTimes: setsBetween(3, 43),
+      cardio: [{ durationSeconds: 60 * 60 }],
+    });
+    // 8 minutes of the workout weren't lifting (before the first set, after the last): the
+    // treadmill may have filled them; the other 52 minutes were outside it.
+    expect(times).toEqual({
+      totalSeconds: (48 + 52) * 60,
+      strengthSeconds: 40 * 60,
+      cardioSeconds: 60 * 60,
+    });
+  });
+
+  it('keeps cardio done within the workout inside its time -- after the lifting, before it or between', () => {
+    const hour = { performedAt: start, completedAt: '2026-11-20T11:00:00Z', hasStrength: true };
+    const treadmill = [{ durationSeconds: 25 * 60 }];
+    const expected = { totalSeconds: 60 * 60, strengthSeconds: 35 * 60, cardioSeconds: 25 * 60 };
+    // Lifting from 3 to 35 minutes in, then the treadmill.
+    expect(workoutTimes({ ...hour, setTimes: setsBetween(3, 35), cardio: treadmill })).toEqual(
+      expected,
+    );
+    // The treadmill first, then lifting from 28 to 60.
+    expect(workoutTimes({ ...hour, setTimes: setsBetween(28, 60), cardio: treadmill })).toEqual(
+      expected,
+    );
+    // Lifting, 25 minutes on the treadmill between exercises, lifting again.
+    expect(
+      workoutTimes({
+        ...hour,
+        setTimes: [...setsBetween(3, 19), ...setsBetween(44, 60)],
+        cardio: treadmill,
+      }),
+    ).toEqual(expected);
+  });
+
+  it('measures the lifting from set to set, leaving out a gap of more than 10 minutes', () => {
+    expect(liftingSeconds([])).toBe(0);
+    expect(liftingSeconds(setsBetween(3, 43))).toBe(40 * 60);
+    expect(liftingSeconds([...setsBetween(3, 19), ...setsBetween(44, 60)])).toBe(32 * 60);
+    // Sets logged after the fact share one time: no lifting measured.
+    expect(liftingSeconds([start, start, start])).toBe(0);
+    expect(
+      finishedSetTimes([
+        { sets: [{ completedAt: start }, { completedAt: null }] },
+        { sets: [{ completedAt: '2026-11-20T10:05:00Z' }] },
+      ]),
+    ).toEqual([start, '2026-11-20T10:05:00Z']);
   });
 
   it('is only the cardio for a workout of cardio alone', () => {
@@ -202,7 +266,7 @@ describe('typing an activity in', () => {
       }),
     );
     // The machine's number, with no unit -- never a km/h or mph.
-    expect(cardioDetails(treadmill)).toBe('30 min · 4.8 km · Speed 6.5 · 2% incline');
+    expect(cardioDetails(treadmill)).toBe('30 min · 4.8 km · Speed 6.5 · Incline 2');
   });
 
   it("shows an outdoor run's pace, worked out from its distance and time", () => {
@@ -299,7 +363,7 @@ describe('changing a saved activity', () => {
 
     // A treadmill speed typed in km/h before speeds were the machine's own number.
     const oldTreadmill = values({ durationSeconds: 1200, speedKmh: 9.5, inclinePercent: 1 });
-    expect(cardioDetails(oldTreadmill)).toBe('20 min · 9.5 km/h · 1% incline');
+    expect(cardioDetails(oldTreadmill)).toBe('20 min · 9.5 km/h · Incline 1');
     expect(saved(draftFromCardio(oldTreadmill), oldTreadmill)).toEqual(oldTreadmill);
   });
 
@@ -366,7 +430,7 @@ describe('an activity from an older API', () => {
       resistanceLevel: null,
       floors: null,
     } as unknown as CardioValues;
-    expect(cardioDetails(older)).toBe('20 min · 3 km · 2% incline');
+    expect(cardioDetails(older)).toBe('20 min · 3 km · Incline 2');
   });
 });
 
@@ -392,7 +456,7 @@ describe('cardio figures, totals and last time', () => {
       { key: 'time', label: 'Time', value: '20 min' },
       { key: 'distance', label: 'Distance', value: '3 km' },
       { key: 'speed', label: 'Speed', value: '6.5' },
-      { key: 'incline', label: 'Incline', value: '2.5%' },
+      { key: 'incline', label: 'Incline', value: '2.5' },
     ]);
     // A run tells its pace; a swim its laps and pool.
     expect(

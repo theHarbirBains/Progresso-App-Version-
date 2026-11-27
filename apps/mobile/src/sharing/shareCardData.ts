@@ -1,4 +1,4 @@
-import { totalMinutesOf } from '../cardio/workoutTime';
+import { finishedSetTimes, totalMinutesOf } from '../cardio/workoutTime';
 import {
   CARDIO_INFO,
   cardioDetails,
@@ -61,7 +61,7 @@ export interface ShareCardio {
   activity: CardioActivity;
   icon: (typeof CARDIO_INFO)[CardioActivity]['icon'];
   name: string;
-  /** "15 min · 3 km · Speed 6.5 · 5% incline" -- only what was saved, km for everyone, never calories. */
+  /** "15 min · 3 km · Speed 6.5 · Incline 5" -- only what was saved, km for everyone, never calories. */
   figures: string;
   durationSeconds: number;
 }
@@ -194,6 +194,7 @@ export async function fetchShareCardData(
             performedAt: detail.performedAt,
             completedAt: detail.completedAt,
             hasStrength: true,
+            setTimes: finishedSetTimes(detail.exercises),
             cardio: cardioEntries,
           })
         : computeDurationMinutes(detail.performedAt, detail.completedAt),

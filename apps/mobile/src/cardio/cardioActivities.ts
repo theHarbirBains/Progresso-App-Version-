@@ -214,7 +214,6 @@ export const CARDIO_FIELDS: Record<CardioField, CardioFieldInfo> = {
   },
   incline: {
     label: 'Incline',
-    unit: '%',
     placeholder: '0',
     keyboard: 'numbers-and-punctuation',
     step: 0.5,
@@ -399,7 +398,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /**
  * Its figures in one line, in the order they matter ("30 min · 5 km · 6:00 /km", "20 min ·
- * 4.8 km · Speed 6.5 · 2.5% incline") -- only what was saved, never calories. A figure an older
+ * 4.8 km · Speed 6.5 · Incline 2.5") -- only what was saved, never calories. A figure an older
  * version of the activity asked for (a rower's damper) still shows.
  */
 export function cardioDetails(entry: CardioValues): string {
@@ -415,7 +414,8 @@ export function cardioDetails(entry: CardioValues): string {
     parts.push(formatKmh(entry.speedKmh));
   }
   if (known(entry.speedSetting)) parts.push(`Speed ${trimNumber(entry.speedSetting, 1)}`);
-  if (known(entry.inclinePercent)) parts.push(`${trimNumber(entry.inclinePercent, 1)}% incline`);
+  // The incline as the machine shows it, a number with no unit -- like its speed.
+  if (known(entry.inclinePercent)) parts.push(`Incline ${trimNumber(entry.inclinePercent, 1)}`);
   if (known(entry.resistanceLevel)) parts.push(`${info.levelLabel} ${entry.resistanceLevel}`);
   if (known(entry.floors)) parts.push(plural(entry.floors, 'floor', 'floors'));
   if (known(entry.steps)) parts.push(plural(entry.steps, 'step', 'steps'));
@@ -465,7 +465,7 @@ export function cardioFigures(entry: CardioValues): CardioFigure[] {
     figures.push({
       key: 'incline',
       label: 'Incline',
-      value: `${trimNumber(entry.inclinePercent, 1)}%`,
+      value: trimNumber(entry.inclinePercent, 1),
     });
   }
   if (known(entry.resistanceLevel)) {
@@ -708,7 +708,7 @@ const READ: Record<CardioField, { read: (text: string) => Parsed; problem: strin
   },
   incline: {
     read: (t) => decimalIn(t, -10, 40, 1),
-    problem: 'Enter the incline as a percentage, from -10 to 40.',
+    problem: 'Enter the incline as the machine shows it, from -10 to 40.',
   },
   level: {
     read: (t) => wholeIn(t, 1, 50),

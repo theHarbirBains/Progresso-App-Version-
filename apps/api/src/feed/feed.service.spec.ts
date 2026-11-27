@@ -1,6 +1,7 @@
 import { FollowsService } from '../follows/follows.service';
 import type { SupabaseService } from '../supabase/supabase.service';
 import { FeedService } from './feed.service';
+import { liftingSeconds, totalMinutes, type WorkoutCardio } from './workout-cardio';
 
 interface QueuedResult {
   data: unknown;
@@ -610,5 +611,53 @@ describe('FeedService', () => {
       expect(result.items.map((item) => item.workout.name)).toEqual(['Push Day']);
       expect(result.items[0]!.author).toMatchObject({ username: 'jane' });
     });
+  });
+});
+
+describe("totalMinutes -- the app's rule (cardio/workoutTime.ts)", () => {
+  const start = '2026-11-20T10:00:00.000Z';
+  const at = (minute: number) => new Date(Date.parse(start) + minute * 60_000).toISOString();
+  const setsBetween = (from: number, to: number) => {
+    const times: string[] = [];
+    for (let minute = from; minute <= to; minute += 4) times.push(at(minute));
+    return times;
+  };
+  const treadmill = (minutes: number) =>
+    [{ durationSeconds: minutes * 60 }] as unknown as WorkoutCardio[];
+
+  it('adds cardio done outside the workout to it, never taking it from the lifting', () => {
+    // 40 minutes of lifting in a 48-minute workout, with an hour on the treadmill typed in.
+    expect(
+      totalMinutes({
+        performedAt: start,
+        completedAt: at(48),
+        hasStrength: true,
+        setTimes: setsBetween(3, 43),
+        cardio: treadmill(60),
+      }),
+    ).toBe(100);
+  });
+
+  it('keeps cardio done within the workout inside its time', () => {
+    expect(
+      totalMinutes({
+        performedAt: start,
+        completedAt: at(60),
+        hasStrength: true,
+        setTimes: [...setsBetween(3, 19), ...setsBetween(44, 60)],
+        cardio: treadmill(25),
+      }),
+    ).toBe(60);
+    // Sets logged after the fact share one time: the cardio fits in the time as far as it can.
+    expect(
+      totalMinutes({
+        performedAt: start,
+        completedAt: at(20),
+        hasStrength: true,
+        setTimes: [start, start],
+        cardio: treadmill(30),
+      }),
+    ).toBe(30);
+    expect(liftingSeconds(setsBetween(3, 43))).toBe(40 * 60);
   });
 });

@@ -127,20 +127,29 @@ export async function enrichWorkoutSummaries(
   const completedSetCountByWorkoutId = new Map<string, number>();
   const totalVolumeKgByWorkoutId = new Map<string, number>();
   const setsByWorkoutExerciseId = new Map<string, SetRecord[]>();
+  // When each finished set was finished, warm-ups too: how long the lifting took, for the time
+  // split between strength training and cardio (cardio/workoutTime.ts).
+  const setTimesByWorkoutId = new Map<string, string[]>();
   const workoutExerciseIds = Array.from(workoutIdByExerciseId.keys());
   if (workoutExerciseIds.length > 0) {
     const { data: sets, error: setsError } = await supabase
       .from('sets')
       .select(
-        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_drop',
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup, is_drop',
       )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
-      .not('completed_at', 'is', null)
-      // A history row's figures and top sets count working sets only.
-      .eq('is_warmup', false);
+      .not('completed_at', 'is', null);
     if (setsError) throw new Error(setsError.message);
     for (const set of sets ?? []) {
+      const timedWorkoutId = workoutIdByExerciseId.get(set.workout_exercise_id);
+      if (timedWorkoutId && set.completed_at) {
+        const times = setTimesByWorkoutId.get(timedWorkoutId) ?? [];
+        times.push(set.completed_at);
+        setTimesByWorkoutId.set(timedWorkoutId, times);
+      }
+      // A history row's figures and top sets count working sets only.
+      if (set.is_warmup === true) continue;
       const type = exerciseInfoById.get(set.workout_exercise_id)?.measurementType ?? 'weight_reps';
       const record: SetRecord = {
         id: set.id,
@@ -232,6 +241,7 @@ export async function enrichWorkoutSummaries(
               performedAt: workout.performedAt,
               completedAt: workout.completedAt,
               hasStrength: (completedSetCountByWorkoutId.get(workout.id) ?? 0) > 0,
+              setTimes: setTimesByWorkoutId.get(workout.id) ?? [],
               cardio,
             })
           : null,

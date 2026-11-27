@@ -60,7 +60,7 @@ import {
 import { formatCardDuration } from '../workouts/workoutFormat';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
 import { WorkoutCardio } from '../cardio/CardioSection';
-import { formatMinutes, workoutTimes } from '../cardio/workoutTime';
+import { finishedSetTimes, formatMinutes, workoutTimes } from '../cardio/workoutTime';
 import { setLabels } from '../workouts/dropSets';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
@@ -406,6 +406,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     performedAt: shown.performedAt,
     completedAt: shown.completedAt,
     hasStrength: loggedSetCount > 0,
+    setTimes: finishedSetTimes(shown.exercises),
     cardio,
   });
   const cardioOnly = loggedSetCount === 0 && cardio.length > 0;

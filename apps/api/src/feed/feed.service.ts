@@ -309,22 +309,32 @@ export class FeedService {
     const completedSetCountByWorkoutId = new Map<string, number>();
     const totalVolumeKgByWorkoutId = new Map<string, number>();
     const setsByExerciseRowId = new Map<string, FeedSet[]>();
+    // When each finished set was finished, warm-ups too: how long the lifting took, for the
+    // workout's total time beside its cardio (workout-cardio.ts).
+    const setTimesByWorkoutId = new Map<string, string[]>();
     const workoutExerciseIds = Array.from(workoutIdByExerciseId.keys());
     if (workoutExerciseIds.length > 0) {
       const { data: sets, error: setsError } = await client
         .from('sets')
-        .select('id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds, is_drop')
+        .select(
+          'id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds, completed_at, is_warmup, is_drop',
+        )
         .in('workout_exercise_id', workoutExerciseIds)
         .is('deleted_at', null)
-        .not('completed_at', 'is', null)
-        // A card's figures and top sets count working sets only: a warm-up counts toward nothing.
-        .eq('is_warmup', false);
+        .not('completed_at', 'is', null);
       if (setsError) throw new InternalServerErrorException('Failed to load friends feed');
 
       for (const set of sets ?? []) {
         const exerciseRowId = set.workout_exercise_id as string;
         const workoutId = workoutIdByExerciseId.get(exerciseRowId);
         if (!workoutId) continue;
+        if (typeof set.completed_at === 'string') {
+          const times = setTimesByWorkoutId.get(workoutId) ?? [];
+          times.push(set.completed_at);
+          setTimesByWorkoutId.set(workoutId, times);
+        }
+        // A card's figures and top sets count working sets only: a warm-up counts toward nothing.
+        if (set.is_warmup === true) continue;
         const type = exerciseInfoById.get(exerciseRowId)?.measurementType ?? 'weight_reps';
         const feedSet: FeedSet = {
           setIndex: set.set_index as number,
@@ -425,6 +435,7 @@ export class FeedService {
           performedAt: workout.performed_at,
           completedAt: workout.completed_at,
           hasStrength: (completedSetCountByWorkoutId.get(workout.id) ?? 0) > 0,
+          setTimes: setTimesByWorkoutId.get(workout.id) ?? [],
           cardio: cardioOf.get(workout.id) ?? [],
         }),
       };

@@ -138,7 +138,7 @@ const treadmill = {
   activity: 'treadmill' as const,
   icon: 'trending-up' as const,
   name: 'Treadmill',
-  figures: '15 min · 3 km · Speed 6.5 · 5% incline',
+  figures: '15 min · 3 km · Speed 6.5 · Incline 5',
   durationSeconds: 900,
 };
 
@@ -286,7 +286,7 @@ describe('ShareWorkoutScreen -- the card, after the reference', () => {
     });
     renderShare();
     expect(await screen.findByTestId('share-card-cardio-row-0')).toHaveTextContent(
-      /Treadmill.*15 min · 3 km · Speed 6.5 · 5% incline/,
+      /Treadmill.*15 min · 3 km · Speed 6.5 · Incline 5/,
     );
     expect(screen.getByTestId('share-card-cardio-1')).toHaveTextContent(/2:30 \/500 m$/);
     expect(screen.getByTestId('share-card-summary')).toHaveTextContent(

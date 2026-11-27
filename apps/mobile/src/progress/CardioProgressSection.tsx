@@ -403,7 +403,8 @@ function Averages({
     rows.push({
       key: 'incline',
       label: 'Avg incline',
-      value: `${Number(figures.averageIncline.toFixed(1))}%`,
+      // As the machine shows it: a number, no unit.
+      value: String(Number(figures.averageIncline.toFixed(1))),
     });
   }
   if (figures.averageLevel !== null) {

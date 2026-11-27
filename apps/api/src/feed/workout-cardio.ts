@@ -102,16 +102,39 @@ const secondsBetween = (from: string, to: string) =>
   Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 1000));
 
 /**
+ * A gap between two sets longer than this wasn't lifting -- a long break, or cardio between
+ * exercises -- so it's room the cardio may have been done in. The app's LIFTING_GAP_SECONDS.
+ */
+export const LIFTING_GAP_SECONDS = 10 * 60;
+
+/** The time spent lifting: from each finished set to the next, leaving out any longer gap. */
+export function liftingSeconds(setTimes: readonly string[]): number {
+  const times = setTimes
+    .map((at) => new Date(at).getTime())
+    .filter((at) => Number.isFinite(at))
+    .sort((a, b) => a - b);
+  let total = 0;
+  for (let i = 1; i < times.length; i += 1) {
+    const gap = (times[i]! - times[i - 1]!) / 1000;
+    if (gap <= LIFTING_GAP_SECONDS) total += gap;
+  }
+  return Math.round(total);
+}
+
+/**
  * The workout's total time in whole minutes, for a workout with cardio -- the same rule as the app's
- * cardio/workoutTime.ts (Harbir's): start to finish, the cardio and the strength training together,
- * or the cardio's own time where that comes to more (logged afterwards); for cardio alone, the
- * cardio's. Null with no cardio (the card shows its duration then), or for a workout with strength
- * training logged with no duration.
+ * cardio/workoutTime.ts (Harbir's): the strength training and the cardio together. The workout's
+ * own time, start to finish, holds as much of the cardio as there's room for beside the lifting
+ * (its sets' times); cardio there isn't room for was done outside it and adds to it. For cardio
+ * alone, the cardio's. Null with no cardio (the card shows its duration then), or for a workout
+ * with strength training logged with no duration.
  */
 export function totalMinutes(workout: {
   performedAt: string;
   completedAt: string | null;
   hasStrength: boolean;
+  /** When each finished set was finished, warm-ups and drops too. */
+  setTimes?: readonly string[];
   cardio: WorkoutCardio[];
 }): number | null {
   if (workout.cardio.length === 0) return null;
@@ -120,5 +143,7 @@ export function totalMinutes(workout: {
   const span =
     workout.completedAt === null ? 0 : secondsBetween(workout.performedAt, workout.completedAt);
   if (span === 0) return null;
-  return Math.round(Math.max(span, cardioSeconds) / 60);
+  const lifting = Math.min(span, liftingSeconds(workout.setTimes ?? []));
+  const within = Math.min(cardioSeconds, span - lifting);
+  return Math.round((span + cardioSeconds - within) / 60);
 }
