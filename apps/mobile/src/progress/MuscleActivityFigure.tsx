@@ -3,29 +3,26 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { figureSexFor } from '../exercises/MuscleBrowseStrip';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import { colors } from '../design/theme';
+import { analyticsColors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { useProfileIfAny } from '../profile/profileContext';
-import { mixHex } from '../theme/accentColor';
 import { ACTIVITY_LEVEL_LABELS, type ActivityLevel, type GroupActivity } from './muscleActivity';
 import { MUSCLE_HEATMAP, TAP_CODES, type HeatmapSide } from './muscleHeatmap.generated';
 
 export type FigureSide = 'front' | 'back';
 
 /**
- * Each level's colour on the figure, from the accent: full for recently trained, softer for
- * frequently, faint for less, and none (the figure's own grey) for no recent training -- so more
- * colour always means more training, in any theme.
+ * Each level's colour (analyticsColors): coral for recently trained, amber for frequently, a muted
+ * teal for less recently, slate for no recent training -- the same on every figure, a man's or a
+ * woman's, and in the legend, the rows and their bars. On the figure, a muscle with no recent
+ * training keeps the body's own grey (no colour, no glow -- a glow means training), unless chosen.
  */
-export function levelColors(accent: string): Record<ActivityLevel, string | null> {
-  const grey = '#8C8984';
-  return {
-    recent: accent,
-    frequent: mixHex(accent, grey, 0.35),
-    less: mixHex(accent, grey, 0.72),
-    none: null,
-  };
-}
+export const LEVEL_COLORS: Record<ActivityLevel, string> = {
+  recent: analyticsColors.recent,
+  frequent: analyticsColors.frequent,
+  less: analyticsColors.less,
+  none: analyticsColors.none,
+};
 
 /** How far round a tap in a gap between muscles looks for one, in tap-map cells. */
 const TAP_REACH = 2;
@@ -64,8 +61,8 @@ export function groupAt(side: HeatmapSide, x: number, y: number): MuscleGroup | 
 /**
  * Muscle Activity's heat map, from the front or behind: Harbir's figure (a man's or a woman's, by
  * the person's sex), the body in grey with each muscle group's muscles over it in the colour of its
- * level (levelColors), a soft glow round them; a group chosen stands out -- in its colour, or a
- * light grey if it's had no recent training -- the rest quieter; a tap on a muscle chooses its
+ * level (LEVEL_COLORS), a soft glow round them; a group chosen stands out -- in its colour, or
+ * slate if it's had no recent training -- the rest quieter; a tap on a muscle chooses its
  * group. Turning it round plays a short turn -- narrowing and fading out, then back in from the
  * other side -- and new colours (another period) come in with a soft fade; neither under Reduce
  * Motion.
@@ -75,7 +72,6 @@ export function MuscleActivityFigure({
   side,
   selected,
   onSelect,
-  accentColor,
   height,
   testID = 'muscle-activity-figure',
 }: {
@@ -83,13 +79,11 @@ export function MuscleActivityFigure({
   side: FigureSide;
   selected: MuscleGroup | null;
   onSelect: (group: MuscleGroup) => void;
-  accentColor: string;
   height: number;
   testID?: string;
 }) {
   const reduceMotion = useReduceMotionPreference();
   const art = heatmapFor(figureSexFor(useProfileIfAny()?.gender));
-  const palette = useMemo(() => levelColors(accentColor), [accentColor]);
   const levelOf = useMemo(
     () => new Map(activity.map((group) => [group.group, group.level])),
     [activity],
@@ -156,7 +150,9 @@ export function MuscleActivityFigure({
 
   const layers = (Object.keys(view.layers) as MuscleGroup[]).flatMap((group) => {
     const color =
-      palette[levelOf.get(group) ?? 'none'] ?? (group === selected ? colors.textSecondary : null);
+      (levelOf.get(group) ?? 'none') !== 'none' || group === selected
+        ? LEVEL_COLORS[levelOf.get(group) ?? 'none']
+        : null;
     if (!color) return [];
     return [{ group, source: view.layers[group]!, color }];
   });

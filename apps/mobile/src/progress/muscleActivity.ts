@@ -47,6 +47,8 @@ export interface ActivityExercise {
   name: string;
   /** Working sets of it in the period. */
   sets: number;
+  /** Weight x reps of its weighted sets in the period (drops included), kg; 0 for any other. */
+  volumeKg: number;
   lastDoneAt: string;
   /** Whether this group is the exercise's own (else one it also works). */
   primary: boolean;
@@ -57,6 +59,8 @@ export interface TrendBucket {
   start: Date;
   /** Working sets with this group as the main muscle. */
   sets: number;
+  /** Their weight x reps (drops included), kg. */
+  volumeKg: number;
 }
 
 export interface GroupActivity {
@@ -161,6 +165,7 @@ export function muscleActivity(
     lastWorkedAt: string | null;
     exercises: Map<string, ActivityExercise>;
     trend: number[];
+    trendVolume: number[];
   }
   const tallies = new Map<MuscleGroup, Tally>();
   const tallyOf = (group: MuscleGroup): Tally => {
@@ -176,6 +181,7 @@ export function muscleActivity(
         lastWorkedAt: null,
         exercises: new Map(),
         trend: starts.map(() => 0),
+        trendVolume: starts.map(() => 0),
       };
       tallies.set(group, tally);
     }
@@ -201,8 +207,11 @@ export function muscleActivity(
     own.lastTrainedAt = later(own.lastTrainedAt, entry.performedAt);
     own.lastWorkedAt = later(own.lastWorkedAt, entry.performedAt);
     const bucket = bucketOf(starts, at);
-    if (bucket >= 0) own.trend[bucket]! += working;
-    note(own, entry, working, true);
+    if (bucket >= 0) {
+      own.trend[bucket]! += working;
+      own.trendVolume[bucket]! += volume;
+    }
+    note(own, entry, working, volume, true);
 
     for (const group of new Set(secondaryOf(entry.exerciseId))) {
       if (group === entry.muscleGroup) continue;
@@ -210,20 +219,28 @@ export function muscleActivity(
       also.secondarySets += working;
       also.secondarySessions.add(entry.workoutId);
       also.lastWorkedAt = later(also.lastWorkedAt, entry.performedAt);
-      note(also, entry, working, false);
+      note(also, entry, working, volume, false);
     }
   }
 
-  function note(tally: Tally, entry: ActivityEntry, sets: number, primary: boolean) {
+  function note(
+    tally: Tally,
+    entry: ActivityEntry,
+    sets: number,
+    volumeKg: number,
+    primary: boolean,
+  ) {
     const known = tally.exercises.get(entry.exerciseId);
     if (known) {
       known.sets += sets;
+      known.volumeKg += volumeKg;
       known.lastDoneAt = later(known.lastDoneAt, entry.performedAt) as string;
     } else {
       tally.exercises.set(entry.exerciseId, {
         exerciseId: entry.exerciseId,
         name: entry.exerciseName,
         sets,
+        volumeKg,
         lastDoneAt: entry.performedAt,
         primary,
       });
@@ -258,7 +275,11 @@ export function muscleActivity(
               new Date(b.lastDoneAt).getTime() - new Date(a.lastDoneAt).getTime(),
           )
         : [],
-      trend: starts.map((start, i) => ({ start, sets: tally?.trend[i] ?? 0 })),
+      trend: starts.map((start, i) => ({
+        start,
+        sets: tally?.trend[i] ?? 0,
+        volumeKg: tally?.trendVolume[i] ?? 0,
+      })),
     };
   });
 }
@@ -268,41 +289,133 @@ export function musclesTrained(activity: readonly GroupActivity[]): number {
   return activity.filter((group) => group.sets > 0).length;
 }
 
-/** A group's sessions against the most any group had in the period: 0 to 1. */
-export function sessionShare(group: GroupActivity, activity: readonly GroupActivity[]): number {
-  const most = Math.max(0, ...activity.map((other) => other.sessions));
-  return most === 0 ? 0 : group.sessions / most;
+/** The period at a glance: its working sets (every exercise's) and the workouts they were in. */
+export interface PeriodTotals {
+  sets: number;
+  workouts: number;
+}
+
+/** The working sets logged in the period, of every exercise, and the workouts holding them. */
+export function periodTotals(
+  entries: readonly ActivityEntry[],
+  period: ActivityPeriod,
+  now: Date,
+): PeriodTotals {
+  const from = periodStart(period, now);
+  let sets = 0;
+  const workouts = new Set<string>();
+  for (const entry of entries) {
+    const at = new Date(entry.performedAt);
+    if (at < from || at.getTime() > now.getTime() + DAY_MS) continue;
+    const working = entry.sets.filter((set) => !set.isDrop).length;
+    if (working === 0) continue;
+    sets += working;
+    workouts.add(entry.workoutId);
+  }
+  return { sets, workouts: workouts.size };
+}
+
+/** The upper body's muscle groups and the lower body's -- the core is neither. */
+export const UPPER_BODY: readonly MuscleGroup[] = [
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'forearms',
+];
+export const LOWER_BODY: readonly MuscleGroup[] = [
+  'quadriceps',
+  'hamstrings',
+  'glutes',
+  'calves',
+  'adductors',
+];
+
+export interface BodyHalf {
+  volumeKg: number;
+  sets: number;
+  /** Its share of the two halves' volume together, 0 to 1. */
+  share: number;
+}
+
+/**
+ * Upper body against lower body in the period: each half's training volume (weight x reps of its
+ * groups' weighted sets) and working sets, and each half's share of the volume -- both 0 with
+ * no weighted sets in either.
+ */
+export function trainingBalance(activity: readonly GroupActivity[]): {
+  upper: BodyHalf;
+  lower: BodyHalf;
+} {
+  const half = (groups: readonly MuscleGroup[]) => {
+    const members = activity.filter((group) => groups.includes(group.group));
+    return {
+      volumeKg: members.reduce((sum, group) => sum + group.volumeKg, 0),
+      sets: members.reduce((sum, group) => sum + group.sets, 0),
+    };
+  };
+  const upper = half(UPPER_BODY);
+  const lower = half(LOWER_BODY);
+  const total = upper.volumeKg + lower.volumeKg;
+  return {
+    upper: { ...upper, share: total > 0 ? upper.volumeKg / total : 0 },
+    lower: { ...lower, share: total > 0 ? lower.volumeKg / total : 0 },
+  };
 }
 
 /** How Muscle Breakdown is ordered. */
-export const BREAKDOWN_SORTS = ['recent', 'most', 'least'] as const;
+export const BREAKDOWN_SORTS = ['recent', 'sets', 'volume', 'frequency'] as const;
 export type BreakdownSort = (typeof BREAKDOWN_SORTS)[number];
 
 export const BREAKDOWN_SORT_LABELS: Record<BreakdownSort, string> = {
   recent: 'Recent',
-  most: 'Most Trained',
-  least: 'Least Trained',
+  sets: 'Sets',
+  volume: 'Volume',
+  frequency: 'Frequency',
 };
 
+/** What a sort orders by, for a group: its last trained moment, sets, volume or sessions. */
+function sortFigure(group: GroupActivity, sort: BreakdownSort): number {
+  if (sort === 'recent') {
+    return group.lastTrainedAt ? new Date(group.lastTrainedAt).getTime() : -Infinity;
+  }
+  if (sort === 'sets') return group.sets;
+  if (sort === 'volume') return group.volumeKg;
+  return group.sessions;
+}
+
 /**
- * Muscle Breakdown's order: Recent -- last trained first, then the ones not trained in the
- * period; Most Trained -- most sessions, then most sets; Least Trained -- fewest sessions, then
- * fewest sets (a pointer, never a verdict). Ties keep the app's order of muscle groups.
+ * Muscle Breakdown's order, the most first: Recent -- last trained first, then the ones not
+ * trained in the period; Sets; Volume; Frequency -- sessions. Ties go to the more sets, then the
+ * app's order of muscle groups.
  */
 export function sortBreakdown(
   activity: readonly GroupActivity[],
   sort: BreakdownSort,
 ): GroupActivity[] {
   const order = new Map(activity.map((group, index) => [group.group, index]));
-  const appOrder = (a: GroupActivity, b: GroupActivity) =>
-    order.get(a.group)! - order.get(b.group)!;
-  const when = (group: GroupActivity) =>
-    group.lastTrainedAt ? new Date(group.lastTrainedAt).getTime() : -Infinity;
-  return [...activity].sort((a, b) => {
-    if (sort === 'recent') return when(b) - when(a) || appOrder(a, b);
-    if (sort === 'most') return b.sessions - a.sessions || b.sets - a.sets || appOrder(a, b);
-    return a.sessions - b.sessions || a.sets - b.sets || appOrder(a, b);
-  });
+  return [...activity].sort(
+    (a, b) =>
+      sortFigure(b, sort) - sortFigure(a, sort) ||
+      b.sets - a.sets ||
+      order.get(a.group)! - order.get(b.group)!,
+  );
+}
+
+/**
+ * A group's bar in Muscle Breakdown: its sets, volume or sessions (for Recent and Frequency)
+ * against the most any group had in the period, 0 to 1.
+ */
+export function breakdownShare(
+  group: GroupActivity,
+  activity: readonly GroupActivity[],
+  sort: BreakdownSort,
+): number {
+  const figure = (other: GroupActivity) =>
+    sort === 'sets' ? other.sets : sort === 'volume' ? other.volumeKg : other.sessions;
+  const most = Math.max(0, ...activity.map(figure));
+  return most === 0 ? 0 : figure(group) / most;
 }
 
 /** "Today", "Yesterday", "3 days ago", or the date for longer ago. */

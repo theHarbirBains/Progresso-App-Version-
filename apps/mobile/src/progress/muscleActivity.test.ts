@@ -6,9 +6,11 @@ import {
   muscleActivity,
   musclesTrained,
   periodStart,
-  sessionShare,
+  breakdownShare,
+  periodTotals,
   sinceText,
   sortBreakdown,
+  trainingBalance,
   trendBuckets,
 } from './muscleActivity';
 import type { ActivityEntry } from './muscleActivityQueries';
@@ -200,7 +202,8 @@ describe('muscleActivity', () => {
 describe('Muscle Breakdown', () => {
   const activity = muscleActivity(
     [
-      // Chest: three sessions, last 4 days ago. Back: one, yesterday. Quads: two, 2 days ago.
+      // Chest: three sessions (9 sets, 4,500 kg), last 4 days ago. Back: one (5 sets, 2,500 kg),
+      // yesterday. Quads: two (6 sets, 3,000 kg), 2 days ago.
       entry({ daysAgo: 4, workoutId: 'c1' }),
       entry({ daysAgo: 8, workoutId: 'c2' }),
       entry({ daysAgo: 12, workoutId: 'c3' }),
@@ -212,7 +215,7 @@ describe('Muscle Breakdown', () => {
     NOW,
     secondaryOf,
   );
-  const order = (sort: 'recent' | 'most' | 'least') =>
+  const order = (sort: 'recent' | 'sets' | 'volume' | 'frequency') =>
     sortBreakdown(activity, sort).map((g) => g.group);
 
   it('counts the muscles trained as the main muscle -- never one only also worked', () => {
@@ -224,19 +227,70 @@ describe('Muscle Breakdown', () => {
     expect(order('recent')).toHaveLength(ACTIVITY_GROUPS.length);
   });
 
-  it('sorts by most sessions, then sets -- and by fewest', () => {
-    expect(order('most').slice(0, 3)).toEqual(['chest', 'quadriceps', 'back']);
-    expect(order('least').slice(-3)).toEqual(['back', 'quadriceps', 'chest']);
-    expect(order('least')[0]).toBe('shoulders');
+  it('sorts by sets, volume or frequency -- the most first', () => {
+    expect(order('sets').slice(0, 3)).toEqual(['chest', 'quadriceps', 'back']);
+    expect(order('volume').slice(0, 3)).toEqual(['chest', 'quadriceps', 'back']);
+    expect(order('frequency').slice(0, 3)).toEqual(['chest', 'quadriceps', 'back']);
+    // Back has fewer sessions than the quads but, sorted by sets, still trails them: 5 to 6.
+    expect(groupOf(activity, 'back').sets).toBe(5);
   });
 
-  it('gives each a share of the busiest muscle’s sessions', () => {
-    const share = (group: MuscleGroup) => sessionShare(groupOf(activity, group), activity);
-    expect(share('chest')).toBe(1);
-    expect(share('quadriceps')).toBeCloseTo(2 / 3);
-    expect(share('hamstrings')).toBe(0);
+  it('gives each a bar of the figure it’s sorted by, against the busiest muscle’s', () => {
+    const share = (group: MuscleGroup, sort: 'recent' | 'sets' | 'volume' | 'frequency') =>
+      breakdownShare(groupOf(activity, group), activity, sort);
+    expect(share('chest', 'frequency')).toBe(1);
+    expect(share('quadriceps', 'frequency')).toBeCloseTo(2 / 3);
+    // Recent's bar is its sessions too.
+    expect(share('quadriceps', 'recent')).toBeCloseTo(2 / 3);
+    expect(share('back', 'sets')).toBeCloseTo(5 / 9);
+    expect(share('back', 'volume')).toBeCloseTo(2500 / 4500);
+    expect(share('hamstrings', 'volume')).toBe(0);
     const none = muscleActivity([], 30, NOW, secondaryOf);
-    expect(sessionShare(none[0]!, none)).toBe(0);
+    expect(breakdownShare(none[0]!, none, 'sets')).toBe(0);
+  });
+
+  it('keeps each exercise’s volume and the volume of each stretch of the period', () => {
+    const chest = groupOf(activity, 'chest');
+    expect(chest.exercises[0]).toMatchObject({ name: 'Bench Press', sets: 9, volumeKg: 4500 });
+    // By seven days: 12 and 8 days ago in the one before last, 4 days ago in this week's.
+    expect(chest.trend.map((bucket) => bucket.volumeKg)).toEqual([0, 0, 0, 3000, 1500]);
+  });
+});
+
+describe('periodTotals', () => {
+  it('counts the working sets of every exercise and the workouts they were in', () => {
+    const entries = [
+      entry({ daysAgo: 2, workoutId: 'a', setCount: 4 }),
+      entry({ daysAgo: 2, workoutId: 'a', muscleGroup: 'back', exerciseId: 'row', setCount: 3 }),
+      entry({ daysAgo: 5, workoutId: 'b', muscleGroup: 'full_body', setCount: 2 }),
+      entry({ daysAgo: 40, workoutId: 'c' }),
+    ];
+    expect(periodTotals(entries, 30, NOW)).toEqual({ sets: 9, workouts: 2 });
+    expect(periodTotals(entries, 90, NOW)).toEqual({ sets: 12, workouts: 3 });
+  });
+});
+
+describe('trainingBalance', () => {
+  it('weighs the upper body against the lower by volume -- the core in neither', () => {
+    const activity = muscleActivity(
+      [
+        entry({ daysAgo: 1, setCount: 6 }),
+        entry({ daysAgo: 1, muscleGroup: 'quadriceps', exerciseId: 'squat', setCount: 2 }),
+        entry({ daysAgo: 1, muscleGroup: 'core', exerciseId: 'crunch', setCount: 5 }),
+      ],
+      30,
+      NOW,
+      secondaryOf,
+    );
+    const balance = trainingBalance(activity);
+    expect(balance.upper).toEqual({ volumeKg: 3000, sets: 6, share: 0.75 });
+    expect(balance.lower).toEqual({ volumeKg: 1000, sets: 2, share: 0.25 });
+  });
+
+  it('has no shares with no weighted sets', () => {
+    const balance = trainingBalance(muscleActivity([], 30, NOW, secondaryOf));
+    expect(balance.upper.share).toBe(0);
+    expect(balance.lower.share).toBe(0);
   });
 });
 

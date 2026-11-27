@@ -1,7 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ProfileContext } from '../profile/profileContext';
-import { groupAt, levelColors, MuscleActivityFigure } from './MuscleActivityFigure';
+import { analyticsColors } from '../design/theme';
+import { groupAt, LEVEL_COLORS, MuscleActivityFigure } from './MuscleActivityFigure';
 import { MUSCLE_HEATMAP, TAP_CODES } from './muscleHeatmap.generated';
 import { muscleActivity } from './muscleActivity';
 
@@ -39,7 +40,6 @@ describe('MuscleActivityFigure', () => {
         side="front"
         selected={null}
         onSelect={onSelect}
-        accentColor="#D99A50"
         height={300}
       />,
     );
@@ -61,12 +61,11 @@ describe('MuscleActivityFigure', () => {
         side="front"
         selected={null}
         onSelect={jest.fn()}
-        accentColor="#D99A50"
         height={300}
       />,
     );
     expect(screen.getByTestId('muscle-activity-figure-layer-chest').props.tintColor).toBe(
-      '#D99A50',
+      analyticsColors.recent,
     );
     expect(screen.queryByTestId('muscle-activity-figure-layer-quadriceps')).toBeNull();
   });
@@ -78,7 +77,6 @@ describe('MuscleActivityFigure', () => {
         side="front"
         selected="quadriceps"
         onSelect={jest.fn()}
-        accentColor="#D99A50"
         height={300}
       />,
     );
@@ -87,6 +85,10 @@ describe('MuscleActivityFigure', () => {
         .opacity;
     expect(opacity('quadriceps')).toBe(1);
     expect(opacity('chest')).toBe(0.3);
+    // Untrained, it stands out in slate -- otherwise it would have no colour on the figure.
+    expect(screen.getByTestId('muscle-activity-figure-layer-quadriceps').props.tintColor).toBe(
+      analyticsColors.none,
+    );
   });
 
   it("knows every group drawn on each figure, a man's and a woman's, from its tap map", () => {
@@ -114,7 +116,6 @@ describe('MuscleActivityFigure', () => {
           side="front"
           selected={null}
           onSelect={jest.fn()}
-          accentColor="#D99A50"
           height={300}
         />
       </ProfileContext.Provider>
@@ -146,17 +147,19 @@ describe('MuscleActivityFigure', () => {
         side="front"
         selected={null}
         onSelect={jest.fn()}
-        accentColor="#D99A50"
         height={300}
       />,
     );
     expect(screen.getByLabelText(/Chest: Recently trained/)).toBeTruthy();
   });
 
-  it('has more colour for more training, and none for no recent training', () => {
-    const palette = levelColors('#D99A50');
-    expect(palette.recent).toBe('#D99A50');
-    expect(palette.frequent).not.toBe(palette.less);
-    expect(palette.none).toBeNull();
+  it('gives each level its own colour -- coral, amber, teal and slate -- whatever the theme', () => {
+    expect(LEVEL_COLORS).toEqual({
+      recent: analyticsColors.recent,
+      frequent: analyticsColors.frequent,
+      less: analyticsColors.less,
+      none: analyticsColors.none,
+    });
+    expect(new Set(Object.values(LEVEL_COLORS)).size).toBe(4);
   });
 });

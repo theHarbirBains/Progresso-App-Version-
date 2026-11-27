@@ -188,3 +188,19 @@ export const typeScale = {
 // Interactive controls are at least this tall/wide -- either visibly, or via
 // `hitSlop` when the visible glyph is smaller (icon buttons).
 export const minTouchTarget = 44;
+
+/**
+ * Muscle analytics' palette (Progress's Muscles tab, Harbir's colour system, November 2026):
+ * distinct hues, so each kind of thing reads at a glance on charcoal rather than as one more shade
+ * of gold. The heat levels -- coral for recently trained, amber for frequently, a muted teal for
+ * less recently, slate for no recent training -- and blue for the analytics' charts and secondary
+ * figures. Gold stays the theme's accent: selected controls and the highlights that matter. Each
+ * holds its contrast on the charcoal surfaces without shouting.
+ */
+export const analyticsColors = {
+  recent: '#E8785E',
+  frequent: '#E3A33E',
+  less: '#5FA79E',
+  none: '#66707C',
+  chart: '#6E9BE6',
+} as const;
