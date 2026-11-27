@@ -23,7 +23,7 @@ import { EXERCISE_TIPS, PHASE_TEXT, PHASES, TIPS } from './howto.mjs';
 import { techniqueFor } from './technique.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MIGRATION = join(here, '..', 'migrations', '20261201100000_retire_more_exercises.sql');
+const MIGRATION = join(here, '..', 'migrations', '20261222100000_t_bar_row_handles.sql');
 const APP_FILE = join(
   here,
   '..',

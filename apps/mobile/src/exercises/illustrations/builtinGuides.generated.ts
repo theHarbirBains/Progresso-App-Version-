@@ -5953,8 +5953,8 @@ export const BUILTIN_GUIDES: Record<string, BuiltinGuideEntry> = {
   },
   'pl-t-bar-row': {
     rows: [
-      'Lie chest-down on the angled pad with your feet on the platform. Take the handles with straight arms.',
-      'Row the handles up toward your chest. Squeeze your shoulder blades together.',
+      'Lie chest-down on the angled pad with your feet on the platform. Take the diagonal handles, palms facing in, with straight arms.',
+      'Row the handles up toward your ribs, elbows close to your sides. Squeeze your shoulder blades together.',
       'Lower slowly to straight arms.',
     ],
     tips: [
@@ -5972,6 +5972,30 @@ export const BUILTIN_GUIDES: Record<string, BuiltinGuideEntry> = {
         title: 'Neutral Grip',
         text: 'Palms facing each other. Palms in keeps your elbows close, so your lats do more of the work.',
         visual: { kind: 'grip', grip: 'neutral' },
+      },
+    ],
+  },
+  'pl-t-bar-row-upper': {
+    rows: [
+      'Lie chest-down on the angled pad with your feet on the platform. Take the upper handles, palms facing down, with straight arms.',
+      'Row the handles up toward your upper chest, elbows out wide. Squeeze your shoulder blades together and back.',
+      'Lower slowly to straight arms.',
+    ],
+    tips: [
+      'Keep your chest on the pad the whole set.',
+      'Squeeze your shoulder blades together at the end.',
+      'Let your arms straighten fully between reps.',
+    ],
+    technique: [
+      {
+        title: 'Chest Pad',
+        text: 'Set the pad so you can just reach the handles with straight arms and your chest on it.',
+        visual: { kind: 'closeup', focus: 'torso', frame: 0 },
+      },
+      {
+        title: 'Overhand Grip',
+        text: 'Palms facing down, away from you. Your elbows can flare a little, so your upper back does more of the work.',
+        visual: { kind: 'grip', grip: 'overhand' },
       },
     ],
   },

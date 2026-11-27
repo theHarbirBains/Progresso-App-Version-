@@ -661,7 +661,11 @@ function rotaryTorso(): SceneSpec {
 
 // --------------------------------------------------------------------------- Plate-loaded legs
 
-function tBarRow(): SceneSpec {
+/**
+ * The chest-supported T-bar row: its diagonal handles (palms in, elbows close) or its upper
+ * handles (overhand, wider, the handles level with the ground, the elbows rowing out).
+ */
+function tBarRow(handles: 'diagonal' | 'upper' = 'diagonal'): SceneSpec {
   const pose = (h: V3, pole: V3): PoseSpec => ({
     pelvis: [-30, 76, 0],
     pitch: 50,
@@ -669,13 +673,18 @@ function tBarRow(): SceneSpec {
     hands: hands({ at: h, pole }),
   });
   const grip = (s: Skeleton): V3 => mid(s.arms.r.end, s.arms.l.end);
-  return two(pose([14, 56, 14], [-0.2, -1, 0.5]), pose([-4, 86, 18], PULLED), [
-    pad([-4, 100, 0], [24, 3, 16], 38),
-    platform([-44, 12, 0], { x: 30, z: 60 }),
-    frame([-60, 1.5, 0], [30, 1.5, 0]),
-    lever([-110, 14, 0], grip, { plates: 'out', beyond: 12 }),
-    grips('neutral'),
-  ]);
+  const upper = handles === 'upper';
+  return two(
+    upper ? pose([14, 60, 21], [-0.2, -0.8, 0.9]) : pose([14, 56, 14], [-0.2, -1, 0.5]),
+    upper ? pose([-2, 90, 25], [-0.6, -0.1, 1]) : pose([-4, 86, 18], PULLED),
+    [
+      pad([-4, 100, 0], [24, 3, 16], 38),
+      platform([-44, 12, 0], { x: 30, z: 60 }),
+      frame([-60, 1.5, 0], [30, 1.5, 0]),
+      lever([-110, 14, 0], grip, { plates: 'out', beyond: 12 }),
+      grips(upper ? 'lr' : 'neutral'),
+    ],
+  );
 }
 
 function plateLatPulldown(): SceneSpec {
@@ -947,7 +956,8 @@ export const MACHINE_ART: Record<string, SceneSpec> = {
   'pl-shoulder-press': press('plates', SHOULDER, FACING),
   'pl-high-row': highRow('plates'),
   'pl-low-row': machineRow('plates', [54, 82, 16], [8, 82, 22], [80, 12, 24]),
-  'pl-t-bar-row': tBarRow(),
+  'pl-t-bar-row': tBarRow('diagonal'),
+  'pl-t-bar-row-upper': tBarRow('upper'),
   'pl-lat-pulldown': plateLatPulldown(),
   'pl-leg-press': legPress45('press'),
   'pl-leg-press-calf-raise': legPress45('calf'),

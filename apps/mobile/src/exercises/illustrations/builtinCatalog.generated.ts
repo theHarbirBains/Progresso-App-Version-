@@ -2495,11 +2495,22 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'horizontal_pull',
   },
   'pl-t-bar-row': {
-    name: 'Chest-Supported T-Bar Row',
+    name: 'Chest-Supported T-Bar Row — Diagonal Handles (Neutral Grip)',
     muscle: 'back',
     equipment: 'machine',
     highlight: { primary: ['upperBack', 'lats'], secondary: ['rearDelts', 'biceps', 'traps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
+  },
+  'pl-t-bar-row-upper': {
+    name: 'Chest-Supported T-Bar Row — Upper Handles (Pronated Grip)',
+    muscle: 'back',
+    equipment: 'machine',
+    highlight: {
+      primary: ['upperBack', 'rearDelts'],
+      secondary: ['lats', 'traps', 'biceps', 'forearms'],
+    },
+    secondaryGroups: ['shoulders', 'biceps', 'forearms'],
     pattern: 'horizontal_pull',
   },
   'pl-lat-pulldown': {

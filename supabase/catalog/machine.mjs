@@ -859,25 +859,72 @@ export default [
     ],
     mistakes: ROW_MISTAKES,
   }),
+  // The chest-supported T-bar row comes with two handle sets that change the grip and the path:
+  // each its own exercise (one per setup that changes the movement).
   plateMachine({
     slug: 'pl-t-bar-row',
-    name: 'Chest-Supported T-Bar Row',
+    name: 'Chest-Supported T-Bar Row — Diagonal Handles (Neutral Grip)',
     muscle: 'back',
     pattern: 'horizontal_pull',
     grip: 'Neutral',
+    attachment: 'Diagonal handles',
     highlight: { primary: ['upperBack', 'lats'], secondary: ['rearDelts', 'biceps', 'traps'] },
-    aliases: ['t bar row machine', 'chest supported t bar', 'incline lever row'],
-    summary: 'Lying chest-down on the pad of a T-bar row machine and rowing its handles up.',
+    aliases: [
+      // Its name before the upper handles were their own exercise.
+      'chest-supported t-bar row',
+      't bar row machine',
+      'chest supported t bar',
+      'incline lever row',
+      'neutral grip t bar row',
+      'diagonal handle t bar row',
+    ],
+    summary:
+      "Lying chest-down on a T-bar row machine's pad and rowing its diagonal handles up, palms facing in.",
     setup: [
       'Lie chest-down on the angled pad with your feet on the platform.',
-      'Take the handles with straight arms.',
+      'Take the diagonal handles, palms facing in, with straight arms.',
     ],
     steps: [
-      'Row the handles up toward your chest.',
+      'Row the handles up toward your ribs, elbows close to your sides.',
       'Squeeze your shoulder blades together.',
       'Lower slowly to straight arms.',
     ],
     mistakes: ROW_MISTAKES,
+  }),
+  plateMachine({
+    slug: 'pl-t-bar-row-upper',
+    name: 'Chest-Supported T-Bar Row — Upper Handles (Pronated Grip)',
+    muscle: 'back',
+    pattern: 'horizontal_pull',
+    grip: 'Pronated',
+    attachment: 'Upper handles',
+    highlight: {
+      primary: ['upperBack', 'rearDelts'],
+      secondary: ['lats', 'traps', 'biceps', 'forearms'],
+    },
+    aliases: [
+      'wide grip t bar row',
+      'overhand t bar row',
+      'pronated t bar row',
+      'upper handle t bar row',
+      'chest supported t bar wide',
+    ],
+    summary:
+      "Lying chest-down on a T-bar row machine's pad and rowing its upper handles up with an overhand grip, elbows out.",
+    setup: [
+      'Lie chest-down on the angled pad with your feet on the platform.',
+      'Take the upper handles, palms facing down, with straight arms.',
+    ],
+    steps: [
+      'Row the handles up toward your upper chest, elbows out wide.',
+      'Squeeze your shoulder blades together and back.',
+      'Lower slowly to straight arms.',
+    ],
+    mistakes: [
+      'Lifting the chest off the pad to heave the weight.',
+      'Shrugging the shoulders up to the ears.',
+      'Cutting the stretch short at the bottom.',
+    ],
   }),
   plateMachine({
     slug: 'pl-lat-pulldown',

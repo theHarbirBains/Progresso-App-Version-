@@ -20,7 +20,7 @@ describe('the built-in exercise illustrations', () => {
   it('every built-in in the catalogue has an illustration, and none is drawn for anything else', () => {
     expect(slugs.filter((slug) => !(slug in EXERCISE_ART))).toEqual([]);
     expect(Object.keys(EXERCISE_ART).filter((slug) => !(slug in BUILTIN_CATALOG))).toEqual([]);
-    expect(slugs).toHaveLength(396);
+    expect(slugs).toHaveLength(397);
   });
 
   it.each(slugs)(
