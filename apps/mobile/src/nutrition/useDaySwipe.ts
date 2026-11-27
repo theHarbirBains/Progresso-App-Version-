@@ -51,8 +51,8 @@ interface Options {
  * - `widgetStyle(index)`: the day's widget at `index` (0 at the top), as the new day's widgets are
  *   dealt in one after another;
  * - `turnTo`: turns to the day before or after, as a swipe does (VoiceOver's way to change day);
- * - `rowSwipeZone`: for a part of the page whose rows swipe for themselves (Today's Foods' swipe to
- *   delete) -- a drag that starts there is left to them, never taken for a turn of the day.
+ * - `rowSwipeZone`: for a part of the page that's dragged sideways for itself (Today's Foods' row of
+ *   cards) -- a drag that starts there is left to it, never taken for a turn of the day.
  */
 export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
   const slide = useRef(new Animated.Value(0)).current;

@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
-  InputAccessoryView,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
@@ -29,18 +26,17 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { DayBar } from '../nutrition/DayBar';
-import { IconButton } from '../design/IconButton';
-import { SwipeToDelete } from '../design/SwipeToDelete';
 import { useProfile } from '../profile/ProfileProvider';
 import { buildCalorieProfileInput, computeMaintenanceCalories } from '../nutrition/calorieTargets';
 import { MacroRows, type MacroFigure } from '../nutrition/MacroRows';
-import { FoodImage } from '../nutrition/FoodImage';
+import { FoodCarousel, type FoodCarouselShortcut } from '../nutrition/FoodCarousel';
+import { LoggedFoodSheet } from '../nutrition/LoggedFoodSheet';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { fetchFoodLogsForRange, type FoodLogRow } from '../nutrition/foodLogQueries';
 import { isTodayKey, shiftDay, todayKey, weekOfLabel } from '../nutrition/logDay';
 import { dayFromKey, dayKey } from '../lib/dayKey';
-import { logMeasures, servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
+import { logMeasures, servingsFor } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
   calorieGoalFor,
@@ -63,8 +59,6 @@ type Props = RootStackScreenProps<'Nutrition'>;
 const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 // Another day's foods before they've been read: one array, so what depends on the foods stays put.
 const NO_LOGS: FoodLogRow[] = [];
-// Links each food row's amount field to the check above the number pad (iPhone).
-const AMOUNT_DONE_ID = 'food-log-amount-done';
 
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- a day's
 // intake against the user's targets, with the day's logged foods. Today by
@@ -84,12 +78,14 @@ const AMOUNT_DONE_ID = 'food-log-amount-done';
 //   shown (MicronutrientsWidget) -- no figures of its own here.
 // - **Log Food**: four outlined tiles -- Scan Barcode, Search Food, Describe Food (AI) and Quick
 //   Entry -- with the Food Library as the card's link: every way into the same logging flow.
-// - **Today's Foods**, with View All (Nutrition History), taking the room that's left: each food
-//   as a row -- its picture, its name, the values snapshotted when it was logged, an editable
-//   quantity and a quiet Delete -- scrolling inside the card, or, with none yet, an empty state
-//   with the page's one filled button, Log Your First Meal. Under them, two quiet actions: Copy
-//   Yesterday (when yesterday has foods -- a sheet of them, all ticked, logged again now) and
-//   Save as Meal (when today has some -- a sheet to name them and keep them as a saved meal).
+// - **Today's Foods**, with View All (Nutrition History), taking the room that's left: the foods
+//   as a row of cards scrolled sideways, either way (FoodCarousel) -- each its picture, its name,
+//   its calories, amount and macros as snapshotted when it was logged; a tap opens it in a sheet
+//   (LoggedFoodSheet) to change the amount or delete it -- then two quiet tiles: Copy Yesterday
+//   (when yesterday has foods -- a sheet of them, all ticked, logged again now) and Save as Meal
+//   (when today has some -- a sheet to name them and keep them as a saved meal). With none yet,
+//   an empty state with the page's one filled button, Log Your First Meal, and Copy Yesterday
+//   under it.
 // - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to Saturday --
 //   as a slim card: a bar, what's been eaten against it and what's left (WeeklyCalorieBudget
 //   summary); a tap opens the rest in a sheet.
@@ -164,8 +160,9 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     };
   }, [navigation]);
 
-  // Moving between days: a swipe turns the day (useDaySwipe) -- no arrows. Swiping right goes
-  // back a day, left forward -- tomorrow and on too.
+  // Moving between days: a swipe turns the day (useDaySwipe), as do the day bar's arrows. Swiping
+  // right goes back a day, left forward -- tomorrow and on too. A sideways drag on the foods
+  // scrolls them instead.
   const reduceMotion = useReduceMotionPreference();
   const { width } = useWindowDimensions();
   // The widgets rise in as the page opens, like every page's; once the day has been moved,
@@ -179,10 +176,14 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const dayTurn = useDaySwipe({ day, onDay: showDay, width, reduceMotion });
 
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
-  // The one food row showing Delete, if any; and whether a row is being swiped, when the page
-  // holds its scroll still.
-  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
-  const [rowSwiping, setRowSwiping] = useState(false);
+  // The food open in its sheet, if any -- by id, so the sheet always shows it as it is now, and
+  // closes once it's gone.
+  const [openLogId, setOpenLogId] = useState<string | null>(null);
+  // An amount being saved, per food: the same amount isn't saved twice at once (the keyboard
+  // going and the sheet closing both finish it).
+  const savingAmount = useRef<Record<string, string>>({});
+  // The foods being deleted, while they go.
+  const deleting = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [yesterdayLogs, setYesterdayLogs] = useState<FoodLogRow[]>([]);
   // The foods of the week the day shown is in (Sunday to Saturday), for its calorie budget.
@@ -306,11 +307,14 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   // an amount (blank, negative, not a number) puts back the one there was.
   async function handleUpdateQuantity(log: FoodLogRow) {
     const typed = (quantityInputs[log.id] ?? '').trim().replace(',', '.');
+    if (savingAmount.current[log.id] === typed || deleting.current.has(log.id)) return;
     const amount = Number(typed);
     const unit = log.enteredUnit ?? 'servings';
     const current = log.enteredAmount ?? log.quantity;
     if (typed !== '' && amount === 0) {
+      savingAmount.current[log.id] = typed;
       await handleDelete(log.id);
+      delete savingAmount.current[log.id];
       return;
     }
     if (typed === '' || !Number.isFinite(amount) || amount < 0) {
@@ -321,6 +325,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     const servings = servingsFor(amount, unit, logMeasures(log));
     if (!(servings > 0)) return;
     setError(null);
+    savingAmount.current[log.id] = typed;
     try {
       const updated = await updateQuantity(
         log,
@@ -333,19 +338,35 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quantity');
+    } finally {
+      delete savingAmount.current[log.id];
     }
   }
 
-  // A food is deleted from its row's swipe (or VoiceOver's Delete action): the swipe and the tap
-  // on Delete are the two deliberate steps, so nothing more is asked.
+  // A food is deleted from its sheet's Delete (or VoiceOver's Delete action on its card): opening
+  // it and tapping Delete are the two deliberate steps, so nothing more is asked. Its sheet closes
+  // as it goes.
   async function handleDelete(logId: string) {
     setError(null);
+    // Going: an amount finished as its sheet closes isn't saved to it meanwhile.
+    deleting.current.add(logId);
     try {
       await removeLog(logId);
-      setSwipeOpenId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete food log');
+    } finally {
+      deleting.current.delete(logId);
     }
+  }
+
+  // The food open, as it is now; none once it's gone (deleted, or another day shown).
+  const openLog = openLogId ? (logs.find((log) => log.id === openLogId) ?? null) : null;
+  // Done, a swipe down or a tap outside: what was typed is saved first, as the keyboard going
+  // would -- a sheet closing mid-typing never loses it.
+  function closeFood() {
+    Keyboard.dismiss();
+    if (openLog) void handleUpdateQuantity(openLog);
+    setOpenLogId(null);
   }
 
   const header = (
@@ -396,96 +417,36 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     { key: 'fat', label: 'Fat', value: goals.fatG, unit: 'g' },
   ];
 
-  // The day's foods: each a row with its picture, its figures and its amount to change, swiped to
-  // delete; then Copy Yesterday and Save as Meal. In the foods card's own scroll.
-  const foodRows = (
-    <View {...dayTurn.rowSwipeZone}>
-      {logs.map((log, index) => (
-        <SwipeToDelete
-          key={log.id}
-          testID={`food-log-swipe-${log.id}`}
-          style={index > 0 && styles.divider}
-          name={log.foodNameSnapshot}
-          open={swipeOpenId === log.id}
-          onOpenChange={(open) => setSwipeOpenId(open ? log.id : null)}
-          onSwipingChange={setRowSwiping}
-          onDelete={() => void handleDelete(log.id)}
-        >
-          <View testID={`food-log-row-${log.id}`} style={styles.logRow}>
-            <FoodImage
-              testID={`food-log-image-${log.id}`}
-              uri={log.imageUrl}
-              name={log.foodNameSnapshot}
-              size={40}
-              zoomable
-            />
-            <View
-              testID={`food-log-info-${log.id}`}
-              style={styles.logInfo}
-              accessible
-              accessibilityLabel={`${log.foodNameSnapshot}, ${wholeFigure(log.calories)} calories`}
-              accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
-              onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === 'delete') void handleDelete(log.id);
-              }}
-            >
-              <Text style={styles.logName} numberOfLines={1}>
-                {log.foodNameSnapshot}
-              </Text>
-              <Text style={styles.logMeta} numberOfLines={1}>
-                {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein ·{' '}
-                {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
-              </Text>
-            </View>
-            <View style={styles.quantityColumn}>
-              <TextInput
-                testID={`food-log-quantity-${log.id}`}
-                style={styles.quantityInput}
-                accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
-                  2,
-                  log.enteredUnit ?? 'servings',
-                  servingMeasures(log).pieces,
-                )}`}
-                accessibilityHint="Enter 0 to take it off the day."
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                inputAccessoryViewID={AMOUNT_DONE_ID}
-                value={quantityInputs[log.id] ?? ''}
-                onChangeText={(text) => setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))}
-                onEndEditing={() => handleUpdateQuantity(log)}
-              />
-              <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
-                {unitWord(
-                  log.enteredAmount ?? log.quantity,
-                  log.enteredUnit ?? 'servings',
-                  servingMeasures(log).pieces,
-                )}
-              </Text>
-            </View>
-          </View>
-        </SwipeToDelete>
-      ))}
-    </View>
-  );
-  const foodShortcuts =
-    (isToday && yesterdayLogs.length > 0) || logs.some((log) => log.foodId !== null) ? (
-      <View style={styles.foodShortcuts}>
-        {isToday && yesterdayLogs.length > 0 ? (
-          <TextButton
-            testID="nutrition-today-copy-yesterday"
-            label="Copy Yesterday"
-            onPress={() => setCopyOpen(true)}
-          />
-        ) : null}
-        {logs.some((log) => log.foodId !== null) ? (
-          <TextButton
-            testID="nutrition-today-save-meal"
-            label="Save as Meal"
-            onPress={() => setSaveMealOpen(true)}
-          />
-        ) : null}
-      </View>
-    ) : null;
+  // Copy Yesterday (today, when yesterday has foods) and Save as Meal (when a food of the day's
+  // has a food behind it): tiles after the foods, or under the empty state.
+  const canCopyYesterday = isToday && yesterdayLogs.length > 0;
+  const canSaveMeal = logs.some((log) => log.foodId !== null);
+  const carouselShortcuts: FoodCarouselShortcut[] = [
+    ...(canCopyYesterday
+      ? [
+          {
+            key: 'copy',
+            testID: 'nutrition-today-copy-yesterday',
+            label: 'Copy\nYesterday',
+            spoken: 'Copy Yesterday',
+            icon: 'copy' as const,
+            onPress: () => setCopyOpen(true),
+          },
+        ]
+      : []),
+    ...(canSaveMeal
+      ? [
+          {
+            key: 'save-meal',
+            testID: 'nutrition-today-save-meal',
+            label: 'Save as\nMeal',
+            spoken: 'Save as Meal',
+            icon: 'bookmark' as const,
+            onPress: () => setSaveMealOpen(true),
+          },
+        ]
+      : []),
+  ];
 
   // The ways to log, as four tiles: what each is, at a glance.
   const logWays: {
@@ -561,7 +522,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
 
   // One page, top to bottom, with nothing to scroll on a phone of today's size (Harbir's design,
   // November 2026): the day's figures, the ways to log, the day's foods (which take whatever room
-  // is left, scrolling inside their card), the week in one line, and the daily targets.
+  // is left, a row of cards scrolled sideways), the week in one line, and the daily targets.
   const dayWidgets = (
     <>
       {displayError ? (
@@ -659,17 +620,15 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   testID: 'nutrition-today-view-all',
                 },
               )}
-              <ScrollView
-                keyboardDismissMode="on-drag"
-                testID="nutrition-today-foods-scroll"
-                style={styles.foodsList}
-                contentContainerStyle={logs.length === 0 ? styles.foodsEmptyContent : undefined}
-                nestedScrollEnabled
-                scrollEnabled={!rowSwiping}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {logs.length === 0 ? (
+              {logs.length === 0 ? (
+                <ScrollView
+                  keyboardDismissMode="on-drag"
+                  testID="nutrition-today-foods-empty"
+                  style={styles.foodsList}
+                  contentContainerStyle={styles.foodsEmptyContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
                   <View style={styles.foodsEmpty}>
                     <View style={styles.emptyLine}>
                       <MaterialCommunityIcons
@@ -691,11 +650,29 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                       onAccentColor={nutritionTheme.onAccent}
                     />
                   </View>
-                ) : (
-                  foodRows
-                )}
-                {foodShortcuts}
-              </ScrollView>
+                  {canCopyYesterday ? (
+                    <View style={styles.foodShortcuts}>
+                      <TextButton
+                        testID="nutrition-today-copy-yesterday"
+                        label="Copy Yesterday"
+                        onPress={() => setCopyOpen(true)}
+                      />
+                    </View>
+                  ) : null}
+                </ScrollView>
+              ) : (
+                <FoodCarousel
+                  key={day}
+                  logs={logs}
+                  accentColor={accent}
+                  onOpen={(log) => setOpenLogId(log.id)}
+                  onDelete={(log) => void handleDelete(log.id)}
+                  shortcuts={carouselShortcuts}
+                  bleed={spacing.lg}
+                  swipeZone={dayTurn.rowSwipeZone}
+                  reduceMotion={reduceMotion}
+                />
+              )}
             </AppCard>
           </Animated.View>
 
@@ -739,6 +716,25 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
             />
           </BottomSheet>
 
+          <LoggedFoodSheet
+            log={openLog}
+            isToday={isToday}
+            amount={openLog ? (quantityInputs[openLog.id] ?? '') : ''}
+            onChangeAmount={(text) => {
+              if (openLog) setQuantityInputs((prev) => ({ ...prev, [openLog.id]: text }));
+            }}
+            onSaveAmount={() => {
+              if (openLog) void handleUpdateQuantity(openLog);
+            }}
+            onDelete={() => {
+              if (!openLog) return;
+              setOpenLogId(null);
+              void handleDelete(openLog.id);
+            }}
+            onClose={closeFood}
+            accentColor={accent}
+            onAccentColor={nutritionTheme.onAccent}
+          />
           <CopyYesterdaySheet
             visible={copyOpen}
             onClose={() => setCopyOpen(false)}
@@ -803,23 +799,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       contentContainerStyle={styles.content}
       header={header}
       rollout={false}
-      scrollEnabled={!dayTurn.swiping && !rowSwiping}
+      scrollEnabled={!dayTurn.swiping}
     >
-      {/* iPhone's number pad has no key to finish with: a check on the bar above it saves the
-          amount typed (it ends the editing, which saves). Android's has its own. */}
-      {Platform.OS === 'ios' ? (
-        <InputAccessoryView nativeID={AMOUNT_DONE_ID}>
-          <View style={styles.amountBar}>
-            <IconButton
-              testID="food-log-amount-save"
-              icon="check"
-              accessibilityLabel="Save amount"
-              color={accent}
-              onPress={() => Keyboard.dismiss()}
-            />
-          </View>
-        </InputAccessoryView>
-      ) : null}
       <RiseIn>{dayBar}</RiseIn>
       <Animated.View
         testID="nutrition-day-content"
@@ -946,7 +927,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // The day's foods: whatever room is left, never less than a row or two, scrolling inside.
+  // The day's foods: whatever room is left, never less than a row of cards.
   foodsWrap: {
     flexGrow: 1,
     minHeight: 112,
@@ -975,64 +956,11 @@ const styles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.textSecondary,
   },
-  // Copy Yesterday and Save as Meal, under the day's foods.
+  // Copy Yesterday, under the empty day.
   foodShortcuts: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: spacing.xs,
-  },
-  divider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  logRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  logInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  logName: {
-    ...typeScale.callout,
-    fontFamily: fonts.semibold,
-    color: colors.textPrimary,
-  },
-  logMeta: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  quantityColumn: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  quantityUnit: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    maxWidth: 72,
-  },
-  // The bar above the number pad, with its one check at the right.
-  amountBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceRaised,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  quantityInput: {
-    width: 60,
-    height: 40,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
-    color: colors.textPrimary,
-    ...typeScale.statSmall,
-    textAlign: 'center',
   },
 
   // The daily targets, four tiles.

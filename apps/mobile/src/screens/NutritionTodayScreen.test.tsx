@@ -154,11 +154,16 @@ beforeEach(() => {
   mockNavigate.mockClear();
 });
 
-/** Deletes a food from its row, as VoiceOver's Delete action -- and the swipe's Delete -- do. */
+/** Deletes a food from its card, as VoiceOver's Delete action -- and its sheet's Delete -- do. */
 function deleteFood(logId: string) {
-  fireEvent(screen.getByTestId(`food-log-info-${logId}`), 'accessibilityAction', {
+  fireEvent(screen.getByTestId(`food-log-row-${logId}`), 'accessibilityAction', {
     nativeEvent: { actionName: 'delete' },
   });
+}
+
+/** Opens a food from its card, in the sheet with its amount and Delete. */
+function openFood(logId: string) {
+  fireEvent.press(screen.getByTestId(`food-log-row-${logId}`));
 }
 
 // CalorieRing hides its own value text from the accessibility tree (its
@@ -299,6 +304,7 @@ describe('NutritionTodayScreen', () => {
 
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
+    openFood('log-1');
     expect(screen.getByTestId('food-log-quantity-log-1')).toHaveProp('value', '2');
     expect(screen.getByTestId('food-log-unit-log-1')).toHaveTextContent('cookies');
 
@@ -322,6 +328,7 @@ describe('NutritionTodayScreen', () => {
 
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
+    openFood('log-1');
     expect(screen.getByTestId('food-log-unit-log-1')).toHaveTextContent('g');
 
     fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '150');
@@ -343,6 +350,7 @@ describe('NutritionTodayScreen', () => {
 
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
+    openFood('log-1');
 
     fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '3');
     await act(async () => {
@@ -380,6 +388,7 @@ describe('NutritionTodayScreen', () => {
       ).toHaveTextContent('435'),
     );
 
+    openFood('log-1');
     fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '0');
     await act(async () => {
       fireEvent(screen.getByTestId('food-log-quantity-log-1'), 'endEditing');
@@ -402,6 +411,7 @@ describe('NutritionTodayScreen', () => {
 
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
+    openFood('log-1');
     const field = () => screen.getByTestId('food-log-quantity-log-1');
     expect(field().props.accessibilityHint).toBe('Enter 0 to take it off the day.');
 
@@ -639,24 +649,99 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     );
   });
 
-  it('shows each logged food as a row with a named quantity field and a quiet destructive Delete', async () => {
-    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+  it('shows the foods as cards in a row that scrolls sideways, in the order they were logged', async () => {
+    const banana = { ...sampleLog, id: 'log-2', foodNameSnapshot: 'Banana', calories: 105 };
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog, banana]);
     renderScreen();
 
-    const row = await screen.findByTestId(`food-log-row-${sampleLog.id}`);
-    expect(row).toBeTruthy();
+    const card = await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+    const row = screen.getByTestId('nutrition-today-foods-scroll');
+    expect(row.props.horizontal).toBe(true);
+    // Each card stops at the row's start, either way.
+    expect(row.props.snapToOffsets).toEqual([0, 224]);
+    expect(row).toHaveTextContent(/Chicken Breast.*Banana/);
+    // Its name, its calories with the amount, and its protein, carbs and fat.
+    expect(card).toHaveTextContent(/Chicken Breast.*330 cal.*2 servings.*62g.*0g.*7g/);
+    expect(card.props.accessibilityLabel).toBe(
+      'Chicken Breast, 2 servings: 330 calories, 62 grams protein, 0 grams carbs, 7 grams fat',
+    );
+    expect(card.props.accessibilityActions).toEqual([{ name: 'delete', label: 'Delete' }]);
+    // The amount and Delete are in its sheet, not on the card.
+    expect(screen.queryByTestId(`food-log-quantity-${sampleLog.id}`)).toBeNull();
+    expect(screen.queryByTestId(`food-log-delete-${sampleLog.id}`)).toBeNull();
+  });
+
+  it('opens a food in a sheet: its figures, its amount and a quiet destructive Delete', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockDeleteFoodLog.mockResolvedValue(undefined);
+    renderScreen();
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+
+    openFood(sampleLog.id);
+    const sheet = screen.getByTestId('food-log-sheet');
+    expect(sheet).toHaveTextContent(/Chicken Breast/);
+    expect(sheet).toHaveTextContent(/Logged at/);
+    expect(screen.getByTestId(`food-log-figures-${sampleLog.id}`)).toHaveTextContent(
+      /330.*Calories.*62g.*Protein.*0g.*Carbs.*7g.*Fat/,
+    );
     expect(
       screen.getByTestId(`food-log-quantity-${sampleLog.id}`).props.accessibilityLabel,
     ).toMatch(/^Amount of Chicken Breast, in servings/);
-    // No Delete button: each row swipes to Delete, and VoiceOver has it as an action.
-    expect(screen.queryByTestId(`food-log-delete-${sampleLog.id}`)).toBeNull();
-    expect(screen.getByTestId(`food-log-swipe-${sampleLog.id}`)).toBeTruthy();
-    expect(
-      screen.getByTestId(`food-log-swipe-${sampleLog.id}-delete`).props.accessibilityLabel,
-    ).toBe('Delete Chicken Breast');
-    expect(screen.getByTestId(`food-log-info-${sampleLog.id}`).props.accessibilityActions).toEqual([
-      { name: 'delete', label: 'Delete' },
-    ]);
+    const remove = screen.getByTestId(`food-log-delete-${sampleLog.id}`);
+    expect(remove).toHaveTextContent('Delete from Today');
+    expect(remove.props.accessibilityLabel).toBe('Delete Chicken Breast');
+
+    await act(async () => {
+      fireEvent.press(remove);
+    });
+
+    // Only this entry goes, at once -- opening it and Delete are the two steps.
+    expect(mockDeleteFoodLog).toHaveBeenCalledWith(sampleLog.id);
+    await waitFor(() => expect(screen.queryByTestId(`food-log-row-${sampleLog.id}`)).toBeNull());
+    expect(screen.queryByTestId(`food-log-quantity-${sampleLog.id}`)).toBeNull();
+  });
+
+  it('saves an amount typed when the sheet closes, once', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    let finish: (value: unknown) => void = () => undefined;
+    mockUpdateFoodLogQuantity.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+
+    openFood(sampleLog.id);
+    const field = screen.getByTestId(`food-log-quantity-${sampleLog.id}`);
+    fireEvent.changeText(field, '3');
+    // The keyboard going and Done both finish it: it's saved the once.
+    fireEvent(field, 'endEditing');
+    fireEvent.press(screen.getByTestId('food-log-sheet-done'));
+    await act(async () => {
+      finish({ ...sampleLog, quantity: 3, calories: 495 });
+    });
+
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledTimes(1);
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(sampleLog, 3, undefined);
+    expect(screen.queryByTestId(`food-log-quantity-${sampleLog.id}`)).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+      ).toHaveTextContent('495'),
+    );
+  });
+
+  it('follows the foods with Copy Yesterday and Save as Meal tiles', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForDay.mockResolvedValue([{ ...sampleLog, id: 'y-1' }]);
+    renderScreen();
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+
+    const row = screen.getByTestId('nutrition-today-foods-scroll');
+    expect(await within(row).findByTestId('nutrition-today-copy-yesterday')).toBeTruthy();
+    expect(within(row).getByTestId('nutrition-today-save-meal')).toBeTruthy();
+    expect(row).toHaveTextContent(/Chicken Breast.*Copy\s*Yesterday.*Save as\s*Meal/s);
   });
 
   it('renders no bare text outside <Text>', async () => {
@@ -1399,7 +1484,9 @@ describe('NutritionTodayScreen -- saving an amount from the keyboard', () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockUpdateFoodLogQuantity.mockResolvedValue({ ...sampleLog, quantity: 3 });
     renderScreen();
-    const field = await screen.findByTestId(`food-log-quantity-${sampleLog.id}`);
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+    openFood(sampleLog.id);
+    const field = screen.getByTestId(`food-log-quantity-${sampleLog.id}`);
 
     expect(field.props.inputAccessoryViewID).toBe('food-log-amount-done');
     expect(field.props.returnKeyType).toBe('done');
