@@ -186,6 +186,7 @@ export function MuscleActivityFigure({
         >
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <Image
+              testID={`${testID}-body`}
               source={view.body}
               style={StyleSheet.absoluteFill}
               contentFit="contain"

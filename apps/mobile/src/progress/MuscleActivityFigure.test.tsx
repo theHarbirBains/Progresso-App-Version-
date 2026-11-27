@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { ProfileContext } from '../profile/profileContext';
 import { groupAt, levelColors, MuscleActivityFigure } from './MuscleActivityFigure';
 import { MUSCLE_HEATMAP, TAP_CODES } from './muscleHeatmap.generated';
 import { muscleActivity } from './muscleActivity';
@@ -88,13 +89,54 @@ describe('MuscleActivityFigure', () => {
     expect(opacity('chest')).toBe(0.3);
   });
 
-  it('knows every group drawn on the figure from its tap map', () => {
-    const front = MUSCLE_HEATMAP.male!.front;
-    expect(groupAt(front, 0.5, 0.22)).toBe('chest');
-    const found = new Set(
-      [...front.tapRows.join('')].filter((code) => code !== '.').map((code) => TAP_CODES[code]),
+  it("knows every group drawn on each figure, a man's and a woman's, from its tap map", () => {
+    for (const sex of ['male', 'female'] as const) {
+      for (const side of ['front', 'back'] as const) {
+        const view = MUSCLE_HEATMAP[sex]![side];
+        const found = new Set(
+          [...view.tapRows.join('')].filter((code) => code !== '.').map((code) => TAP_CODES[code]),
+        );
+        expect([...found].sort()).toEqual(Object.keys(view.layers).sort());
+      }
+      expect(groupAt(MUSCLE_HEATMAP[sex]!.front, 0.5, 0.22)).toBe('chest');
+      expect(groupAt(MUSCLE_HEATMAP[sex]!.back, 0.5, 0.47)).toBe('glutes');
+    }
+  });
+
+  it("draws a woman's figure for a woman, and a man's otherwise", () => {
+    const female = MUSCLE_HEATMAP.female!.front;
+    const male = MUSCLE_HEATMAP.male!.front;
+    expect(female.body).not.toEqual(male.body);
+    const figure = (gender: string | null) => (
+      <ProfileContext.Provider value={{ profile: { gender } } as never}>
+        <MuscleActivityFigure
+          activity={activity}
+          side="front"
+          selected={null}
+          onSelect={jest.fn()}
+          accentColor="#D99A50"
+          height={300}
+        />
+      </ProfileContext.Provider>
     );
-    expect([...found].sort()).toEqual(Object.keys(front.layers).sort());
+    const { rerender } = render(figure('female'));
+    expect(
+      screen.getByTestId('muscle-activity-figure-body', { includeHiddenElements: true }).props
+        .source,
+    ).toEqual(female.body);
+    expect(screen.getByTestId('muscle-activity-figure-layer-chest').props.source).toEqual(
+      female.layers.chest,
+    );
+    rerender(figure('male'));
+    expect(
+      screen.getByTestId('muscle-activity-figure-body', { includeHiddenElements: true }).props
+        .source,
+    ).toEqual(male.body);
+    rerender(figure(null));
+    expect(
+      screen.getByTestId('muscle-activity-figure-body', { includeHiddenElements: true }).props
+        .source,
+    ).toEqual(male.body);
   });
 
   it('says what it shows to assistive tech', () => {

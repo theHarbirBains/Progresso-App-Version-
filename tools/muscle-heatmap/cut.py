@@ -12,7 +12,8 @@ muscles gold on a dark, glowing background (Harbir's art). Each side becomes:
 and muscleHeatmap.generated.ts maps them, with each side's tap map: which group's muscles are at
 each point of the picture.
 
-Where each group's muscles are is drawn here by hand, as an area of the picture (REGIONS): a gold
+Where each group's muscles are is drawn here by hand for each sex's picture, as an area of it
+(MALE_REGIONS, FEMALE_REGIONS): a gold
 group takes the gold inside its area, exactly as Harbir drew it; a group his picture leaves grey
 (the core, the lats and lower back, the inner thighs, the forearms) takes the body inside its
 area. Run it again on new art by redrawing the areas.
@@ -34,17 +35,18 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(ROOT, 'apps', 'mobile', 'assets', 'muscle-heatmap')
 MAP = os.path.join(ROOT, 'apps', 'mobile', 'src', 'progress', 'muscleHeatmap.generated.ts')
 
-# Each side's part of the source picture (x0, y0, x1, y1), in the source's own pixels.
+# Each side's part of the source picture (x0, y0, x1, y1), in the source's own pixels -- the same
+# for both sexes' pictures, so the figures are drawn the same size.
 CROPS = {'front': (330, 0, 766, 960), 'back': (776, 0, 1212, 960)}
-# The front figure's middle (its sternum) and the back's (its spine): the areas below are drawn for
-# the figure's left of the picture and mirrored across it.
-MIDDLES = {'front': 548, 'back': 995}
 # The tap map's cell, in source pixels.
 CELL = 8
 
-# Each group's areas on each side, in source pixels: (polygon, 'gold' or 'body', mirrored). A gold
-# area takes the gold inside it; a body area the whole body inside it.
-REGIONS = {
+# Each sex's picture, drawn by hand from it:
+# - `middles`: the front figure's middle (its sternum) and the back's (its spine) -- a mirrored area
+#   is drawn for the figure's left of the picture and mirrored across it;
+# - `regions`: each group's areas on each side, in source pixels: (polygon, 'gold' or 'body',
+#   mirrored). A gold area takes the gold inside it; a body area the whole body inside it.
+MALE_REGIONS = {
     'front': {
         'shoulders': [([(378, 160), (462, 158), (468, 200), (452, 250), (440, 264), (398, 264), (374, 226)], 'gold', True)],
         'chest': [([(462, 150), (634, 150), (644, 250), (630, 266), (548, 274), (466, 266), (452, 250)], 'gold', False)],
@@ -67,6 +69,34 @@ REGIONS = {
         'hamstrings': [([(894, 505), (992, 505), (992, 668), (894, 668)], 'gold', True)],
         'calves': [([(858, 640), (987, 640), (987, 892), (858, 892)], 'gold', True)],
     },
+}
+FEMALE_REGIONS = {
+    'front': {
+        'shoulders': [([(410, 175), (470, 180), (470, 215), (462, 238), (445, 246), (415, 250), (405, 220)], 'gold', True)],
+        'chest': [([(468, 170), (614, 170), (622, 240), (608, 282), (541, 286), (474, 282), (460, 240)], 'gold', False)],
+        'biceps': [([(415, 238), (466, 238), (467, 290), (459, 346), (425, 350), (412, 300)], 'gold', True)],
+        'forearms': [([(378, 298), (418, 294), (426, 346), (462, 346), (455, 400), (440, 470), (390, 476), (370, 432), (370, 350)], 'body', True)],
+        'core': [([(476, 272), (606, 272), (608, 330), (600, 400), (585, 425), (560, 440), (541, 445), (522, 440), (497, 425), (482, 400), (474, 330)], 'body', False)],
+        'quadriceps': [([(436, 390), (522, 405), (530, 500), (526, 632), (468, 638), (436, 590)], 'gold', True)],
+        'adductors': [([(505, 418), (522, 428), (536, 468), (536, 525), (528, 570), (516, 580), (510, 520)], 'body', True)],
+        'calves': [([(418, 636), (522, 636), (522, 892), (418, 892)], 'gold', True)],
+    },
+    'back': {
+        'shoulders': [([(868, 172), (920, 168), (928, 205), (920, 246), (895, 260), (866, 242), (858, 205)], 'gold', True)],
+        'back': [
+            ([(915, 112), (1079, 112), (1084, 180), (1080, 240), (1002, 348), (992, 348), (914, 240), (910, 180)], 'gold', False),
+            ([(912, 215), (1082, 215), (1085, 250), (1078, 300), (1072, 340), (1068, 392), (997, 398), (926, 392), (922, 340), (916, 300), (909, 250)], 'body', False),
+        ],
+        'triceps': [([(856, 232), (916, 240), (919, 300), (906, 350), (886, 366), (856, 362), (848, 300)], 'gold', True)],
+        'forearms': [([(828, 346), (896, 334), (891, 386), (871, 460), (834, 466), (820, 420)], 'body', True)],
+        'glutes': [([(892, 382), (1102, 382), (1102, 500), (1050, 507), (997, 501), (944, 507), (892, 500)], 'gold', False)],
+        'hamstrings': [([(898, 500), (996, 500), (996, 656), (898, 656)], 'gold', True)],
+        'calves': [([(868, 648), (993, 648), (993, 896), (868, 896)], 'gold', True)],
+    },
+}
+ART = {
+    'male': {'middles': {'front': 548, 'back': 995}, 'regions': MALE_REGIONS},
+    'female': {'middles': {'front': 541, 'back': 997}, 'regions': FEMALE_REGIONS},
 }
 # Where areas overlap, the earlier group takes the pixel.
 PRIORITY = ['chest', 'shoulders', 'biceps', 'triceps', 'back', 'core', 'forearms', 'glutes',
@@ -119,13 +149,14 @@ def main(source, sex='male'):
 
     os.makedirs(os.path.join(OUT, sex), exist_ok=True)
     out = {}
+    art = ART[sex]
     for side, (x0, y0, x1, y1) in CROPS.items():
-        middle = MIDDLES[side]
+        middle = art['middles'][side]
         taken = np.zeros(lum.shape, bool)
         labels = np.full(lum.shape, '.', dtype='<U1')
         layers = {}
         for group in PRIORITY:
-            areas = REGIONS[side].get(group)
+            areas = art['regions'][side].get(group)
             if not areas:
                 continue
             mask = np.zeros(lum.shape, bool)
