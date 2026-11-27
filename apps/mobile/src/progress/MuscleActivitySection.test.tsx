@@ -148,11 +148,15 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
       'back',
       'biceps',
     ]);
+    // Each row: its name, when it was last trained, and the figure it's sorted by (sets).
     expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(
-      /Chest.*Today.*1 session · 2 sets · 1,000 kg/,
+      /Chest.*Today.*2sets/,
+    );
+    expect(screen.getByTestId('muscle-activity-row-chest').props.accessibilityLabel).toMatch(
+      /1 session · 2 sets · 1,000 kg/,
     );
     expect(screen.getByTestId('muscle-activity-row-triceps')).toHaveTextContent(
-      /Triceps.*Today.*Also worked · 2 sets/,
+      /Triceps.*Today.*2also worked/,
     );
     expect(screen.queryByTestId('muscle-activity-row-hamstrings')).toBeNull();
 
@@ -175,6 +179,8 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     fireEvent.press(screen.getByTestId('muscle-activity-sort-volume'));
     expect(screen.getByTestId('muscle-activity-sort')).toHaveTextContent(/Sort: Volume/);
     expect(breakdownOrder().slice(0, 2)).toEqual(['chest', 'quadriceps']);
+    // Each row leads with the figure it's sorted by.
+    expect(screen.getByTestId('muscle-activity-row-chest')).toHaveTextContent(/1,000kg/);
   });
 
   it('changes period in memory, with no new read', async () => {
@@ -201,12 +207,19 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
       expanded: true,
     });
     expect(screen.getByTestId('muscle-activity-group-level')).toHaveTextContent(
-      /Recently trained · 1–2 days · 0.2 sessions a week/,
+      /Recently trained.*1–2 days/,
+    );
+    // Its figures as blocks of their own.
+    expect(screen.getByTestId('muscle-activity-group-sessions')).toHaveTextContent('1Session');
+    expect(screen.getByTestId('muscle-activity-group-sets')).toHaveTextContent('2Working Sets');
+    expect(screen.getByTestId('muscle-activity-group-volume')).toHaveTextContent('1,000 kgVolume');
+    expect(screen.getByTestId('muscle-activity-group-fourth')).toHaveTextContent(
+      '0.2Sessions / Week',
     );
     expect(screen.getByTestId('muscle-activity-group')).not.toHaveTextContent(/EACH WEEK/);
     expect(screen.queryByTestId('muscle-activity-trend')).toBeNull();
     expect(screen.getByTestId('muscle-activity-exercise-bench')).toHaveTextContent(
-      /Bench Press.*2 sets · 1,000 kg · Today/,
+      /Bench Press.*Today.*2 sets.*1,000 kg/,
     );
     fireEvent.press(screen.getByTestId('muscle-activity-exercise-bench'));
     expect(mockOpenExercise).toHaveBeenCalledWith('bench', 'Bench Press');
@@ -223,7 +236,7 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(breakdownOrder()).toEqual(['quadriceps']);
     expect(screen.getByTestId('muscle-activity-filter')).toHaveTextContent('Showing Quadriceps');
     expect(screen.getByTestId('muscle-activity-group-level')).toHaveTextContent(
-      /No recent training · 15\+ days/,
+      /No recent training.*15\+ days/,
     );
     expect(screen.getByTestId('muscle-activity-figure-layer-quadriceps')).toBeTruthy();
     expect(

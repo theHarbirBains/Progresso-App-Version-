@@ -18,6 +18,7 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { SkeletonCards } from '../design/Skeleton';
+import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import {
   analyticsColors,
@@ -27,12 +28,14 @@ import {
   radii,
   spacing,
   typeScale,
+  widgetGap,
 } from '../design/theme';
 import { sideOf } from '../exercises/illustrations/muscleMap';
 import { MuscleFigure } from '../exercises/MuscleFigure';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { fromKg } from '../lib/units';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { withAlpha } from '../theme/accentColor';
 import { LEVEL_COLORS, MuscleActivityFigure, type FigureSide } from './MuscleActivityFigure';
 import {
   ACTIVITY_GROUPS,
@@ -63,7 +66,7 @@ const ROWS_SHOWN = 6;
 /** How many of a group's exercises its row lists, opened. */
 const EXERCISES_SHOWN = 5;
 /** A breakdown row's muscle picture. */
-const THUMB = 40;
+const THUMB = 44;
 /** Below this screen width, the legend goes under the figure rather than beside it. */
 const STACK_BELOW_WIDTH = 350;
 
@@ -156,15 +159,54 @@ function SummaryTile({
   );
 }
 
+/** The figure a row leads with, by its sort: its sets, its volume or its sessions. */
+function rowFigure(
+  group: GroupActivity,
+  sort: BreakdownSort,
+  unit: 'kg' | 'lb',
+): { value: string; label: string; muted: boolean } {
+  if (sort === 'volume' && group.volumeKg > 0) {
+    return {
+      value: Math.round(fromKg(group.volumeKg, unit)).toLocaleString('en-US'),
+      label: unit,
+      muted: false,
+    };
+  }
+  if (sort === 'frequency' && group.sessions > 0) {
+    return {
+      value: group.sessions.toLocaleString('en-US'),
+      label: group.sessions === 1 ? 'session' : 'sessions',
+      muted: false,
+    };
+  }
+  if (group.sets > 0) {
+    return {
+      value: group.sets.toLocaleString('en-US'),
+      label: group.sets === 1 ? 'set' : 'sets',
+      muted: false,
+    };
+  }
+  if (group.secondarySets > 0) {
+    return {
+      value: group.secondarySets.toLocaleString('en-US'),
+      label: 'also worked',
+      muted: true,
+    };
+  }
+  return { value: '—', label: '', muted: true };
+}
+
 /**
- * One muscle in Muscle Breakdown: its picture (Harbir's figure of it, a man's or a woman's, its
- * muscles in its level's colour), its name and when it was last trained, its sessions, sets and
- * volume, and a bar of the figure it's sorted by against the busiest muscle's. A tap opens it: its
- * level and the exercises behind it.
+ * One muscle in Muscle Breakdown, easy to scan: its picture (Harbir's figure of it, its muscles in
+ * its level's colour), its name, a dot of its level's colour and when it was last trained, and on
+ * the right the figure it's sorted by -- its sets, volume or sessions -- with a bar of it against
+ * the busiest muscle's. A tap opens it in place: its level, its figures as blocks of their own and
+ * the exercises behind it.
  */
 function BreakdownRow({
   group,
   share,
+  sort,
   now,
   unit,
   period,
@@ -175,6 +217,7 @@ function BreakdownRow({
 }: {
   group: GroupActivity;
   share: number;
+  sort: BreakdownSort;
   now: Date;
   unit: 'kg' | 'lb';
   period: ActivityPeriod;
@@ -187,6 +230,7 @@ function BreakdownRow({
   // When it was last worked -- as the main muscle or one an exercise also works, as its colour.
   const last = sinceText(group.lastWorkedAt, now);
   const color = LEVEL_COLORS[group.level];
+  const figure = rowFigure(group, sort, unit);
   return (
     <View style={divider && styles.rowDivider}>
       <Pressable
@@ -211,16 +255,31 @@ function BreakdownRow({
         </View>
         <View style={styles.rowBody}>
           <View style={styles.rowTop}>
-            <Text style={styles.rowName} numberOfLines={1}>
-              {name}
-            </Text>
-            <Text style={styles.rowWhen} numberOfLines={1}>
-              {last ?? '—'}
-            </Text>
+            <View style={styles.rowWords}>
+              <Text style={styles.rowName} numberOfLines={1}>
+                {name}
+              </Text>
+              <View style={styles.rowWhenLine}>
+                <Swatch color={color} size={8} />
+                <Text style={styles.rowWhen} numberOfLines={1}>
+                  {last ?? 'Nothing logged'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.rowFigure}>
+              <Text
+                style={[styles.rowFigureValue, figure.muted && styles.rowFigureMuted]}
+                numberOfLines={1}
+              >
+                {figure.value}
+              </Text>
+              {figure.label ? (
+                <Text style={styles.rowFigureLabel} numberOfLines={1}>
+                  {figure.label}
+                </Text>
+              ) : null}
+            </View>
           </View>
-          <Text style={styles.rowStats} numberOfLines={1}>
-            {statsLine(group, unit)}
-          </Text>
           <View style={styles.rowBar}>
             <AnimatedBar
               fraction={share}
@@ -231,51 +290,164 @@ function BreakdownRow({
         </View>
         <Feather
           name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={16}
+          size={18}
           color={colors.textMuted}
         />
       </Pressable>
 
       {expanded ? (
         <SoftAppear testID="muscle-activity-group">
-          <View style={styles.details}>
-            <View style={styles.levelRow}>
-              <Swatch color={color} />
-              <Text testID="muscle-activity-group-level" style={styles.levelText}>
-                {ACTIVITY_LEVEL_LABELS[group.level]} · {ACTIVITY_LEVEL_NOTES[group.level]}
-                {period !== 7 && group.sessions > 0
-                  ? ` · ${group.perWeek.toFixed(1)} sessions a week`
-                  : ''}
-              </Text>
-            </View>
-
-            {group.exercises.length > 0 ? (
-              <>
-                <Text style={styles.kicker}>EXERCISES</Text>
-                {group.exercises.slice(0, EXERCISES_SHOWN).map((exercise, i) => (
-                  <ListRow
-                    key={exercise.exerciseId}
-                    testID={`muscle-activity-exercise-${exercise.exerciseId}`}
-                    title={exercise.name}
-                    subtitle={[
-                      plural(exercise.sets, 'set', 'sets'),
-                      ...(exercise.volumeKg > 0 ? [volumeText(exercise.volumeKg, unit)] : []),
-                      sinceText(exercise.lastDoneAt, now) ?? '',
-                      ...(exercise.primary ? [] : ['Also works it']),
-                    ].join(' · ')}
-                    divider={i > 0}
-                    onPress={() => onOpenExercise(exercise.exerciseId, exercise.name)}
-                  />
-                ))}
-              </>
-            ) : null}
-            {group.secondarySets > 0 && group.sets > 0 ? (
-              <Text testID="muscle-activity-group-also" style={styles.also}>
-                Also worked in {plural(group.secondarySets, 'set', 'sets')} of other exercises.
-              </Text>
-            ) : null}
-          </View>
+          <GroupDetails
+            group={group}
+            color={color}
+            now={now}
+            unit={unit}
+            period={period}
+            onOpenExercise={onOpenExercise}
+          />
         </SoftAppear>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * A muscle opened: its level as a pill with its days, its figures as blocks (sessions, working
+ * sets, volume, and sessions a week -- or, over 7 days, the sets of exercises that also work it),
+ * then its exercises, each with when it was last done on the left and its sets and volume on the
+ * right; five, then Show All.
+ */
+function GroupDetails({
+  group,
+  color,
+  now,
+  unit,
+  period,
+  onOpenExercise,
+}: {
+  group: GroupActivity;
+  color: string;
+  now: Date;
+  unit: 'kg' | 'lb';
+  period: ActivityPeriod;
+  onOpenExercise: (exerciseId: string, exerciseName: string) => void;
+}) {
+  const [allExercises, setAllExercises] = useState(false);
+  const exercises = allExercises ? group.exercises : group.exercises.slice(0, EXERCISES_SHOWN);
+  const fourth =
+    period === 7
+      ? { value: group.secondarySets.toLocaleString('en-US'), label: 'Also Worked Sets' }
+      : {
+          value: group.sessions > 0 ? group.perWeek.toFixed(1) : '0',
+          label: 'Sessions / Week',
+        };
+  return (
+    <View style={styles.details}>
+      <View testID="muscle-activity-group-level" style={styles.levelRow}>
+        <View
+          style={[
+            styles.levelPill,
+            { backgroundColor: withAlpha(color, 0.16), borderColor: withAlpha(color, 0.45) },
+          ]}
+        >
+          <Swatch color={color} size={8} />
+          <Text style={[styles.levelPillText, { color }]}>
+            {ACTIVITY_LEVEL_LABELS[group.level]}
+          </Text>
+        </View>
+        <Text style={styles.levelNote}>{ACTIVITY_LEVEL_NOTES[group.level]}</Text>
+      </View>
+
+      <View style={styles.statGrid}>
+        <View style={styles.statRow}>
+          <StatBlock
+            testID="muscle-activity-group-sessions"
+            value={group.sessions.toLocaleString('en-US')}
+            label={group.sessions === 1 ? 'Session' : 'Sessions'}
+          />
+          <StatBlock
+            testID="muscle-activity-group-sets"
+            value={group.sets.toLocaleString('en-US')}
+            label="Working Sets"
+          />
+        </View>
+        <View style={styles.statRow}>
+          <StatBlock
+            testID="muscle-activity-group-volume"
+            value={group.volumeKg > 0 ? volumeText(group.volumeKg, unit) : '—'}
+            label="Volume"
+          />
+          <StatBlock
+            testID="muscle-activity-group-fourth"
+            value={fourth.value}
+            label={fourth.label}
+          />
+        </View>
+      </View>
+
+      {group.secondarySets > 0 && group.sets > 0 && period !== 7 ? (
+        <View testID="muscle-activity-group-also" style={styles.alsoRow}>
+          <Feather name="git-branch" size={13} color={colors.textMuted} />
+          <Text style={styles.also}>
+            Also worked in {plural(group.secondarySets, 'set', 'sets')} of other exercises
+          </Text>
+        </View>
+      ) : null}
+
+      {group.exercises.length > 0 ? (
+        <View style={styles.exerciseList}>
+          <Text style={styles.kicker}>
+            EXERCISES · {group.exercises.length.toLocaleString('en-US')}
+          </Text>
+          {exercises.map((exercise, i) => (
+            <Pressable
+              key={exercise.exerciseId}
+              testID={`muscle-activity-exercise-${exercise.exerciseId}`}
+              onPress={() => onOpenExercise(exercise.exerciseId, exercise.name)}
+              style={({ pressed }) => [
+                styles.exerciseRow,
+                i > 0 && styles.exerciseDivider,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={[
+                exercise.name,
+                plural(exercise.sets, 'set', 'sets'),
+                ...(exercise.volumeKg > 0 ? [volumeText(exercise.volumeKg, unit)] : []),
+                sinceText(exercise.lastDoneAt, now) ?? '',
+                ...(exercise.primary ? [] : ['Also works it']),
+              ].join(', ')}
+            >
+              <View style={styles.exerciseWords}>
+                <Text style={styles.exerciseName} numberOfLines={2}>
+                  {exercise.name}
+                </Text>
+                <View style={styles.exerciseMeta}>
+                  <Text style={styles.exerciseWhen}>{sinceText(exercise.lastDoneAt, now)}</Text>
+                  {exercise.primary ? null : (
+                    <View style={styles.alsoTag}>
+                      <Text style={styles.alsoTagText}>Also works it</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View style={styles.exerciseFigures}>
+                <Text style={styles.exerciseSets}>{plural(exercise.sets, 'set', 'sets')}</Text>
+                {exercise.volumeKg > 0 ? (
+                  <Text style={styles.exerciseVolume}>{volumeText(exercise.volumeKg, unit)}</Text>
+                ) : null}
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
+            </Pressable>
+          ))}
+          {group.exercises.length > EXERCISES_SHOWN ? (
+            <TextButton
+              testID="muscle-activity-group-all-exercises"
+              label={allExercises ? 'Show Fewer' : `Show All ${group.exercises.length} Exercises`}
+              onPress={() => setAllExercises((all) => !all)}
+            />
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -396,6 +568,7 @@ export function MuscleActivitySection({
       key={group.group}
       group={group}
       share={breakdownShare(group, activity, sort)}
+      sort={sort}
       now={now}
       unit={weightUnit}
       period={period}
@@ -821,8 +994,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    minHeight: minTouchTarget + 16,
-    paddingVertical: spacing.sm,
+    minHeight: minTouchTarget + 20,
+    paddingVertical: spacing.md,
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -838,56 +1011,157 @@ const styles = StyleSheet.create({
   rowBody: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    gap: spacing.sm,
   },
   rowTop: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  rowWords: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
   },
   rowName: {
-    ...typeScale.callout,
+    ...typeScale.body,
     fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    flex: 1,
   },
-  rowWhen: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-  },
-  rowStats: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-  },
-  rowBar: {
-    marginTop: 4,
-  },
-  details: {
-    paddingLeft: THUMB + spacing.md,
-    paddingBottom: spacing.md,
-  },
-  levelRow: {
+  rowWhenLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
   },
-  levelText: {
+  rowWhen: {
     ...typeScale.secondary,
     color: colors.textSecondary,
     flexShrink: 1,
   },
+  // The figure it's sorted by, a readout on the right.
+  rowFigure: {
+    alignItems: 'flex-end',
+    minWidth: 52,
+  },
+  rowFigureValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  rowFigureMuted: {
+    color: colors.textMuted,
+  },
+  rowFigureLabel: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
+  rowBar: {},
+
+  // A muscle opened.
+  details: {
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  levelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  levelPillText: {
+    ...typeScale.label,
+  },
+  levelNote: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  statGrid: {
+    gap: widgetGap,
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+  alsoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   also: {
     ...typeScale.caption,
     color: colors.textMuted,
-    marginTop: spacing.sm,
+    flexShrink: 1,
+  },
+  exerciseList: {
+    marginTop: spacing.xs,
   },
   kicker: {
     ...typeScale.caption,
     fontFamily: fonts.semibold,
     color: colors.textMuted,
     letterSpacing: 0.8,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: minTouchTarget + 8,
+    paddingVertical: spacing.sm,
+  },
+  exerciseDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  exerciseWords: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  exerciseName: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  exerciseMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  exerciseWhen: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  alsoTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceLift,
+  },
+  alsoTagText: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  exerciseFigures: {
+    alignItems: 'flex-end',
+  },
+  exerciseSets: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  exerciseVolume: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
   },
   viewAll: {
     flexDirection: 'row',
