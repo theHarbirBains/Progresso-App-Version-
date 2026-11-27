@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { ActivityEntry } from './muscleActivityQueries';
 import { MuscleActivitySection } from './MuscleActivitySection';
 
@@ -77,13 +78,11 @@ beforeEach(() => {
   mockOpenExercise.mockClear();
 });
 
-/** The drawn muscles on the figure that answer a tap. */
-type Node = { props: Record<string, unknown> };
-function tappableMuscles(): (() => void)[] {
-  return screen.UNSAFE_root.findAll(
-    (candidate: Node) =>
-      typeof candidate.props.onPress === 'function' && typeof candidate.props.d === 'string',
-  ).map((node: Node) => node.props.onPress as () => void);
+/** A tap on the figure from the front, at a point 0-1 across and down. */
+function tapFigure(x: number, y: number) {
+  const figure = screen.getByTestId('muscle-activity-figure-front');
+  const { width, height } = figure.props.style as { width: number; height: number };
+  fireEvent.press(figure, { nativeEvent: { locationX: x * width, locationY: y * height } });
 }
 
 /** Muscle Breakdown's rows, top to bottom, by muscle group. */
@@ -188,26 +187,27 @@ describe("MuscleActivitySection -- Progress's Muscles tab", () => {
     expect(breakdownOrder()).toHaveLength(6);
   });
 
-  it('shows just the muscle tapped on the figure, outlined there -- tapped again, every muscle', async () => {
+  it('shows just the muscle tapped on the figure, standing out there -- tapped again, every muscle', async () => {
     await renderScreen();
-    const press = tappableMuscles()[0]!;
-    act(() => press());
+    // A thigh.
+    tapFigure(0.35, 0.55);
 
-    const shown = breakdownOrder();
-    expect(shown).toHaveLength(1);
-    const row = screen.getByTestId(`muscle-activity-row-${shown[0]}`);
-    expect(row.props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByTestId('muscle-activity-filter')).toHaveTextContent(/^Showing /);
-    expect(screen.getByTestId('muscle-activity-group-level')).toBeTruthy();
-    // Outlined on the figure: its muscles drawn with the outline's width.
+    expect(breakdownOrder()).toEqual(['quadriceps']);
+    expect(screen.getByTestId('muscle-activity-row-quadriceps').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('muscle-activity-filter')).toHaveTextContent('Showing Quadriceps');
+    expect(screen.getByTestId('muscle-activity-group-level')).toHaveTextContent(
+      /No recent training · 15\+ days/,
+    );
+    // On the figure, it stands out (in grey: not trained lately); the chest goes quiet.
+    expect(screen.getByTestId('muscle-activity-figure-layer-quadriceps')).toBeTruthy();
     expect(
-      screen.UNSAFE_root.findAll(
-        (candidate: Node) =>
-          typeof candidate.props.d === 'string' && candidate.props.strokeWidth === 1.4,
-      ).length,
-    ).toBeGreaterThan(0);
+      StyleSheet.flatten(screen.getByTestId('muscle-activity-figure-layer-chest').props.style)
+        .opacity,
+    ).toBe(0.3);
 
-    act(() => tappableMuscles()[0]!());
+    tapFigure(0.35, 0.55);
     expect(screen.queryByTestId('muscle-activity-group')).toBeNull();
     expect(breakdownOrder()).toHaveLength(6);
   });
