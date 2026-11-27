@@ -260,16 +260,30 @@ export function ExerciseBrowser({
     [onDeleteMine],
   );
 
-  // A-Z under a letter each. With a muscle chosen, only the exercises that are for it (their
-  // primary muscle group) -- never one that only works it secondarily.
-  const listSections = useMemo(
-    () =>
-      groupExercisesByLetter(shownRows).map((section) => ({
-        title: section.letter,
-        data: section.data,
-      })),
+  // A search's results (rows marked with their searchKind, best first): Best Matches, then
+  // Related Exercises -- the same movement or muscles, never mixed in with the matches.
+  const searched = useMemo(() => shownRows.some((row) => row.searchKind), [shownRows]);
+  const matchCount = useMemo(
+    () => shownRows.filter((row) => row.searchKind === 'match').length,
     [shownRows],
   );
+
+  // Otherwise A-Z under a letter each. With a muscle chosen, only the exercises that are for it
+  // (their primary muscle group) -- never one that only works it secondarily.
+  const listSections = useMemo(() => {
+    if (searched) {
+      const matches = shownRows.filter((row) => row.searchKind === 'match');
+      const related = shownRows.filter((row) => row.searchKind === 'related');
+      return [
+        ...(matches.length > 0 ? [{ title: SEARCH_SECTIONS.match, data: matches }] : []),
+        ...(related.length > 0 ? [{ title: SEARCH_SECTIONS.related, data: related }] : []),
+      ];
+    }
+    return groupExercisesByLetter(shownRows).map((section) => ({
+      title: section.letter,
+      data: section.data,
+    }));
+  }, [shownRows, searched]);
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: SectionListData<ExerciseRow, { title: string }> }) => (
@@ -490,7 +504,9 @@ export function ExerciseBrowser({
         ) : (
           <View style={styles.countSortRow}>
             <Text testID="exercise-library-count" style={styles.countText}>
-              {shownRows.length} {shownRows.length === 1 ? 'exercise' : 'exercises'}
+              {searched
+                ? searchCountText(matchCount, shownRows.length - matchCount)
+                : `${shownRows.length} ${shownRows.length === 1 ? 'exercise' : 'exercises'}`}
             </Text>
           </View>
         )}
@@ -600,6 +616,15 @@ function passes(
   }
   if (skip !== 'movement' && !matchesMovement(row, values.movement)) return false;
   return true;
+}
+
+/** A search's two sections. */
+const SEARCH_SECTIONS = { match: 'Best Matches', related: 'Related Exercises' } as const;
+
+/** "3 matches · 5 related", or "No matches · 5 related". */
+export function searchCountText(matches: number, related: number): string {
+  const found = matches === 0 ? 'No matches' : `${matches} ${matches === 1 ? 'match' : 'matches'}`;
+  return related > 0 ? `${found} · ${related} related` : found;
 }
 
 /** How many rows each choice of each filter would show, with the others as they are. */

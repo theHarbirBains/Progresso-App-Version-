@@ -2,14 +2,14 @@ import type { ExerciseResponse, SharedExerciseResponse, ShareSource } from '../l
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
-import { EQUIPMENT_LABELS, type Equipment } from './equipment';
+import type { Equipment } from './equipment';
 import { loadBuiltinExtras } from './builtinExtras';
+import { exerciseSearchKind, searchExercises, type SearchKind } from './search/exerciseSearch';
 // Plugs the built-in guides' Supabase reads into builtinExtras.ts.
 import './exerciseGuide';
 import type { LoadType, Pulley, PulleyPosition } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
-import { MOVEMENT_CATEGORY_LABELS, movementCategoryOf } from './movementCategories';
+import type { MuscleGroup } from './muscleGroups';
 
 // Reads go directly to Supabase (anon key + RLS), never through the
 // backend -- the existing exercises_select RLS policy already restricts
@@ -49,6 +49,11 @@ export interface ExerciseRow {
   secondaryMuscleGroups?: MuscleGroup[];
   /** Other names a built-in is found by ("Deadlift" for Barbell Deadlift). */
   searchAliases?: string[];
+  /**
+   * In a search's results (exercises/search): a match for what was typed, or an exercise related
+   * to it (the same movement or muscles, not the one searched for). Absent outside a search.
+   */
+  searchKind?: SearchKind;
   /** How a built-in moves (`exercises.movement_pattern`): its movement category comes from it. */
   movementPattern?: string | null;
   /**
@@ -283,63 +288,24 @@ function withBuiltinExtras(
   });
 }
 
-/** Lower case, letters and digits only, single-spaced: "Farmer's Bent-Over Carry" -> "farmers bent over carry". */
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-/** Shorthand people type for equipment. */
-const SHORTHAND: Record<string, string> = {
-  db: 'dumbbell',
-  bb: 'barbell',
-  kb: 'kettlebell',
-  ez: 'ez',
-  sm: 'smith',
-};
-
 /**
- * Whether an exercise matches what's typed: the text anywhere in its name (as always), or every
- * word typed starting a word of its name, one of its other names, its muscle group, its equipment,
- * what it's held by (its attachment and grip) or its movement category (Push, Hinge, ...), in any
- * order -- so "curl dumbbell" finds Dumbbell Curl, "db row" finds Dumbbell Bent-Over Row,
- * "v handle row" the V-handle cable rows, "chest cable" every cable chest exercise and "hinge
- * barbell" the barbell hinges.
+ * Whether a search finds an exercise -- as a match or as related (exercises/search): its name or
+ * other names exactly or as a phrase, every word typed in its name, other names or setup in any
+ * order (gym shorthand, synonyms and near misses included -- "db row", "lat pull down",
+ * "dumbell curl"), text anywhere in its name, or a search describing what it's for and done with
+ * ("chest cable", "hinge barbell", "rear delts").
  */
 export function matchesExerciseSearch(
   row: Pick<ExerciseRow, 'name' | 'searchAliases'> &
     Partial<
-      Pick<ExerciseRow, 'muscleGroup' | 'equipment' | 'attachment' | 'grip' | 'movementPattern'>
+      Pick<
+        ExerciseRow,
+        'muscleGroup' | 'equipment' | 'attachment' | 'grip' | 'movementPattern' | 'slug'
+      >
     >,
   search: string,
 ): boolean {
-  const query = normalize(search);
-  if (!query) return true;
-  const names = [row.name, ...(row.searchAliases ?? [])].map(normalize);
-  if (names.some((name) => name.includes(query))) return true;
-  const setup = [
-    row.muscleGroup ? MUSCLE_GROUP_LABELS[row.muscleGroup] : null,
-    row.equipment ? EQUIPMENT_LABELS[row.equipment] : null,
-    row.attachment,
-    row.grip,
-    categoryLabel(row.movementPattern),
-  ]
-    .filter((part): part is string => !!part)
-    .map(normalize);
-  const words = new Set([...names, ...setup].join(' ').split(' '));
-  return query.split(' ').every((token) => {
-    const wanted = SHORTHAND[token] ?? token;
-    for (const word of words) if (word.startsWith(wanted) || word.startsWith(token)) return true;
-    return false;
-  });
-}
-
-function categoryLabel(pattern: string | null | undefined): string | null {
-  const category = movementCategoryOf(pattern);
-  return category ? MOVEMENT_CATEGORY_LABELS[category] : null;
+  return exerciseSearchKind(row, search) !== null;
 }
 
 /**
@@ -351,11 +317,10 @@ export function invalidateExerciseCache(userId: string): void {
   fullExerciseListCache.delete(userId);
 }
 
-/** search/muscleGroup/source filtering, done in memory over an already-fetched list --
- * the same semantics buildExerciseQuery applies in SQL (a plain case-insensitive
- * substring match on name, since the cached list is never re-escaped-ilike'd). The list
- * is already sorted ascending by name, and `.filter` preserves that order, so only a
- * descending request needs any re-ordering. */
+/** muscleGroup/equipment/source filtering, done in memory over an already-fetched list (sorted
+ * ascending by name; `.filter` keeps that order). A search then ranks what's left
+ * (exercises/search): its matches best first, then the exercises related to it, each marked with
+ * its `searchKind`. */
 function filterExerciseRows(
   rows: ExerciseRow[],
   params: {
@@ -367,8 +332,7 @@ function filterExerciseRows(
   },
 ): ExerciseRow[] {
   const { userId, search, muscleGroup, source, equipment } = params;
-  return rows.filter((row) => {
-    if (!matchesExerciseSearch(row, search)) return false;
+  const filtered = rows.filter((row) => {
     // A muscle filter is the exercise's primary muscle group alone.
     if (muscleGroup && row.muscleGroup !== muscleGroup) return false;
     if (equipment && row.equipment !== equipment) return false;
@@ -376,6 +340,8 @@ function filterExerciseRows(
     if (source === 'mine' && row.createdBy !== userId) return false;
     return true;
   });
+  if (!search.trim()) return filtered;
+  return searchExercises(filtered, search).map(({ row, kind }) => ({ ...row, searchKind: kind }));
 }
 
 /**
@@ -397,7 +363,8 @@ export async function fetchAllExercises(params: FetchAllExercisesParams): Promis
     source,
     equipment,
   });
-  return ascending ? filtered : [...filtered].reverse();
+  // A search's results are in order of relevance; otherwise A-Z, or Z-A.
+  return ascending || search.trim() ? filtered : [...filtered].reverse();
 }
 
 /**

@@ -227,3 +227,36 @@ describe('ExerciseBrowser and the built-in library', () => {
     expect(screen.queryByText(/Also Works/)).toBeNull();
   });
 });
+
+describe('ExerciseBrowser and a search', () => {
+  it("shows a search's matches and related exercises under their own headings, matches first", () => {
+    renderBrowser({
+      searchInput: 'skull crusher',
+      rows: [
+        { ...rows[1], searchKind: 'match' },
+        { ...rows[0], searchKind: 'related' },
+      ],
+    });
+    expect(screen.getByTestId('exercise-library-section-Best Matches')).toBeTruthy();
+    expect(screen.getByTestId('exercise-library-section-Related Exercises')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-library-section-B')).toBeNull();
+    expect(screen.getByTestId('exercise-library-count')).toHaveTextContent('1 match · 1 related');
+  });
+
+  it('says when there are no matches, only related exercises', () => {
+    renderBrowser({
+      searchInput: 'zz',
+      rows: [{ ...rows[0], searchKind: 'related' }],
+    });
+    expect(screen.queryByTestId('exercise-library-section-Best Matches')).toBeNull();
+    expect(screen.getByTestId('exercise-library-count')).toHaveTextContent(
+      'No matches · 1 related',
+    );
+  });
+
+  it('lists A-Z as before with no search', () => {
+    renderBrowser();
+    expect(screen.getByTestId('exercise-library-section-B')).toBeTruthy();
+    expect(screen.getByTestId('exercise-library-count')).toHaveTextContent('4 exercises');
+  });
+});
