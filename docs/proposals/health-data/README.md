@@ -1,6 +1,7 @@
 # Health data architecture — Phase 2 proposal
 
-Status: **proposal, awaiting Harbir's approval.** Nothing here is built or migrated. Phase 1 (the UI
+Status: **proposal; Harbir's decisions taken (§7), awaiting his go-ahead to build Phase 2.**
+Nothing here is built or migrated. Phase 1 (the UI
 prototype, `apps/mobile/src/health/preview`) was approved on 2026-11-27. Phases 3 (Apple Health),
 4 (Oura), 5 (unified data), 6 (recovery and baselines) and 7 (polish) each need their own
 approval; this document only plans the data they will share.
@@ -185,6 +186,11 @@ Progresso app ◀── health_daily(from, to) (SQL, security invoker: own rows,
    new permission wording and the rewritten Privacy Policy.
 
 ## 7. Decisions for Harbir
+
+**Decided 2026-11-27:** store on our servers (1); Health in every membership (2); trainers never
+see a client's health data for now (3); 90 days of history on connect (4). Retention (5) as
+recommended unless he says otherwise.
+
 
 1. **Store health data on our servers (recommended)**, or keep Apple Health data on the phone only?
    Server storage is what makes Oura, more than one device, insights, baselines and a new phone
