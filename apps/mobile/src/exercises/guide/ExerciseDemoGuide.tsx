@@ -111,8 +111,9 @@ const FIGURE_HEIGHT = 230;
 const TABS_HEIGHT = 68;
 
 /**
- * The 3D Exercise Guide (Harbir's design, November 2026) -- for the exercises in
- * tools/exercise-guides/demos.json, the pilot first: its demonstration playing by itself, muted,
+ * The Exercise Guide (Harbir's design, November 2026) -- for the exercises in
+ * tools/exercise-guides/demos.json, the pilot first: its demonstration video (Harbir's licensed
+ * videos, once they're in) playing by itself, muted,
  * inline and round and round (Pause and, where it has a sound track, Sound in its corner), its
  * name over its variation, the muscles it targets and a line on what it is; then How To, Muscles
  * and Tips, which stay at the top as it scrolls and follow it. How To: Equipment & Details (the
@@ -120,8 +121,7 @@ const TABS_HEIGHT = 68;
  * it is, with its grip and setup pictures), Watch Full Demonstration, and Step-by-Step. Muscles:
  * the anatomy figure with its primary muscles in coral and its secondary ones in amber. Tips: Do
  * (its Key Tips) and Avoid (its common mistakes). Everything is the exercise's own guide, from the
- * catalogue; until its demonstration is rendered, its drawing stands where the video will be,
- * saying so.
+ * catalogue; until it has a video, its picture stands where the video will be.
  */
 export function ExerciseDemoGuide({
   guide,
@@ -406,9 +406,9 @@ export function ExerciseDemoGuide({
 }
 
 /**
- * The top of the guide: its demonstration, looping, with its length in a corner -- or, until it's
- * rendered, the exercise's movement as drawn (its 3D render's last frame, else its drawing's),
- * saying the demonstration is on its way.
+ * The top of the guide: its demonstration video, looping, with its length in a corner -- or, until
+ * it has one, the exercise's movement as the app already shows it (its rendered last frame, else
+ * its drawing's).
  */
 function Hero({
   guide,
@@ -484,13 +484,9 @@ function Hero({
       style={[styles.hero, styles.heroStill, { width, height }]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`${guide.name}. Its 3D demonstration is on its way.`}
+      accessibilityLabel={guide.name}
     >
       {art}
-      <View style={styles.comingBadge}>
-        <Feather name="video" size={12} color={colors.textSecondaryBright} />
-        <Text style={styles.comingText}>3D demonstration on its way</Text>
-      </View>
     </View>
   );
 }
@@ -800,22 +796,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.glassBorder,
-  },
-  comingBadge: {
-    position: 'absolute',
-    left: spacing.sm,
-    bottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: withAlpha(colors.background, 0.7),
-  },
-  comingText: {
-    ...typeScale.caption,
-    color: colors.textSecondaryBright,
   },
   duration: {
     position: 'absolute',

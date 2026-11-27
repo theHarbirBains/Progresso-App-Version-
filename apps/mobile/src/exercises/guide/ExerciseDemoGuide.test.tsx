@@ -118,8 +118,8 @@ describe('ExerciseDemoGuide', () => {
     expect(screen.getByTestId('exercise-guide-fact-handles')).toHaveTextContent(
       /HandlesUpper handles/,
     );
-    // The machine as this exercise uses it, and its grip and setup pictures (Technique & Setup).
-    expect(screen.getByTestId('exercise-guide-equipment-picture')).toBeTruthy();
+    // No machine picture until one is added; its grip and setup pictures (Technique & Setup).
+    expect(screen.queryByTestId('exercise-guide-equipment-picture')).toBeNull();
     expect(screen.getByTestId('exercise-guide-setup-1')).toHaveTextContent(/Overhand Grip/);
 
     expect(screen.getByTestId('exercise-guide-step-1')).toHaveTextContent(/Set Up/);
@@ -145,11 +145,9 @@ describe('ExerciseDemoGuide', () => {
     );
   });
 
-  it('shows the drawing, saying so, until the demonstration is rendered', () => {
+  it('shows the exercise as drawn until it has a video', () => {
     render(<ExerciseDemoGuide guide={pilot} demo={unrendered} accent="#D99A50" />);
-    expect(screen.getByTestId('exercise-guide-hero-still')).toHaveTextContent(
-      /3D demonstration on its way/,
-    );
+    expect(screen.getByTestId('exercise-guide-hero-still')).toBeTruthy();
     expect(createVideoPlayer).not.toHaveBeenCalled();
     expect(screen.queryByTestId('exercise-guide-full-demo')).toBeNull();
   });
@@ -229,7 +227,7 @@ describe('ExerciseDemoGuide', () => {
   });
 });
 
-describe('ExerciseGuideSheet with the 3D Exercise Guide', () => {
+describe('ExerciseGuideSheet with the Exercise Guide', () => {
   beforeEach(() => {
     forgetBuiltinExtras();
     setBuiltinSources({

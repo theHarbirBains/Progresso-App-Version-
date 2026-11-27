@@ -148,7 +148,7 @@ export function ExerciseGuideSheet({
 }: Props) {
   const state = useExerciseGuide(exerciseId, visible);
   const { slug, cards } = useGuideCards(exerciseId, state.guide);
-  // An exercise in the 3D Exercise Guide: its header names the guide, then the exercise once its
+  // An exercise in the Exercise Guide: its header names the guide, then the exercise once its
   // name has scrolled away.
   const demo = slug ? EXERCISE_DEMOS[slug] : undefined;
   const [nameAway, setNameAway] = useState(false);
@@ -225,7 +225,7 @@ export function ExerciseGuideBody({
   exerciseId: string;
   exerciseName: string;
   state: ReturnType<typeof useExerciseGuide>;
-  /** The 3D Exercise Guide's: told when its name scrolls out of view and back. */
+  /** The Exercise Guide's: told when its name scrolls out of view and back. */
   onNameScrolledAway?: (away: boolean) => void;
   testID?: string;
 }) {
@@ -244,7 +244,7 @@ export function ExerciseGuideBody({
     cards && slug ? cardLabels(slug, shown?.name ?? exerciseName, shown?.commonMistakes ?? []) : [];
   const demo = slug ? EXERCISE_DEMOS[slug] : undefined;
 
-  // An exercise in the 3D Exercise Guide (tools/exercise-guides/demos.json) shows that, once read.
+  // An exercise in the Exercise Guide (tools/exercise-guides/demos.json) shows that, once read.
   if (demo && shown && !error) {
     return (
       <ExerciseDemoGuide
@@ -766,7 +766,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     color: colors.textSecondaryBright,
   },
-  // The 3D Exercise Guide's header: its title, as a screen's.
+  // The Exercise Guide's header: its title, as a screen's.
   guideHeaderText: {
     ...typeScale.cardTitle,
     flex: 1,
