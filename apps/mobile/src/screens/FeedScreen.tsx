@@ -712,7 +712,7 @@ export function FeedScreen({ navigation }: Props) {
             aside={
               <DailyStepsWidget
                 steps={steps}
-                onOpen={() => goToSection(navigation, 'ProgressOverview', { section: 'Steps' })}
+                onOpen={() => goToSection(navigation, 'ProgressOverview', { section: 'Health' })}
               />
             }
           />

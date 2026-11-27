@@ -22,6 +22,7 @@ import {
 } from './healthParts';
 import { stageColors } from './HealthOverview';
 import { setPreviewSetup, type HealthPage } from './healthPreview';
+import { StepsSection } from '../../progress/StepsSection';
 import {
   ACTIVITY,
   anyDevice,
@@ -399,31 +400,15 @@ export function ActivityPage({ setup, accent, open }: PageProps) {
     );
   }
   const wearable = hasWearable(setup);
-  const hourLabels = ACTIVITY.hourly.map((_, i) =>
-    i === 0 ? '6a' : i === 6 ? '12p' : i === 12 ? '6p' : i === 16 ? '10p' : '',
-  );
-  const weekTotal = ACTIVITY.week.reduce((sum, day) => sum + day.steps, 0);
   return (
     <>
-      <AppCard hero testID="health-activity-hero">
-        <View style={styles.block}>
-          <Text style={styles.kicker}>TODAY</Text>
-          <Text style={styles.bigValue}>
-            {ACTIVITY.steps}
-            <Text style={styles.bigUnit}> steps</Text>
-          </Text>
-          <Columns
-            values={ACTIVITY.hourly}
-            labels={hourLabels}
-            height={64}
-            color={accent}
-            gap={3}
-          />
-          <SourceTag source={sourceOf('steps', setup)} />
-        </View>
+      {/* Steps are real: Apple Health's, on this phone -- what a release build's Health tab is. */}
+      <AppCard testID="health-activity-steps">
+        <StepsSection accentColor={accent} embedded />
       </AppCard>
 
       <Block accent={accent} testID="health-activity-today">
+        <SampleNote />
         <View style={styles.stats}>
           {wearable ? (
             <>
@@ -436,22 +421,6 @@ export function ActivityPage({ setup, accent, open }: PageProps) {
         {wearable ? (
           <Note>Active calories count all of today’s movement, not just workouts.</Note>
         ) : null}
-      </Block>
-
-      <Block title="This week" accent={accent}>
-        <Columns
-          values={ACTIVITY.week.map((day) => day.steps)}
-          labels={ACTIVITY.week.map((day) => day.day)}
-          highlight={ACTIVITY.week.length - 1}
-          height={80}
-          color={accent}
-          gap={8}
-        />
-        <View style={styles.stats}>
-          <StatBlock value={weekTotal.toLocaleString('en-US')} label="Steps" />
-          <StatBlock value={Math.round(weekTotal / 7).toLocaleString('en-US')} label="Daily Avg" />
-          {wearable ? <StatBlock value="4h 12m" label="Exercise" /> : null}
-        </View>
       </Block>
     </>
   );

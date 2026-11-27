@@ -325,7 +325,7 @@ describe('ProgressOverviewScreen shell', () => {
     });
   });
 
-  it('lists its sections (Overview, Top Sets, Muscles, Cardio, Steps), opening on Muscles', async () => {
+  it('lists its sections (Overview, Top Sets, Muscles, Cardio, Health), opening on Muscles', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     route = {} as never;
     renderScreen();
@@ -337,10 +337,11 @@ describe('ProgressOverviewScreen shell', () => {
     });
     route = OVERVIEW;
 
-    for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Muscles', 'Cardio', 'Health']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
-    // All Time and Nutrition are Overview's views, not sections of their own.
+    // All Time and Nutrition are Overview's views, and steps are Health's -- not tabs of their own.
+    expect(screen.queryByTestId('progress-tabs-Steps')).toBeNull();
     expect(screen.queryByTestId('progress-tabs-AllTime')).toBeNull();
     expect(screen.queryByTestId('progress-tabs-Nutrition')).toBeNull();
     for (const removed of ['Strength', 'PRs', 'Exercises', 'OneRepMax']) {
@@ -553,7 +554,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('puts the active section in its own widget, on every tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'Health']) {
       goToSection(section);
       expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
       expect(screen.getByTestId('progress-section-card')).toBeTruthy();
@@ -569,7 +570,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('renders no bare text outside <Text> on any tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'Health']) {
       goToSection(section);
       expectNoBareText();
     }
@@ -672,26 +673,42 @@ describe('ProgressOverviewScreen -- steps', () => {
     expect(queryStatisticsForQuantity).not.toHaveBeenCalled();
   });
 
-  it('opens on the Steps tab when asked (from Feed)', async () => {
+  it('opens on Health, where steps are, when asked (from Feed)', async () => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(true);
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
-    route = { params: { section: 'Steps' } } as never;
+    route = { params: { section: 'Health' } } as never;
     renderScreen();
 
-    expect(await screen.findByTestId('progress-steps')).toBeTruthy();
-    expect(screen.getByTestId('progress-tabs-Steps').props.accessibilityState).toMatchObject({
+    // A development build: the Health prototype, its steps from Apple Health.
+    expect(await screen.findByTestId('health-overview')).toBeTruthy();
+    expect(await screen.findByTestId('health-activity-source')).toHaveTextContent(
+      'Connect Apple Health',
+    );
+    expect(screen.getByTestId('progress-tabs-Health').props.accessibilityState).toMatchObject({
       selected: true,
     });
   });
 
-  it('opens on Overview when asked for Steps off iPhone', async () => {
+  it('opens Health when asked for Steps, as older links do', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    route = { params: { section: 'Steps' } } as never;
+    renderScreen();
+
+    expect(await screen.findByTestId('health-overview')).toBeTruthy();
+    expect(screen.getByTestId('progress-tabs-Health').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+  });
+
+  it('says Apple Health isn’t available when asked for steps off iPhone', async () => {
     const os = Platform.OS;
     Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
     route = { params: { section: 'Steps' } } as never;
     try {
       renderScreen();
-      expect(await screen.findByTestId('progress-section-card')).toBeTruthy();
-      expect(screen.queryByTestId('progress-steps')).toBeNull();
+      expect(await screen.findByTestId('health-activity-source')).toHaveTextContent(
+        'Apple Health isn’t available here',
+      );
     } finally {
       Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
     }

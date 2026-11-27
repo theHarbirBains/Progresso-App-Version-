@@ -8,8 +8,8 @@ import { withAlpha } from '../../theme/accentColor';
 import { Columns, Ring, StackedBar } from './healthCharts';
 import { BlockTitle, InsightRow, MetricTile, SampleNote, Tile } from './healthParts';
 import { setPreviewSetup, usePreviewSetup, type HealthPage } from './healthPreview';
+import { useRealSteps } from './realSteps';
 import {
-  ACTIVITY,
   anyDevice,
   DEVICE_ORDER,
   DEVICES,
@@ -82,6 +82,7 @@ export function HealthOverview({
   const stages = stageColors(accent);
   const insights = insightsFor(setup).slice(0, 2);
   const readiness = Math.max(40, READINESS.score - dayOffset * 4);
+  const steps = useRealSteps();
 
   return (
     <ScrollView
@@ -94,7 +95,7 @@ export function HealthOverview({
       {/* The prototype's own controls: which devices it pretends this person has. */}
       <View style={styles.previewBar}>
         <View style={styles.previewHead}>
-          <SampleNote testID="health-sample-note" />
+          <SampleNote testID="health-sample-note" exceptSteps />
           <Pressable
             testID="health-preview-onboarding"
             onPress={() => onOpen('setup', undefined, true)}
@@ -258,23 +259,36 @@ export function HealthOverview({
               <Text style={styles.caption}>In bed {SLEEP.inBed}</Text>
             </Tile>
           ) : null}
+          {/* Steps are real: Apple Health's, on this phone. */}
           <Tile
             testID="health-activity"
             onPress={() => open('activity')}
             style={styles.half}
-            accessibilityLabel={`Activity, ${ACTIVITY.steps} steps`}
+            accessibilityLabel={
+              steps.today === null
+                ? `Activity, steps: ${steps.note}`
+                : `Activity, ${steps.today.toLocaleString('en-US')} steps today, from Apple Health`
+            }
           >
             <View style={styles.tileHead}>
               <Feather name="trending-up" size={14} color={accent} />
               <Text style={styles.tileName}>Activity</Text>
             </View>
-            <Text style={styles.tileValue}>
-              {ACTIVITY.steps}
+            <Text testID="health-activity-steps" style={styles.tileValue}>
+              {steps.today === null ? '—' : steps.today.toLocaleString('en-US')}
               <Text style={styles.tileUnit}> steps</Text>
             </Text>
-            <Columns values={ACTIVITY.hourly} height={22} color={accent} gap={2} />
-            <Text style={styles.caption}>
-              {wearable ? `${ACTIVITY.activeCalories} active cal` : ACTIVITY.distance}
+            {steps.week ? (
+              <Columns
+                values={steps.week}
+                highlight={steps.week.length - 1}
+                height={22}
+                color={accent}
+                gap={2}
+              />
+            ) : null}
+            <Text testID="health-activity-source" style={styles.caption}>
+              {steps.note}
             </Text>
           </Tile>
         </View>

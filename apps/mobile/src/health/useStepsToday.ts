@@ -10,7 +10,7 @@ export interface StepsToday {
   access: StepsAccess | null;
   /** Today's count once asked, else null. */
   steps: number | null;
-  /** The average of the 7 days before today, as the Steps tab works it out -- what Feed's
+  /** The average of the 7 days before today, as the Health tab works it out -- what Feed's
    * Daily Steps widget's bar measures today against (there's no step goal). Null until read, or
    * when it couldn't be. */
   average: number | null;

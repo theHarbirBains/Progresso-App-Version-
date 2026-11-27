@@ -1333,7 +1333,7 @@ describe('FeedScreen -- Daily Steps', () => {
     expectNoBareText();
   });
 
-  it("opens Progress's Steps tab when tapped, as a section", async () => {
+  it("opens Progress's Health tab, where steps are, when tapped -- as a section", async () => {
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
     renderScreen();
 
@@ -1341,7 +1341,10 @@ describe('FeedScreen -- Daily Steps', () => {
     expect(navigation.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'RESET',
-        payload: { index: 0, routes: [{ name: 'ProgressOverview', params: { section: 'Steps' } }] },
+        payload: {
+          index: 0,
+          routes: [{ name: 'ProgressOverview', params: { section: 'Health' } }],
+        },
       }),
     );
   });
@@ -1367,7 +1370,7 @@ describe('FeedScreen -- Daily Steps', () => {
     renderScreen();
 
     expect(await screen.findByTestId('feed-daily-steps-connect')).toHaveTextContent('Connect');
-    // Never asked from here: the Steps tab explains first, then connects.
+    // Never asked from here: the Health tab explains first, then connects.
     fireEvent.press(screen.getByTestId('feed-daily-steps'));
     expect(requestAuthorization).not.toHaveBeenCalled();
     expect(navigation.dispatch).toHaveBeenCalled();

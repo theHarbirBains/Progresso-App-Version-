@@ -15,6 +15,8 @@ import { weekLabel } from './WeeklySummaryBlock';
 interface Props {
   accentColor: string;
   now?: () => Date;
+  /** Inside another page's scroll (the Health prototype's Activity page): no scroll of its own. */
+  embedded?: boolean;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -33,13 +35,13 @@ function share(value: number, most: number): number {
 }
 
 /**
- * Progress's Steps tab (iPhone only): steps from Apple Health -- today, this week and the 7-day
+ * Progress's Health tab's steps (iPhone only): from Apple Health -- today, this week and the 7-day
  * average as figures, then the last 7 days and the last 4 weeks (Monday to Sunday) as rows with
  * bars of the way to the most in the list. No line graph, no goal and no judgement: the figures
  * say what happened. Read on the phone each time the tab opens and kept nowhere. Until Progresso
  * has asked, it offers to connect Apple Health, as Feed's Steps card does.
  */
-export function StepsSection({ accentColor, now = () => new Date() }: Props) {
+export function StepsSection({ accentColor, now = () => new Date(), embedded = false }: Props) {
   const today = now();
   const { access, days, connecting, failure, connect } = useStepsHistory(
     stepsDaysToRead(today),
@@ -104,14 +106,8 @@ export function StepsSection({ accentColor, now = () => new Date() }: Props) {
   const mostInAWeek = Math.max(...history.weeks.map((week) => week.total));
   const nothing = days.every((day) => day.steps === 0);
 
-  return (
-    <ScrollView
-      keyboardDismissMode="on-drag"
-      testID="progress-steps"
-      style={progressStyles.sectionFill}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+  const body = (
+    <>
       <ProgressCardHeader title="Steps" subtitle="From Apple Health, on this phone" />
       <View style={styles.figures}>
         <StatBlock
@@ -185,6 +181,19 @@ export function StepsSection({ accentColor, now = () => new Date() }: Props) {
           );
         })}
       </View>
+    </>
+  );
+  return embedded ? (
+    <View testID="progress-steps">{body}</View>
+  ) : (
+    <ScrollView
+      keyboardDismissMode="on-drag"
+      testID="progress-steps"
+      style={progressStyles.sectionFill}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {body}
     </ScrollView>
   );
 }

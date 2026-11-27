@@ -7,7 +7,6 @@ import { SkeletonCards } from '../design/Skeleton';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { UnderlineTabs } from '../design/UnderlineTabs';
-import { HealthOverview } from '../health/preview/HealthOverview';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { RiseIn, RiseInGroup } from '../design/RiseIn';
@@ -25,7 +24,7 @@ import { ProgressHeader } from '../progress/ProgressHeader';
 import { ownProgressSections, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
-import { StepsSection } from '../progress/StepsSection';
+import { HealthSection } from '../progress/HealthSection';
 import { CardioProgressSection } from '../progress/CardioProgressSection';
 import { MuscleActivitySection } from '../progress/MuscleActivitySection';
 import { TopSetsSection } from '../progress/TopSetsSection';
@@ -96,11 +95,12 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
   const loading = statsLoading || prsLoading;
   const error = statsError ?? prsError;
 
-  // Opened on the section asked for (Feed's Daily Steps widget asks for Steps), else the Muscles
-  // heat map (Harbir's call) -- only one this person has (no Steps off iPhone).
-  // All Time is part of Overview now: asked for, it's Overview on All Time.
+  // Opened on the section asked for (Feed's Daily Steps widget asks for Health), else the Muscles
+  // heat map (Harbir's call) -- only one this person has (no Health off iPhone in a release).
+  // All Time is part of Overview now, and steps are Health's: asked for, they open there.
   const askedFor = route?.params?.section;
-  const asked: ProgressSection | undefined = askedFor === 'AllTime' ? 'Overview' : askedFor;
+  const asked: ProgressSection | undefined =
+    askedFor === 'AllTime' ? 'Overview' : askedFor === 'Steps' ? 'Health' : askedFor;
   const offered = (section: ProgressSection | undefined) =>
     section !== undefined && ownProgressSections().some((s) => s.key === section);
   const [activeSection, setActiveSection] = useState<ProgressSection>(
@@ -295,14 +295,10 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
               />
             ) : null}
 
-            {/* Steps: the phone's own, from Apple Health -- read as the tab opens. */}
-            {contentReady && activeSection === 'Steps' ? (
-              <StepsSection accentColor={theme.accent} />
-            ) : null}
-
-            {/* Health: a Phase 1 prototype, sample data, development builds only. */}
+            {/* Health: steps, its real part, from Apple Health -- read as the tab opens -- and, in
+            a development build, the Health prototype around them (HealthSection). */}
             {contentReady && activeSection === 'Health' ? (
-              <HealthOverview
+              <HealthSection
                 accent={theme.accent}
                 onOpen={(page, metric, onboarding) =>
                   navigation.navigate('HealthPreview', { page, metric, onboarding })

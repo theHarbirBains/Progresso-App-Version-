@@ -1,7 +1,7 @@
 import type { DaySteps } from '../health/steps';
 import { weekRange } from './weeklySummary';
 
-// What Progress's Steps tab shows, worked out from Apple Health's daily counts (read on the
+// What Progress's Health tab shows of steps, worked out from Apple Health's daily counts (read on the
 // phone, kept nowhere): today, the 7 days before it, and the last 4 weeks, Monday to Sunday like
 // the Weekly Summary. A day Apple Health has nothing for is a 0, never skipped.
 

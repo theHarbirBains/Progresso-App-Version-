@@ -366,23 +366,14 @@ export const SLEEP = {
   consistency: 'Within 25 min of your usual bedtime on 6 of 7 nights',
 };
 
-/** Sample activity today, and the last 7 days. */
+/**
+ * Sample activity beyond steps -- distance, and what a watch adds. Steps themselves are never
+ * sample: they're Apple Health's (realSteps.ts).
+ */
 export const ACTIVITY = {
-  steps: '8,412',
   distance: '6.1 km',
   activeCalories: '486',
   exerciseMinutes: '42',
-  /** Steps in each hour, 6 AM to 10 PM. */
-  hourly: [80, 420, 910, 380, 210, 640, 1120, 300, 260, 410, 980, 1420, 380, 260, 220, 170, 90],
-  week: [
-    { day: 'F', steps: 9120 },
-    { day: 'S', steps: 11840 },
-    { day: 'S', steps: 6230 },
-    { day: 'M', steps: 7410 },
-    { day: 'T', steps: 8960 },
-    { day: 'W', steps: 7050 },
-    { day: 'T', steps: 8412 },
-  ],
 };
 
 /**

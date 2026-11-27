@@ -9,7 +9,7 @@ import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   steps: StepsToday;
-  /** Opens Progress's Steps tab: today, the week and the last four weeks. */
+  /** Opens Progress's Health tab: today's steps, the week and the last four weeks. */
   onOpen: () => void;
 }
 
@@ -21,7 +21,7 @@ const MAX_WIDTH = 136;
  * Today's steps, from Apple Health, as a small widget beside Feed's greeting (iPhone only): the
  * count in the mono face, then a thin bar of today against the 7-day average with that average
  * under it -- there's no step goal, so the bar never says "short". Until Progresso has asked it
- * says Connect; when Apple Health can't be reached it says so. A tap always opens the Steps tab,
+ * says Connect; when Apple Health can't be reached it says so. A tap always opens the Health tab,
  * which connects, explains and shows the rest. Nothing at all off iPhone.
  */
 export function DailyStepsWidget({ steps, onOpen }: Props) {

@@ -17,7 +17,7 @@ export interface StepsHistoryRead {
 }
 
 /**
- * The last `count` days' steps for Progress's Steps tab, read from Apple Health on the phone when
+ * The last `count` days' steps for Progress's Health tab, read from Apple Health on the phone when
  * the tab opens and whenever the app comes back to the front -- a local read, so nothing is cached
  * or stored. Today's count is handed to the Steps widget as it's read, as Feed's is.
  */

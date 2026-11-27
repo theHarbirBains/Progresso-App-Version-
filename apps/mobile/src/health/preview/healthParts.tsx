@@ -17,12 +17,17 @@ import {
 
 type FeatherName = ComponentProps<typeof Feather>['name'];
 
-/** "Sample data" -- on every page of the prototype, so nothing reads as real. */
-export function SampleNote({ testID }: { testID?: string }) {
+/**
+ * "Sample data" -- on the prototype's pages, so nothing sample reads as real. Where the real steps
+ * show beside it, it says so.
+ */
+export function SampleNote({ testID, exceptSteps }: { testID?: string; exceptSteps?: boolean }) {
   return (
     <View testID={testID} style={styles.sample}>
       <Feather name="eye" size={12} color={colors.textMuted} />
-      <Text style={styles.sampleText}>Preview · sample data</Text>
+      <Text style={styles.sampleText}>
+        {exceptSteps ? 'Preview · sample data, except your steps' : 'Preview · sample data'}
+      </Text>
     </View>
   );
 }

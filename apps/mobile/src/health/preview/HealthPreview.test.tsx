@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  getRequestStatusForAuthorization,
+  isHealthDataAvailable,
+  queryStatisticsCollectionForQuantity,
+} from '@kingstinct/react-native-healthkit';
+import { Platform } from 'react-native';
 import { CLIENT_PROGRESS_SECTIONS, ownProgressSections } from '../../progress/progressSections';
 import { HealthPreviewScreen } from '../../screens/HealthPreviewScreen';
 import { heartHighlights, HealthOverview, setupNames } from './HealthOverview';
@@ -42,16 +48,25 @@ function renderPage(page: HealthPage, metric?: MetricKey, onboarding?: boolean) 
 afterEach(() => use(setups.watch));
 
 describe('the Health prototype is never real, and never in a release', () => {
-  it('shows the Health tab only in development builds, and never on a trainer’s view', () => {
-    expect(ownProgressSections(true).map((s) => s.key)).toContain('Health');
-    expect(ownProgressSections(false).map((s) => s.key)).not.toContain('Health');
+  it('shows Health (the steps) on iPhone, off it only in development builds, never on a trainer’s view', () => {
+    expect(ownProgressSections(false).map((s) => s.key)).toContain('Health');
+    const os = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
+    try {
+      expect(ownProgressSections(false).map((s) => s.key)).not.toContain('Health');
+      expect(ownProgressSections(true).map((s) => s.key)).toContain('Health');
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+    }
     expect(CLIENT_PROGRESS_SECTIONS.map((s) => s.key)).not.toContain('Health');
   });
 
   it('says it is sample data, and never makes a readiness score of its own', () => {
     use(setups.watch);
     render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
-    expect(screen.getByTestId('health-sample-note')).toHaveTextContent(/sample data/);
+    expect(screen.getByTestId('health-sample-note')).toHaveTextContent(
+      /sample data, except your steps/,
+    );
     // A watch alone: the signals, no score.
     expect(screen.queryByTestId('health-readiness')).toBeNull();
     expect(screen.getByTestId('health-recovery-signals')).toBeTruthy();
@@ -80,7 +95,7 @@ describe('Health, made for each person’s devices', () => {
   it('with just an iPhone: steps, and a watch or ring offered -- no sleep or heart', () => {
     use(setups.phone);
     render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
-    expect(screen.getByTestId('health-activity')).toHaveTextContent(/8,412/);
+    expect(screen.getByTestId('health-activity')).toBeTruthy();
     expect(screen.queryByTestId('health-sleep')).toBeNull();
     expect(screen.queryByTestId('health-heart-restingHr')).toBeNull();
     expect(screen.getByTestId('health-add-wearable')).toBeTruthy();
@@ -111,6 +126,69 @@ describe('Health, made for each person’s devices', () => {
     expect(screen.queryByTestId('health-sleep')).toBeNull();
     fireEvent.press(screen.getByTestId('health-preview-device-oura'));
     expect(screen.getByTestId('health-sleep')).toBeTruthy();
+  });
+});
+
+describe('steps are real -- Apple Health’s, never sample', () => {
+  const day = (daysAgo: number, quantity: number) => {
+    const now = new Date();
+    return {
+      startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo),
+      sumQuantity: { unit: 'count', quantity },
+    };
+  };
+
+  afterEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+    jest.mocked(queryStatisticsCollectionForQuantity).mockResolvedValue([] as never);
+  });
+
+  it('shows today’s count from Apple Health on the Activity tile', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest
+      .mocked(queryStatisticsCollectionForQuantity)
+      .mockResolvedValue([day(1, 9000), day(0, 5321)] as never);
+    use(setups.phone);
+    render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('health-activity-steps')).toHaveTextContent('5,321 steps'),
+    );
+    expect(screen.getByTestId('health-activity-source')).toHaveTextContent('From Apple Health');
+  });
+
+  it('shows no count -- never a 0 -- until Apple Health is connected, and says so', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('health-activity-source')).toHaveTextContent(
+        'Connect Apple Health',
+      ),
+    );
+    expect(screen.getByTestId('health-activity-steps')).toHaveTextContent('— steps');
+  });
+
+  it('says where Apple Health isn’t available', async () => {
+    render(<HealthOverview accent={ACCENT} onOpen={jest.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('health-activity-source')).toHaveTextContent(
+        'Apple Health isn’t available here',
+      ),
+    );
+  });
+
+  it('opens Activity on the real steps -- the same as a release build’s Health tab -- then the sample extras', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(2);
+    jest.mocked(queryStatisticsCollectionForQuantity).mockResolvedValue([day(0, 5321)] as never);
+    use(setups.watch);
+    renderPage('activity');
+
+    expect(await screen.findByTestId('progress-steps-today')).toHaveTextContent(/5,321/);
+    expect(screen.getByTestId('health-activity-today')).toHaveTextContent(/sample data/);
   });
 });
 

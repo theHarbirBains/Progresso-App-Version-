@@ -30,7 +30,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - The landing screen: your own completed workouts and logged foods as activity cards, and a Friends tab with the people you follow
 - Your next workout in the active split, a card for a workout that's in progress, and a "+" shortcut to Start Workout or Log Food
 - The Workouts tab leads with the same Next Workout, started in one tap with that day's plan, or a way to choose a split when there isn't one
-- On iPhone, today's steps from Apple Health in a small Daily Steps widget beside the greeting -- with a bar of today against your 7-day average -- opening Progress's Steps tab, where you connect it. Progresso only reads the step count; it stays on your phone and is never sent to Progresso's servers
+- On iPhone, today's steps from Apple Health in a small Daily Steps widget beside the greeting -- with a bar of today against your 7-day average -- opening Progress's Health tab, where you connect it. Progresso only reads the step count; it stays on your phone and is never sent to Progresso's servers
 
 **Home Screen widgets (iPhone)**
 
@@ -101,7 +101,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
 - Feedback & Suggestions (Support & About): send a bug report, feature request, usability issue or general feedback, with an optional screenshot and the app version and platform it came from, then see each one's status as it's looked at. Support and full admins get a Feedback Inbox (Settings › Admin) to filter, search, move each on and keep internal notes, every change recorded
 - Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")
-- Apple Health is connected from onboarding or from Progress's Steps tab -- Feed's Daily Steps widget opens it (iPhone only), not from Settings; it's turned off in the Health app
+- Apple Health is connected from onboarding or from Progress's Health tab -- Feed's Daily Steps widget opens it (iPhone only), not from Settings; it's turned off in the Health app
 
 **Social**
 
