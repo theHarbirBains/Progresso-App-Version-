@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase';
-import { fetchAllCompletedWorkouts, fetchWorkoutIdForSet } from './progressStatsQueries';
+import {
+  fetchAllCompletedWorkouts,
+  fetchWorkoutCardioTimes,
+  fetchWorkoutIdForSet,
+} from './progressStatsQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -11,7 +15,7 @@ interface Result {
 }
 
 function createQueryBuilder(result: Result) {
-  const methods = ['select', 'eq', 'is', 'not', 'order', 'range', 'maybeSingle'] as const;
+  const methods = ['select', 'eq', 'in', 'is', 'not', 'order', 'range', 'maybeSingle'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     builder[m] = jest.fn(() => builder);
@@ -84,5 +88,62 @@ describe('fetchWorkoutIdForSet', () => {
     mockFrom.mockReturnValue(createQueryBuilder({ data: null, error: { message: 'boom' } }));
 
     await expect(fetchWorkoutIdForSet('set-1')).rejects.toThrow('boom');
+  });
+});
+
+describe('fetchWorkoutCardioTimes', () => {
+  it("gives each workout with cardio its activities' times and its sets' -- warm-ups for time only", async () => {
+    mockFrom.mockImplementation((table: string) =>
+      createQueryBuilder(
+        table === 'workout_cardio'
+          ? {
+              data: [
+                { id: 'c1', workout_id: 'w1', duration_seconds: 1500 },
+                { id: 'c2', workout_id: 'w1', duration_seconds: 600 },
+                { id: 'c3', workout_id: 'run', duration_seconds: 1800 },
+              ],
+              error: null,
+            }
+          : table === 'workout_exercises'
+            ? { data: [{ id: 'we1', workout_id: 'w1' }], error: null }
+            : {
+                data: [
+                  {
+                    id: 's1',
+                    workout_exercise_id: 'we1',
+                    completed_at: '2026-01-01T10:05:00Z',
+                    is_warmup: true,
+                  },
+                  {
+                    id: 's2',
+                    workout_exercise_id: 'we1',
+                    completed_at: '2026-01-01T10:09:00Z',
+                    is_warmup: false,
+                  },
+                ],
+                error: null,
+              },
+      ),
+    );
+
+    const times = await fetchWorkoutCardioTimes('user-1');
+
+    expect(times.get('w1')).toEqual({
+      cardio: [{ durationSeconds: 1500 }, { durationSeconds: 600 }],
+      setTimes: ['2026-01-01T10:05:00Z', '2026-01-01T10:09:00Z'],
+      hasStrength: true,
+    });
+    // Cardio alone: no sets, no strength.
+    expect(times.get('run')).toEqual({
+      cardio: [{ durationSeconds: 1800 }],
+      setTimes: [],
+      hasStrength: false,
+    });
+  });
+
+  it('reads nothing more for someone with no cardio', async () => {
+    mockFrom.mockReturnValue(createQueryBuilder({ data: [], error: null }));
+    expect((await fetchWorkoutCardioTimes('user-1')).size).toBe(0);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 });

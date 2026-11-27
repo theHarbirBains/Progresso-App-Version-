@@ -19,7 +19,7 @@ export interface WorkoutTimeInput {
   /**
    * When each of its finished sets was finished, warm-ups and drops too: how long the lifting
    * took. Sets logged after the fact share one time, so they measure nothing -- the cardio then
-   * fits in the workout's time as far as it can.
+   * is within the workout's time if it fits in it, and on top of it if it's as long or longer.
    */
   setTimes?: readonly string[];
   cardio: { durationSeconds: number }[];
@@ -87,7 +87,15 @@ export function workoutTimes(input: WorkoutTimeInput, now?: Date): WorkoutTimes 
   // The cardio done within the workout's own time: as much as there's room for beside the
   // lifting. The rest was done outside it, and adds to the total.
   const lifting = Math.min(span, liftingSeconds(input.setTimes ?? []));
-  const within = Math.min(cardioSeconds, span - lifting);
+  const within =
+    lifting > 0
+      ? Math.min(cardioSeconds, span - lifting)
+      : // No lifting measured (sets logged after the fact share one time): cardio that fits in the
+        // time typed was done within it; cardio as long as the whole of it or longer can't have
+        // been, with lifting in it too -- it was done outside it, and adds to it.
+        cardioSeconds < span
+        ? cardioSeconds
+        : 0;
   return {
     totalSeconds: span + (cardioSeconds - within),
     strengthSeconds: span - within,

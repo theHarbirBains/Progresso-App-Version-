@@ -648,7 +648,8 @@ describe("totalMinutes -- the app's rule (cardio/workoutTime.ts)", () => {
         cardio: treadmill(25),
       }),
     ).toBe(60);
-    // Sets logged after the fact share one time: the cardio fits in the time as far as it can.
+    // Sets logged after the fact share one time: cardio that fits in the time typed is within it,
+    // cardio as long or longer on top of it.
     expect(
       totalMinutes({
         performedAt: start,
@@ -657,7 +658,16 @@ describe("totalMinutes -- the app's rule (cardio/workoutTime.ts)", () => {
         setTimes: [start, start],
         cardio: treadmill(30),
       }),
-    ).toBe(30);
+    ).toBe(50);
+    expect(
+      totalMinutes({
+        performedAt: start,
+        completedAt: at(60),
+        hasStrength: true,
+        setTimes: [start, start],
+        cardio: treadmill(25),
+      }),
+    ).toBe(60);
     expect(liftingSeconds(setsBetween(3, 43))).toBe(40 * 60);
   });
 });

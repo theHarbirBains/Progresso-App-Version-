@@ -46,6 +46,8 @@ jest.mock('../lib/avatarUpload', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+  // A workout with cardio's total time: none unless a test says.
+  fetchWorkoutCardioTimes: jest.fn(async () => new Map()),
 }));
 
 // The shared food log keeps a logged food in the library first (foodQueries.keepInLibrary);

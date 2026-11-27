@@ -39,6 +39,15 @@ describe('computeMonthSummary', () => {
     });
   });
 
+  it('counts a workout with cardio at its total time -- strength training and cardio together', () => {
+    const workouts = [
+      workout({ id: 'w1', durationMinutes: 48, totalMinutes: 100, cardio: [{} as never] }),
+      // No cardio: start to finish, whatever else it carries.
+      workout({ id: 'w2', durationMinutes: 60, totalMinutes: null }),
+    ];
+    expect(computeMonthSummary(workouts).totalMinutes).toBe(160);
+  });
+
   it('treats a null duration as zero rather than breaking the sum', () => {
     const workouts = [workout({ durationMinutes: null, completedSetCount: 5 })];
     expect(computeMonthSummary(workouts)).toEqual({

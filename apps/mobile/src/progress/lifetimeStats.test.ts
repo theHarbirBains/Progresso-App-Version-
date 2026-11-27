@@ -38,6 +38,19 @@ describe('computeLifetimeStats', () => {
     expect(stats.totalMinutes).toBe(90);
   });
 
+  it('takes a workout with cardio at its total time where it was read', () => {
+    const stats = computeLifetimeStats([
+      // 48 minutes start to finish, with an hour of cardio done outside it: 1h 40m in all.
+      workout({
+        performedAt: '2026-01-01T10:00:00Z',
+        completedAt: '2026-01-01T10:48:00Z',
+        totalMinutes: 100,
+      }),
+      workout({ performedAt: '2026-01-02T10:00:00Z', completedAt: '2026-01-02T10:30:00Z' }),
+    ]);
+    expect(stats.totalMinutes).toBe(130);
+  });
+
   it('counts only workouts performed in the current calendar month', () => {
     const now = new Date('2026-03-15T12:00:00Z');
     const stats = computeLifetimeStats(

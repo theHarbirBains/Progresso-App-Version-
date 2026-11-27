@@ -6,7 +6,7 @@ import {
   fetchAllOneRepMaxes,
   fetchAllRepPRs,
 } from '../workouts/prSummaryQueries';
-import { fetchAllCompletedWorkouts } from './progressStatsQueries';
+import { fetchAllCompletedWorkouts, fetchWorkoutCardioTimes } from './progressStatsQueries';
 import { AllTimeStatsProvider, useAllTimeStats } from './AllTimeStatsProvider';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -15,6 +15,8 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('./progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+  // A workout with cardio's total time: none unless a test says.
+  fetchWorkoutCardioTimes: jest.fn(async () => new Map()),
 }));
 
 jest.mock('../workouts/allExerciseHistoryQueries', () => ({
@@ -72,6 +74,44 @@ describe('AllTimeStatsProvider', () => {
   // ProgressOverviewScreen each fetched the user's whole history
   // independently on every focus -- two consumers reading the same context
   // must only cost one fetch of each query.
+  it('gives a workout with cardio its total time -- the strength training and the cardio together', async () => {
+    mockFetchAllCompletedWorkouts.mockResolvedValue([
+      {
+        id: 'chest',
+        name: 'Chest',
+        performedAt: '2026-01-01T10:00:00Z',
+        completedAt: '2026-01-01T10:48:00Z',
+        workoutSplitDayId: null,
+      },
+      sampleWorkout,
+    ]);
+    // 40 minutes of lifting in its 48, and an hour of treadmill done outside it.
+    const sets = Array.from({ length: 11 }, (_, i) =>
+      new Date(Date.parse('2026-01-01T10:03:00Z') + i * 4 * 60_000).toISOString(),
+    );
+    jest
+      .mocked(fetchWorkoutCardioTimes)
+      .mockResolvedValueOnce(
+        new Map([
+          ['chest', { cardio: [{ durationSeconds: 3600 }], setTimes: sets, hasStrength: true }],
+        ]),
+      );
+    const { result } = renderHook(() => useAllTimeStats(), { wrapper: AllTimeStatsProvider });
+    await waitFor(() => expect(result.current.statsLoading).toBe(false));
+
+    expect(result.current.allWorkouts[0]).toMatchObject({ id: 'chest', totalMinutes: 100 });
+    expect(result.current.allWorkouts[1]).toEqual(sampleWorkout);
+  });
+
+  it('keeps every workout start to finish when the cardio cannot be read', async () => {
+    jest.mocked(fetchWorkoutCardioTimes).mockRejectedValueOnce(new Error('offline'));
+    const { result } = renderHook(() => useAllTimeStats(), { wrapper: AllTimeStatsProvider });
+    await waitFor(() => expect(result.current.statsLoading).toBe(false));
+
+    expect(result.current.statsError).toBeNull();
+    expect(result.current.allWorkouts).toEqual([sampleWorkout]);
+  });
+
   it('fetches only once, even with multiple consumers reading the same context', async () => {
     function ConsumerA() {
       useAllTimeStats();

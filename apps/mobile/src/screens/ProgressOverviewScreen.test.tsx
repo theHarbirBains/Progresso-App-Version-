@@ -65,6 +65,8 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+  // A workout with cardio's total time: none unless a test says.
+  fetchWorkoutCardioTimes: jest.fn(async () => new Map()),
   fetchWorkoutIdForSet: jest.fn(),
 }));
 

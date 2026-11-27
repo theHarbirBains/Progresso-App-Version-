@@ -11,7 +11,13 @@ export function computeMonthSummary(workouts: EnrichedWorkoutSummary[]): MonthSu
   return workouts.reduce<MonthSummary>(
     (acc, workout) => ({
       totalWorkouts: acc.totalWorkouts + 1,
-      totalMinutes: acc.totalMinutes + (workout.durationMinutes ?? 0),
+      // With cardio, its total time: the strength training and the cardio together, as its row
+      // and its page show it (cardio/workoutTime.ts).
+      totalMinutes:
+        acc.totalMinutes +
+        ((workout.cardio?.length ?? 0) > 0
+          ? (workout.totalMinutes ?? workout.durationMinutes ?? 0)
+          : (workout.durationMinutes ?? 0)),
       totalSets: acc.totalSets + workout.completedSetCount,
     }),
     { totalWorkouts: 0, totalMinutes: 0, totalSets: 0 },

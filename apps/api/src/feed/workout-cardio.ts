@@ -144,6 +144,13 @@ export function totalMinutes(workout: {
     workout.completedAt === null ? 0 : secondsBetween(workout.performedAt, workout.completedAt);
   if (span === 0) return null;
   const lifting = Math.min(span, liftingSeconds(workout.setTimes ?? []));
-  const within = Math.min(cardioSeconds, span - lifting);
+  // No lifting measured (sets logged after the fact share one time): cardio that fits in the time
+  // typed was done within it; cardio as long as all of it or longer was done outside it.
+  const within =
+    lifting > 0
+      ? Math.min(cardioSeconds, span - lifting)
+      : cardioSeconds < span
+        ? cardioSeconds
+        : 0;
   return Math.round((span + cardioSeconds - within) / 60);
 }

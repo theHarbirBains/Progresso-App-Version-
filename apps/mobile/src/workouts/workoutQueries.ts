@@ -55,6 +55,12 @@ export interface WorkoutSummary {
   performedAt: string;
   completedAt: string | null;
   workoutSplitDayId: string | null;
+  /**
+   * With cardio, its total time in minutes -- the strength training and the cardio together
+   * (cardio/workoutTime.ts), where it's been read; absent otherwise, when its time is start to
+   * finish.
+   */
+  totalMinutes?: number | null;
 }
 
 export interface SetRecord {

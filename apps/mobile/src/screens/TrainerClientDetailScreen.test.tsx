@@ -45,6 +45,8 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn().mockResolvedValue([]),
+  // A workout with cardio's total time: none unless a test says.
+  fetchWorkoutCardioTimes: jest.fn(async () => new Map()),
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({

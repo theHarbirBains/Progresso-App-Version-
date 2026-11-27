@@ -92,16 +92,37 @@ describe('workoutTimes', () => {
     ).toEqual({ totalSeconds: 3600, strengthSeconds: 3600, cardioSeconds: 0 });
   });
 
-  it('takes the cardio as the total where it comes to more than the workout lasted', () => {
-    // Started, then finished 20 minutes later with 30 minutes of cardio typed in.
+  it('adds cardio longer than a past-logged workout to it -- fitting cardio stays within', () => {
+    // Logged after the fact: its sets share one time, so no lifting is measured.
+    const logged = {
+      performedAt: start,
+      hasStrength: true,
+      setTimes: [start, start, start],
+    };
+    // 45 minutes typed, with an hour on the treadmill: it can't have been within the 45.
     expect(
       workoutTimes({
-        performedAt: start,
-        completedAt: '2026-11-20T10:20:00Z',
-        hasStrength: true,
+        ...logged,
+        completedAt: '2026-11-20T10:45:00Z',
+        cardio: [{ durationSeconds: 3600 }],
+      }),
+    ).toEqual({ totalSeconds: 105 * 60, strengthSeconds: 45 * 60, cardioSeconds: 3600 });
+    // As long as the whole of it: on top too, with lifting in it as well.
+    expect(
+      workoutTimes({
+        ...logged,
+        completedAt: '2026-11-20T10:30:00Z',
         cardio: [{ durationSeconds: 1800 }],
       }),
-    ).toEqual({ totalSeconds: 1800, strengthSeconds: 0, cardioSeconds: 1800 });
+    ).toEqual({ totalSeconds: 60 * 60, strengthSeconds: 30 * 60, cardioSeconds: 1800 });
+    // An hour typed with 25 minutes of cardio: within it.
+    expect(
+      workoutTimes({
+        ...logged,
+        completedAt: '2026-11-20T11:00:00Z',
+        cardio: [{ durationSeconds: 1500 }],
+      }),
+    ).toEqual({ totalSeconds: 3600, strengthSeconds: 35 * 60, cardioSeconds: 1500 });
   });
 
   /** Sets finished every few minutes, from one minute after the start to another. */

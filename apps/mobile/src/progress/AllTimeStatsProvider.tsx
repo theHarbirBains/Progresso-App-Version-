@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+
+import { totalMinutesOf } from '../cardio/workoutTime';
 import { useSignedInResource } from '../lib/useSignedInResource';
 import {
   fetchAllExerciseHistory,
@@ -14,7 +16,11 @@ import {
   type RepPRWithExercise,
 } from '../workouts/prSummaryQueries';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
-import { fetchAllCompletedWorkouts } from './progressStatsQueries';
+import {
+  fetchAllCompletedWorkouts,
+  fetchWorkoutCardioTimes,
+  type WorkoutCardioTimes,
+} from './progressStatsQueries';
 
 export interface AllTimeStatsContextValue {
   allWorkouts: WorkoutSummary[];
@@ -49,11 +55,29 @@ const EMPTY_STATS: StatsGroup = { allWorkouts: [], allSetHistory: [] };
 const EMPTY_PRS: PrsGroup = { repPRs: [], oneRepMaxes: [], exerciseRecords: [] };
 
 async function fetchStatsGroup(userId: string): Promise<StatsGroup> {
-  const [allWorkouts, allSetHistory] = await Promise.all([
+  const [allWorkouts, allSetHistory, cardioTimes] = await Promise.all([
     fetchAllCompletedWorkouts(userId),
     fetchAllExerciseHistory(userId),
+    // A workout with cardio's total time -- its strength training and its cardio together, the
+    // same as its own page shows. Without it, every workout's time is start to finish.
+    fetchWorkoutCardioTimes(userId).catch(() => new Map<string, WorkoutCardioTimes>()),
   ]);
-  return { allWorkouts, allSetHistory };
+  return {
+    allWorkouts: allWorkouts.map((workout) => {
+      const times = cardioTimes.get(workout.id);
+      return times
+        ? {
+            ...workout,
+            totalMinutes: totalMinutesOf({
+              performedAt: workout.performedAt,
+              completedAt: workout.completedAt,
+              ...times,
+            }),
+          }
+        : workout;
+    }),
+    allSetHistory,
+  };
 }
 
 async function fetchPrsGroup(userId: string): Promise<PrsGroup> {

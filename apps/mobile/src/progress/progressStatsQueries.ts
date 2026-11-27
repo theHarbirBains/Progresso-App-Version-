@@ -1,4 +1,4 @@
-import { fetchAllRows } from '../lib/fetchAllRows';
+import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import { toWorkoutSummary, type WorkoutSummary } from '../workouts/workoutQueries';
 
@@ -45,4 +45,78 @@ export async function fetchWorkoutIdForSet(setId: string): Promise<string | null
 
   const embedded = data.workout_exercises as unknown as { workout_id: string } | null;
   return embedded?.workout_id ?? null;
+}
+
+/** What a workout with cardio's total time is worked out from (workoutTime.ts). */
+export interface WorkoutCardioTimes {
+  cardio: { durationSeconds: number }[];
+  /** When each of its finished sets was finished, warm-ups and drops too. */
+  setTimes: string[];
+  /** Whether it has a working set finished -- with none, it's cardio alone. */
+  hasStrength: boolean;
+}
+
+/**
+ * Each of the person's workouts with cardio -- its activities' times and its sets' -- for totals
+ * over many workouts (a lifetime's time). A workout without cardio isn't in it: its time is start
+ * to finish.
+ */
+export async function fetchWorkoutCardioTimes(
+  userId: string,
+): Promise<Map<string, WorkoutCardioTimes>> {
+  const cardioRows = await fetchAllRows<{
+    id: string;
+    workout_id: string;
+    duration_seconds: number;
+  }>((from, to) =>
+    supabase
+      .from('workout_cardio')
+      .select('id, workout_id, duration_seconds', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('id')
+      .range(from, to),
+  );
+  const times = new Map<string, WorkoutCardioTimes>();
+  for (const row of cardioRows) {
+    const entry = times.get(row.workout_id) ?? { cardio: [], setTimes: [], hasStrength: false };
+    entry.cardio.push({ durationSeconds: Number(row.duration_seconds) });
+    times.set(row.workout_id, entry);
+  }
+  if (times.size === 0) return times;
+
+  const exerciseRows = await fetchAllRowsForIds<{ id: string; workout_id: string }>(
+    [...times.keys()],
+    (ids, from, to) =>
+      supabase
+        .from('workout_exercises')
+        .select('id, workout_id', { count: 'exact' })
+        .in('workout_id', ids)
+        .is('deleted_at', null)
+        .order('id')
+        .range(from, to),
+  );
+  const workoutOf = new Map(exerciseRows.map((row) => [row.id, row.workout_id]));
+  if (workoutOf.size === 0) return times;
+  const setRows = await fetchAllRowsForIds<{
+    id: string;
+    workout_exercise_id: string;
+    completed_at: string;
+    is_warmup: boolean | null;
+  }>([...workoutOf.keys()], (ids, from, to) =>
+    supabase
+      .from('sets')
+      .select('id, workout_exercise_id, completed_at, is_warmup', { count: 'exact' })
+      .in('workout_exercise_id', ids)
+      .is('deleted_at', null)
+      .not('completed_at', 'is', null)
+      .order('id')
+      .range(from, to),
+  );
+  for (const row of setRows) {
+    const entry = times.get(workoutOf.get(row.workout_exercise_id) ?? '');
+    if (!entry) continue;
+    entry.setTimes.push(row.completed_at);
+    if (row.is_warmup !== true) entry.hasStrength = true;
+  }
+  return times;
 }

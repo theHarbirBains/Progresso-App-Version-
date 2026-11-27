@@ -7,7 +7,9 @@ import type { WorkoutSummary } from '../workouts/workoutQueries';
 // its own, mirroring the same pattern as exerciseProgress.ts/
 // muscleGroupProgress.ts. Duration is workouts.completed_at minus
 // performed_at (topSetSummary's computeDurationMinutes), none for a workout
-// still going.
+// still going -- or, for a workout with cardio, its total time where it's been
+// read (`totalMinutes`: the strength training and the cardio together,
+// cardio/workoutTime.ts).
 
 export interface LifetimeStats {
   totalWorkouts: number;
@@ -26,7 +28,7 @@ export function computeLifetimeStats(
 ): LifetimeStats {
   const totalWorkouts = workouts.length;
   const totalMinutes = workouts.reduce(
-    (sum, w) => sum + (computeDurationMinutes(w.performedAt, w.completedAt) ?? 0),
+    (sum, w) => sum + (w.totalMinutes ?? computeDurationMinutes(w.performedAt, w.completedAt) ?? 0),
     0,
   );
   const firstWorkoutAt = workouts[0]?.performedAt ?? null;
