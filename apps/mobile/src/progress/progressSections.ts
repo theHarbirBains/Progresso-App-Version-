@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { HEALTH_PREVIEW_ENABLED } from '../health/preview/healthPreview';
 
 // Progress's sections/tabs, per the current approved product scope --
 // Strength (removed: Progress has no line graphs), History/Volume/
@@ -17,13 +18,23 @@ export const PROGRESS_SECTIONS = [
   { key: 'Cardio', label: 'Cardio', icon: 'activity' },
   { key: 'AllTime', label: 'All Time', icon: 'calendar' },
   { key: 'Steps', label: 'Steps', icon: 'trending-up' },
+  // PHASE 1 PROTOTYPE (Harbir's Health & Wearables brief): sample data, shown only in development
+  // builds (ownProgressSections) -- never on TestFlight or the App Store.
+  { key: 'Health', label: 'Health', icon: 'heart' },
 ] as const;
 
 export type ProgressSection = (typeof PROGRESS_SECTIONS)[number]['key'];
 
-/** The person's own Progress tabs: Steps only where Apple Health can be (iPhone). */
-export function ownProgressSections() {
-  return PROGRESS_SECTIONS.filter((section) => section.key !== 'Steps' || Platform.OS === 'ios');
+/**
+ * The person's own Progress tabs: Steps only where Apple Health can be (iPhone), and Health -- a
+ * prototype for now -- only in development builds.
+ */
+export function ownProgressSections(healthPreview = HEALTH_PREVIEW_ENABLED) {
+  return PROGRESS_SECTIONS.filter(
+    (section) =>
+      (section.key !== 'Steps' || Platform.OS === 'ios') &&
+      (section.key !== 'Health' || healthPreview),
+  );
 }
 
 /**
@@ -31,5 +42,9 @@ export function ownProgressSections() {
  * and no Cardio or Muscles tab yet.
  */
 export const CLIENT_PROGRESS_SECTIONS = PROGRESS_SECTIONS.filter(
-  (section) => section.key !== 'Steps' && section.key !== 'Cardio' && section.key !== 'Muscles',
+  (section) =>
+    section.key !== 'Steps' &&
+    section.key !== 'Cardio' &&
+    section.key !== 'Muscles' &&
+    section.key !== 'Health',
 );

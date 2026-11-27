@@ -1,3 +1,4 @@
+import type { HealthPreviewParams } from '../health/preview/healthPreview';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MontageItem } from '../lib/api';
 import type { ProgressSection } from '../progress/progressSections';
@@ -129,6 +130,8 @@ export type RootStackParamList = {
   /** Progress, on a section (Feed's Daily Steps widget opens Steps); Overview when absent. */
   ProgressOverview: { section?: ProgressSection } | undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
+  /** Health's deeper pages -- PHASE 1 PROTOTYPE, sample data, development builds only. */
+  HealthPreview: HealthPreviewParams;
   /** Workout Splits, on its My Splits or Programs tab (My Splits when absent). */
   WorkoutSplits: { tab?: 'splits' | 'programs' } | undefined;
   WorkoutSplitView: { splitId: string };

@@ -7,6 +7,7 @@ import { SkeletonCards } from '../design/Skeleton';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { UnderlineTabs } from '../design/UnderlineTabs';
+import { HealthOverview } from '../health/preview/HealthOverview';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { RiseIn, RiseInGroup } from '../design/RiseIn';
@@ -250,6 +251,16 @@ export function ProgressOverviewScreen({ navigation, route }: Props) {
             {/* Steps: the phone's own, from Apple Health -- read as the tab opens. */}
             {contentReady && activeSection === 'Steps' ? (
               <StepsSection accentColor={theme.accent} />
+            ) : null}
+
+            {/* Health: a Phase 1 prototype, sample data, development builds only. */}
+            {contentReady && activeSection === 'Health' ? (
+              <HealthOverview
+                accent={theme.accent}
+                onOpen={(page, scenario, metric) =>
+                  navigation.navigate('HealthPreview', { page, scenario, metric })
+                }
+              />
             ) : null}
 
             {/* All Time: the workouts' all-time figures, or nutrition's -- two tabs of one section. */}

@@ -105,6 +105,7 @@ import { getWelcomeStage, setWelcomeStage, useWelcomeStage } from './src/onboard
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDetailScreen';
+import { HealthPreviewScreen } from './src/screens/HealthPreviewScreen';
 import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecurityScreen';
@@ -511,6 +512,8 @@ function Root() {
                     name="ProgressExerciseDetail"
                     component={ProgressExerciseDetailScreen}
                   />
+                  {/* Health's pages: a Phase 1 prototype, opened only from development builds. */}
+                  <Stack.Screen name="HealthPreview" component={HealthPreviewScreen} />
                   <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
                   {/* Workout Programs (programs/programScreens.ts) -- onboarding's sheet has them too. */}
                   {PROGRAM_SCREENS.map((screen) => (
